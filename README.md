@@ -1,5 +1,10 @@
 # InstallKit
 
+[![NuGet](https://img.shields.io/nuget/vpre/InstallKit.Sdk?label=InstallKit.Sdk)](https://www.nuget.org/packages/InstallKit.Sdk)
+[![NuGet downloads](https://img.shields.io/nuget/dt/InstallKit.Sdk)](https://www.nuget.org/packages/InstallKit.Sdk)
+[![CI](https://github.com/lucavoit/InstallKit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lucavoit/InstallKit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/lucavoit/InstallKit)](LICENSE)
+
 Build Windows installers (MSI and setup `.exe` bundles) with plain C# and `dotnet build`. InstallKit sits on top of [WixSharp](https://github.com/oleg-shilo/wixsharp) and the [WiX Toolset](https://wixtoolset.org/), and adds a fluent API, an MSBuild SDK, a native modern installer UI, install-time C# handlers and ready-made Azure DevOps pipeline templates.
 
 > **Status: early preview (0.1).** The API may still change between releases. Feedback and issues are welcome.
@@ -40,7 +45,7 @@ return InstallerHost.Run(args, plan =>
 ```
 
 ```xml
-<Project Sdk="InstallKit.Sdk/0.1.0">
+<Project Sdk="InstallKit.Sdk/0.1.0-preview.1">
   <ItemGroup>
     <InstallerPayload Include="..\MyApp\MyApp.csproj" PublishProperties="RuntimeIdentifier=win-x64;SelfContained=true" />
   </ItemGroup>
@@ -74,20 +79,11 @@ You can still set properties directly, with `plan.Msi("My App", msi => { msi.Man
 
 ## Getting started
 
-InstallKit is not published to nuget.org yet. Until it is, build the packages from this repository and add them to a local NuGet feed:
+The packages are on [nuget.org](https://www.nuget.org/packages?q=InstallKit). While InstallKit is a preview, name the version explicitly (a bare `0.1.0` is not the same version as `0.1.0-preview.1`):
 
 ```bash
-git clone https://github.com/lucavoit/InstallKit
-cd InstallKit
-dotnet pack InstallKit.slnx -c Release     # packages end up in artifacts/packages
-dotnet nuget add source "$(pwd)/artifacts/packages" --name installkit-local
-```
-
-Then create and build an installer project:
-
-```bash
-dotnet new install InstallKit.Templates
-dotnet new installkit -n MyApp.Installer --product "My App" --manufacturer Contoso --payload ../MyApp/MyApp.csproj --bundle
+dotnet new install InstallKit.Templates::0.1.0-preview.1
+dotnet new installkit -n MyApp.Installer --sdkVersion 0.1.0-preview.1 --product "My App" --manufacturer Contoso --payload ../MyApp/MyApp.csproj --bundle
 # add --engine WixSharpCore for the .NET 10 preview engine
 # once per repository: pin the WiX toolset
 dotnet new tool-manifest
@@ -121,7 +117,7 @@ return InstallerHost.Run(args, plan =>
 ```
 
 ```xml
-<Project Sdk="InstallKit.Sdk/0.1.0">
+<Project Sdk="InstallKit.Sdk/0.1.0-preview.1">
   <!-- No InstallerPayload: the files come from outside this repository. -->
 </Project>
 ```
