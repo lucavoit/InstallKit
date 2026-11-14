@@ -431,7 +431,9 @@ namespace InstallKit.WixSharp
                     throw new NotSupportedException($"The WixSharp engine does not support chain items of type {item.GetType().Name}.");
             }
 
-            result.Vital = item.Vital;
+            // WiX rejects Vital on a PackageGroupRef (the .NET Framework prerequisite); packages accept it.
+            if (!(result is PackageGroupRef))
+                result.Vital = item.Vital;
             return result;
         }
 
