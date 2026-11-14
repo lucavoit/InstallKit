@@ -116,3 +116,43 @@ jobs:
         with:
           name: qa-${{ matrix.engine }}
           path: ${{ env.QA_DIR }}
+
+  # A user without a monorepo: an installer project outside this repository, built only from the
+  # packed NuGet packages and the template, with the payload taken from a folder another pipeline made.
+  consumer:
+    name: Consumer (${{ matrix.engine }})
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [ WixSharp, WixSharpCore ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: ${{ runner.temp }}/packages
+
+      - name: Build the consumer installer from the packed packages
+        shell: pwsh
+        run: ./qa/consumer/Build-Consumer.ps1 -PackagesDir "${{ runner.temp }}/packages" -WorkDir "${{ runner.temp }}/consumer" -Engine ${{ matrix.engine }}
+
+      - name: Install and uninstall it and assert
+        shell: pwsh
+        run: |
+          $container = New-PesterContainer -Path qa/tests/Consumer.Tests.ps1 -Data @{ OutDir = "${{ runner.temp }}/consumer/out"; LogDir = "${{ runner.temp }}/consumer/logs" }
+          Invoke-Pester -Container $container -Output Detailed -CI
+
+      - name: Upload installers and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: consumer-${{ matrix.engine }}
+          path: ${{ runner.temp }}/consumer/out
