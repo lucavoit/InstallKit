@@ -1,0 +1,72 @@
+# QA for InstallKit: builds the QA demo installer twice (1.0.0 and 1.1.0) with each engine, then installs,
+# upgrades, repairs and uninstalls it on the Windows agent and asserts the outcome with Pester
+# (qa/tests/Installer.Tests.ps1). Results show up in the pipeline's Tests tab.
+#
+# The tests change the machine (Program Files, a service, shortcuts), so run them on Microsoft-hosted
+# agents only, never on a self-hosted agent you care about.
+trigger:
+  branches:
+    include: [ main ]
+
+pr:
+  branches:
+    include: [ main ]
+
+parameters:
+  - name: engines
+    type: object
+    default:
+      - name: WixSharp
+        project: qa/QaDemo.Installer/QaDemo.Installer.csproj
+      - name: WixSharpCore
+        project: qa/QaDemo.Installer.Core/QaDemo.Installer.Core.csproj
+
+stages:
+  - stage: QA
+    jobs:
+      - ${{ each engine in parameters.engines }}:
+          - job: Qa_${{ engine.name }}
+            displayName: QA (${{ engine.name }} engine)
+            pool:
+              vmImage: windows-latest
+            timeoutInMinutes: 60
+            variables:
+              v1Dir: $(Build.ArtifactStagingDirectory)/qa/1.0.0
+              v2Dir: $(Build.ArtifactStagingDirectory)/qa/1.1.0
+              logDir: $(Build.ArtifactStagingDirectory)/qa/logs
+            steps:
+              - checkout: self
+                fetchDepth: 1
+
+              - template: ../pipelines/steps/setup-tools.yml
+
+              - template: ../pipelines/steps/build-installer.yml
+                parameters:
+                  setupProject: ${{ engine.project }}
+                  version: 1.0.0
+                  outputDirectory: $(v1Dir)
+
+              - template: ../pipelines/steps/build-installer.yml
+                parameters:
+                  setupProject: ${{ engine.project }}
+                  version: 1.1.0
+                  outputDirectory: $(v2Dir)
+
+              - pwsh: ./qa/tests/Invoke-Qa.ps1 -V1 '$(v1Dir)' -V2 '$(v2Dir)' -LogDir '$(logDir)' -ResultFile '$(Agent.TempDirectory)/qa-results.xml'
+                displayName: Install, upgrade, repair, uninstall and assert
+
+              - task: PublishTestResults@2
+                displayName: Publish QA results
+                condition: always()
+                inputs:
+                  testResultsFormat: NUnit
+                  testResultsFiles: $(Agent.TempDirectory)/qa-results.xml
+                  testRunTitle: QA ${{ engine.name }}
+                  failTaskOnFailedTests: true
+
+              - task: PublishPipelineArtifact@1
+                displayName: Publish installers and install logs
+                condition: always()
+                inputs:
+                  targetPath: $(Build.ArtifactStagingDirectory)/qa
+                  artifact: qa-${{ engine.name }}-$(System.JobAttempt)

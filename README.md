@@ -70,6 +70,7 @@ You can still set properties directly, with `plan.Msi("My App", msi => { msi.Man
 | `pipelines/` | Azure DevOps step, job and stage templates. |
 | `samples/` | A Windows service with an MSI and a bundle, plus an example `azure-pipelines.yml`. |
 | `tests/` | Unit tests for the model, version handling and validation. |
+| `qa/` | End-to-end QA: a demo installer that uses most features, plus Pester tests that install, upgrade, repair and uninstall it on a Windows agent. |
 
 ## Getting started
 
@@ -361,6 +362,24 @@ Issues and pull requests are welcome. Please open an issue first for larger chan
 
 ```bash
 dotnet test tests/InstallKit.Abstractions.Tests -c Release
+```
+
+## QA
+
+[`qa/azure-pipelines.yml`](qa/azure-pipelines.yml) builds the QA demo installer as 1.0.0 and 1.1.0 with each engine, then runs [`qa/tests/Installer.Tests.ps1`](qa/tests/Installer.Tests.ps1) on a Microsoft-hosted Windows agent. It checks:
+
+- **Install:** the Add/Remove Programs entry, payload and extra files, Start menu and desktop shortcuts, the running service, the `OnAfterInstall` handler and `RunAfterInstall` command, and a property passed on the command line.
+- **Upgrade:** 1.1.0 replaces 1.0.0, and `RunBeforeUninstall` does not run.
+- **Repair:** a deleted file is restored.
+- **Uninstall:** `RunBeforeUninstall` runs, and the service, files, shortcuts and Add/Remove Programs entry are removed.
+- **Bundle:** `QaDemoSetup.exe` installs and uninstalls the same product.
+
+The tests change the machine, so only run them on a disposable one. Locally, from an elevated PowerShell:
+
+```powershell
+dotnet build qa/QaDemo.Installer -c Release -p:Version=1.0.0 -p:InstallKitOutputDir=$PWD/out/1.0.0/
+dotnet build qa/QaDemo.Installer -c Release -p:Version=1.1.0 -p:InstallKitOutputDir=$PWD/out/1.1.0/
+./qa/tests/Invoke-Qa.ps1 -V1 out/1.0.0 -V2 out/1.1.0
 ```
 
 ## License
