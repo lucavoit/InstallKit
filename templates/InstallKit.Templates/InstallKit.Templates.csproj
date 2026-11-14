@@ -10,6 +10,7 @@
     <NoWarn>$(NoWarn);NU5128</NoWarn>
     <Description>dotnet new templates for InstallKit installer projects.</Description>
     <EnableDefaultItems>false</EnableDefaultItems>
+    <PackageTags>dotnet-new;templates;installer;msi;wix;wixsharp;windows</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="content\**" Exclude="content\**\bin\**;content\**\obj\**" />

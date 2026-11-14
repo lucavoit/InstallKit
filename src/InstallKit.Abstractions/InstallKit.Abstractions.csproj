@@ -8,6 +8,9 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>InstallKit</RootNamespace>
     <Description>Engine-neutral installer model for InstallKit (MSI packages and bundles).</Description>
+    <!-- Symbol package (.snupkg) next to the .nupkg, pushed to the nuget.org symbol server. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <!--
