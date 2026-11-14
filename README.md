@@ -97,6 +97,43 @@ dotnet build MyApp.Installer -p:Version=1.0.0
 
 Building the MSI requires **Windows** (WiX and the .NET Framework engine). On other OSes the build stops with `IK003`. You can set `InstallKitBuildOnBuild=false` there, which still compiles the project.
 
+## Using your own build output
+
+You don't need a monorepo, and you don't need InstallKit to build your application. If your pipeline already produces the files to ship (a `dotnet publish` folder, a build artifact, files downloaded from another job), leave out `<InstallerPayload>` and give the installer the folder's path:
+
+```csharp
+using InstallKit;
+
+// The pipeline that built the application passes the folder in.
+var appDir = Environment.GetEnvironmentVariable("APP_PUBLISH_DIR")
+    ?? throw new InvalidOperationException("Set APP_PUBLISH_DIR to the published application folder.");
+
+return InstallerHost.Run(args, plan =>
+{
+    plan.Msi(MsiBuilder.Create("My App")
+        .WithManufacturer("Contoso")
+        .WithUpgradeCode("0b6f9a8e-3c1d-4e57-9a43-6d2f1c8b7e10")
+        .WithDirectory(appDir)                 // every file in the folder, keeping its structure
+        .WithMainExecutable("MyApp.exe"));     // relative to the folder; gets the Start menu shortcut
+});
+```
+
+```xml
+<Project Sdk="InstallKit.Sdk/0.1.0">
+  <!-- No InstallerPayload: the files come from outside this repository. -->
+</Project>
+```
+
+```bash
+APP_PUBLISH_DIR=/path/to/publish dotnet build MyApp.Installer -p:Version=1.2.3
+```
+
+- **Any path works:** absolute or relative, on any drive. A relative path is relative to the installer project folder, so prefer absolute paths from a pipeline.
+- **Checked before WiX runs:** a folder that doesn't exist fails with `IK112`, and an MSI with no files at all fails with `IK110`.
+- **Mix and match:** call `WithDirectory` several times, optionally with a target subfolder (`.WithDirectory(docsDir, "docs")`), and combine it with `WithPayload`.
+- **Existing installers in a bundle:** `WithMsi("path.msi")` chains an MSI that was built elsewhere, and `WithExe(path, ...)` chains any other setup program.
+- **Your pipeline:** the build only needs a Windows agent, the .NET SDK and the pinned `wix` tool (`dotnet tool restore`). The Azure DevOps templates in `pipelines/` are optional.
+
 ## How it works
 
 1. `dotnet build` compiles the installer project as a small .NET Framework console app.
@@ -373,6 +410,8 @@ The `qa` jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) build th
 - **Repair:** a deleted file is restored.
 - **Uninstall:** `RunBeforeUninstall` runs, and the service, files, shortcuts and Add/Remove Programs entry are removed.
 - **Bundle:** `QaDemoSetup.exe` installs and uninstalls the same product.
+
+A separate `consumer` job checks the route a user without a monorepo takes. [`qa/consumer/Build-Consumer.ps1`](qa/consumer/Build-Consumer.ps1) creates an installer project outside this repository from the packed NuGet packages and the `dotnet new installkit` template, points it at a folder of prebuilt files, and builds an MSI and a bundle. [`qa/tests/Consumer.Tests.ps1`](qa/tests/Consumer.Tests.ps1) then installs and removes it. This is the test that proves the packages work without this repository.
 
 The tests change the machine, so only run them on a disposable one. Locally, from an elevated PowerShell:
 
