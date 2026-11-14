@@ -80,7 +80,7 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
     It 'registers exactly one product in Add/Remove Programs' {
         $entries = Get-MsiEntries
         $entries | Should -HaveCount 1
-        $entries[0].DisplayVersion | Should -Be '1.0.0'
+        $entries[0].DisplayVersion | Should -Be '1.0.0.0'
         $entries[0].Publisher | Should -Be 'InstallKit'
     }
 
@@ -126,7 +126,7 @@ Describe 'Major upgrade to 1.1.0 without MODE' {
     It 'replaces 1.0.0 instead of installing side by side' {
         $entries = Get-MsiEntries
         $entries | Should -HaveCount 1
-        $entries[0].DisplayVersion | Should -Be '1.1.0'
+        $entries[0].DisplayVersion | Should -Be '1.1.0.0'
     }
 
     It 'does not run RunBeforeUninstall during an upgrade' {
@@ -176,7 +176,7 @@ Describe 'Bundle (QaDemoSetup.exe) install and uninstall' {
     It 'registers the bundle in Add/Remove Programs' {
         $bundles = Get-BundleEntries
         $bundles | Should -HaveCount 1
-        $bundles[0].DisplayVersion | Should -Be '1.1.0'
+        $bundles[0].DisplayVersion | Should -Be '1.1.0.0'
     }
 
     It 'installs the chained MSI' {
