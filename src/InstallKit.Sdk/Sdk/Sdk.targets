@@ -32,9 +32,14 @@
     <InstallKitPayloadManifest>$(InstallKitIntermediateDir)payloads.txt</InstallKitPayloadManifest>
     <InstallKitOutputsFile>$(InstallKitIntermediateDir)outputs.txt</InstallKitOutputsFile>
 
-    <!-- Pinned wix version from the nearest .config/dotnet-tools.json. -->
+    <!--
+      Pinned wix version from the nearest tool manifest. Older SDKs create .config/dotnet-tools.json;
+      the .NET 10 SDK's `dotnet new tool-manifest` creates dotnet-tools.json in the root. Both are used by dotnet tool restore.
+    -->
     <_InstallKitToolRoot>$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildProjectDirectory)', '.config\dotnet-tools.json'))</_InstallKitToolRoot>
     <_InstallKitToolManifest Condition="'$(_InstallKitToolRoot)' != ''">$(_InstallKitToolRoot)\.config\dotnet-tools.json</_InstallKitToolManifest>
+    <_InstallKitToolRoot Condition="'$(_InstallKitToolManifest)' == ''">$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildProjectDirectory)', 'dotnet-tools.json'))</_InstallKitToolRoot>
+    <_InstallKitToolManifest Condition="'$(_InstallKitToolManifest)' == '' and '$(_InstallKitToolRoot)' != ''">$(_InstallKitToolRoot)\dotnet-tools.json</_InstallKitToolManifest>
     <InstallKitWixVersion Condition="'$(InstallKitWixVersion)' == '' and '$(_InstallKitToolManifest)' != ''">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(_InstallKitToolManifest)')), '"wix"\s*:\s*\{[^}]*?"version"\s*:\s*"([^"]+)"').Groups[1].Value)</InstallKitWixVersion>
     <_InstallKitWixMajor Condition="'$(InstallKitWixVersion)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(InstallKitWixVersion)', '^\d+').Value)</_InstallKitWixMajor>
   </PropertyGroup>
@@ -76,7 +81,7 @@
 
   <Target Name="InstallKitRestoreTools" Condition="'$(InstallKitRestoreTools)' == 'true'">
     <Warning Code="IK002" Condition="'$(_InstallKitToolManifest)' == ''"
-             Text="No .config/dotnet-tools.json with a pinned wix version was found. Run 'dotnet new tool-manifest' and 'dotnet tool install wix --version 6.0.2' at the repository root." />
+             Text="No dotnet-tools.json (or .config/dotnet-tools.json) with a pinned wix version was found. Run 'dotnet new tool-manifest' and 'dotnet tool install wix --version 6.0.2' at the repository root." />
     <Exec Command="dotnet tool restore" WorkingDirectory="$(_InstallKitToolRoot)" Condition="'$(_InstallKitToolManifest)' != ''" StandardOutputImportance="low" />
   </Target>
 
