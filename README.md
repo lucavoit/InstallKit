@@ -276,7 +276,7 @@ stages:
 
 Download a published installer with `az artifacts universal download --feed installers --name my-app --version 1.2.345 --path .`.
 
-[`azure-pipelines.yml`](azure-pipelines.yml) in this repository is InstallKit's own CI. It runs the tests, packs the NuGet packages, builds the sample with these templates and pushes the packages to a feed.
+These templates are for your own pipelines. InstallKit itself is built with GitHub Actions; see [Contributing](#contributing).
 
 ## What target machines need
 
@@ -358,7 +358,7 @@ Only WiX 6 and 7 are confirmed to work with WixSharp 2.14.2; test 5.0.2 before y
 
 ## Contributing
 
-Issues and pull requests are welcome. Please open an issue first for larger changes. Run the unit tests with:
+Issues and pull requests are welcome. Please open an issue first for larger changes. [CI](.github/workflows/ci.yml) runs on every pull request and push to `main`: unit tests, packing, both sample installers and the end-to-end QA. Run the unit tests locally with:
 
 ```bash
 dotnet test tests/InstallKit.Abstractions.Tests -c Release
@@ -366,7 +366,7 @@ dotnet test tests/InstallKit.Abstractions.Tests -c Release
 
 ## QA
 
-[`qa/azure-pipelines.yml`](qa/azure-pipelines.yml) builds the QA demo installer as 1.0.0 and 1.1.0 with each engine, then runs [`qa/tests/Installer.Tests.ps1`](qa/tests/Installer.Tests.ps1) on a Microsoft-hosted Windows agent. It checks:
+The `qa` jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) build the QA demo installer as 1.0.0 and 1.1.0 with each engine, then run [`qa/tests/Installer.Tests.ps1`](qa/tests/Installer.Tests.ps1) on a GitHub-hosted Windows runner. It checks:
 
 - **Install:** the Add/Remove Programs entry, payload and extra files, Start menu and desktop shortcuts, the running service, the `OnAfterInstall` handler and `RunAfterInstall` command, and a property passed on the command line.
 - **Upgrade:** 1.1.0 replaces 1.0.0, and `RunBeforeUninstall` does not run.
