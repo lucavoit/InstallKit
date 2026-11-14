@@ -55,7 +55,15 @@ Set-Content (Join-Path $solution 'nuget.config') @"
 "@
 Push-Location $solution
 try {
-    Run 'Pin the wix tool' { dotnet new tool-manifest | Out-Null; dotnet tool install wix --version $WixVersion }
+    Run 'Pin the wix tool' {
+        dotnet new tool-manifest | Out-Null
+        # The .NET 10 SDK writes dotnet-tools.json to the root; older SDKs write .config/dotnet-tools.json.
+        if (Test-Path 'dotnet-tools.json') {
+            New-Item -ItemType Directory -Force .config | Out-Null
+            Move-Item 'dotnet-tools.json' '.config/dotnet-tools.json'
+        }
+        dotnet tool install wix --version $WixVersion
+    }
 
     # 3. The project comes from the packed template, as in the README.
     Run 'Install the template package' { dotnet new install $templatePackage.FullName }
