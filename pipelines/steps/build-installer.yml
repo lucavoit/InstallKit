@@ -1,0 +1,35 @@
+# Builds an InstallKit installer project. The MSI/bundle land in outputDirectory.
+parameters:
+  - name: setupProject            # path to the installer .csproj
+    type: string
+  - name: version                 # product version, e.g. 1.4.$(Build.BuildId)
+    type: string
+  - name: configuration
+    type: string
+    default: Release
+  - name: outputDirectory
+    type: string
+    default: '$(Build.ArtifactStagingDirectory)/installer'
+  # Optional command run per file to sign it; {file} is replaced by the quoted path.
+  # MSIs are signed before bundles embed them; bundles get their engine signed too.
+  - name: signCommand
+    type: string
+    default: ''
+  - name: extraArguments          # extra dotnet build arguments
+    type: string
+    default: ''
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Build installer
+    inputs:
+      command: build
+      projects: ${{ parameters.setupProject }}
+      arguments: >-
+        -c ${{ parameters.configuration }}
+        -p:Version=${{ parameters.version }}
+        "-p:InstallKitOutputDir=${{ parameters.outputDirectory }}/"
+        ${{ parameters.extraArguments }}
+    env:
+      # Passed as an environment variable so quotes in the command survive.
+      INSTALLKIT_SIGN_COMMAND: ${{ parameters.signCommand }}

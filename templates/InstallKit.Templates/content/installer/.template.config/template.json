@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Luca",
+  "classifications": [
+    "Installer",
+    "MSI",
+    "WiX"
+  ],
+  "identity": "InstallKit.Installer",
+  "name": "InstallKit installer project",
+  "shortName": "installkit",
+  "description": "An installer project that builds an MSI (and optionally a setup bundle) with dotnet build.",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "MyProduct.Installer",
+  "preferNameDirectory": true,
+  "symbols": {
+    "product": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "My Product",
+      "replaces": "My Product",
+      "description": "Product name shown in Add/Remove Programs."
+    },
+    "manufacturer": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "My Company",
+      "replaces": "My Company"
+    },
+    "payload": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "..\\MyApp\\MyApp.csproj",
+      "replaces": "..\\MyApp\\MyApp.csproj",
+      "description": "Relative path to the project to install."
+    },
+    "payloadName": {
+      "type": "derived",
+      "valueSource": "payload",
+      "valueTransform": "projectFileName",
+      "replaces": "MyAppPayload"
+    },
+    "bundle": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Also produce a setup .exe bundle."
+    },
+    "sdkVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "0.1.0",
+      "replaces": "INSTALLKIT_SDK_VERSION"
+    },
+    "msiUpgradeCode": {
+      "type": "generated",
+      "generator": "guid",
+      "replaces": "11111111-1111-1111-1111-111111111111",
+      "parameters": {
+        "defaultFormat": "D"
+      }
+    },
+    "bundleUpgradeCode": {
+      "type": "generated",
+      "generator": "guid",
+      "replaces": "22222222-2222-2222-2222-222222222222",
+      "parameters": {
+        "defaultFormat": "D"
+      }
+    },
+    "engine": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "WixSharp",
+      "replaces": "INSTALLKIT_ENGINE",
+      "description": "Installer engine.",
+      "choices": [
+        {
+          "choice": "WixSharp",
+          "description": "WixSharp on .NET Framework 4.8 (all features)"
+        },
+        {
+          "choice": "WixSharpCore",
+          "description": "WixSharp.Core on .NET 10 (preview: no install events or modern UI yet)"
+        }
+      ]
+    }
+  },
+  "forms": {
+    "projectFileName": {
+      "identifier": "replace",
+      "pattern": "^.*[\\\\/]([^\\\\/]+)\\.csproj$",
+      "replacement": "$1"
+    }
+  }
+}

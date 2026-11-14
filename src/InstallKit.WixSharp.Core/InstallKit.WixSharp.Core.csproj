@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Preview engine: WixSharp.Core (.NET 10). It compiles the same engine source as InstallKit.WixSharp,
+    with INSTALLKIT_CORE defined, so both engines stay in step. Same namespace and type names, so user code
+    (including `using InstallKit.WixSharp;`) works unchanged with either engine.
+    Not supported: the WPF dialogs (ModernWpf falls back to the native Modern UI, IK200).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>InstallKit.WixSharp</RootNamespace>
+    <DefineConstants>$(DefineConstants);INSTALLKIT_CORE</DefineConstants>
+    <Description>WixSharp.Core (WiX 4+, .NET 10) engine for InstallKit. Preview.</Description>
+    <Nullable>annotations</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixSharp.Core" Version="2.14.2" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\InstallKit.Abstractions\InstallKit.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\InstallKit.WixSharp\WixSharpEngine.cs" Link="WixSharpEngine.cs" />
+    <Compile Include="..\InstallKit.WixSharp\BrandingImages.cs" Link="BrandingImages.cs" />
+    <Compile Include="..\InstallKit.WixSharp\WixSharpCustomizations.cs" Link="WixSharpCustomizations.cs" />
+    <Compile Include="..\InstallKit.WixSharp\ModernDialogs.cs" Link="ModernDialogs.cs" />
+  </ItemGroup>
+</Project>

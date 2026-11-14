@@ -1,0 +1,30 @@
+<Project>
+  <!--
+    InstallKit.Sdk: an installer project is a small console program that describes the MSI/bundle
+    with InstallKit; `dotnet build` compiles it, publishes the payload projects and runs it.
+  -->
+  <Import Project="InstallKit.Version.props" Condition="Exists('$(MSBuildThisFileDirectory)InstallKit.Version.props')" />
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <!-- The engine (InstallKitEngine) and its target framework are chosen in Sdk.targets, so the project can set them. -->
+    <OutputType>Exe</OutputType>
+    <LangVersion Condition="'$(LangVersion)' == ''">latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!-- Build the installer on every build. Turn off for fast inner-loop builds of the solution. -->
+    <InstallKitBuildOnBuild Condition="'$(InstallKitBuildOnBuild)' == ''">true</InstallKitBuildOnBuild>
+    <!-- Restore the pinned wix tool from .config/dotnet-tools.json before building. -->
+    <InstallKitRestoreTools Condition="'$(InstallKitRestoreTools)' == ''">true</InstallKitRestoreTools>
+    <!-- Keep the generated WiX source (.wxs) in obj/ for review and debugging. -->
+    <InstallKitEmitSource Condition="'$(InstallKitEmitSource)' == ''">true</InstallKitEmitSource>
+    <!-- Optional: command run per file, {file} is the path. See README "Signing". -->
+    <InstallKitSignCommand Condition="'$(InstallKitSignCommand)' == ''"></InstallKitSignCommand>
+    <!-- Compile your own WPF dialogs (XAML) for the modern UI. -->
+    <InstallKitUseWpf Condition="'$(InstallKitUseWpf)' == ''">false</InstallKitUseWpf>
+    <!-- WiX 7+ only: the EULA you accept, e.g. wix7. Read the README "WiX version and licence" first. -->
+    <InstallKitAcceptWixEula Condition="'$(InstallKitAcceptWixEula)' == ''"></InstallKitAcceptWixEula>
+  </PropertyGroup>
+</Project>

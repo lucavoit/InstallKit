@@ -1,0 +1,93 @@
+# Stages: build the installer, then publish it to Azure Artifacts (Universal Packages).
+#
+#   stages:
+#     - template: pipelines/stages/installer.yml@installkit
+#       parameters:
+#         setupProject: src/MyApp.Installer/MyApp.Installer.csproj
+#         version: 1.2.$(Build.BuildId)
+#         feed: MyProject/installers
+#         packageName: my-app
+parameters:
+  - name: setupProject
+    type: string
+  - name: version
+    type: string
+  - name: feed
+    type: string
+  - name: packageName
+    type: string
+  - name: configuration
+    type: string
+    default: Release
+  - name: pool
+    type: object
+    default:
+      vmImage: windows-latest
+  - name: dotnetVersion
+    type: string
+    default: '10.x'
+  - name: toolManifestDirectory
+    type: string
+    default: '$(Build.SourcesDirectory)'
+  - name: signCommand
+    type: string
+    default: ''
+  - name: extraBuildArguments
+    type: string
+    default: ''
+  - name: smokeTest
+    type: boolean
+    default: true
+  - name: preBuildSteps
+    type: stepList
+    default: []
+  - name: postBuildSteps
+    type: stepList
+    default: []
+  # Pull request builds are never published by default. Narrow it further, for example to main:
+  #   and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  - name: publishCondition
+    type: string
+    default: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  - name: publish
+    type: boolean
+    default: true
+
+stages:
+  - stage: BuildInstaller
+    displayName: Build installer
+    jobs:
+      - template: ../jobs/build-installer.yml
+        parameters:
+          setupProject: ${{ parameters.setupProject }}
+          version: ${{ parameters.version }}
+          configuration: ${{ parameters.configuration }}
+          pool: ${{ parameters.pool }}
+          dotnetVersion: ${{ parameters.dotnetVersion }}
+          toolManifestDirectory: ${{ parameters.toolManifestDirectory }}
+          signCommand: ${{ parameters.signCommand }}
+          extraBuildArguments: ${{ parameters.extraBuildArguments }}
+          smokeTest: ${{ parameters.smokeTest }}
+          preBuildSteps: ${{ parameters.preBuildSteps }}
+          postBuildSteps: ${{ parameters.postBuildSteps }}
+
+  - ${{ if parameters.publish }}:
+      - stage: PublishInstaller
+        displayName: Publish to Azure Artifacts
+        dependsOn: BuildInstaller
+        condition: ${{ parameters.publishCondition }}
+        jobs:
+          - job: Publish
+            pool:
+              vmImage: ubuntu-latest   # publishing needs no Windows agent
+            steps:
+              - checkout: none
+              - download: current
+                artifact: installer
+              - template: ../steps/publish-universal.yml
+                parameters:
+                  feed: ${{ parameters.feed }}
+                  packageName: ${{ parameters.packageName }}
+                  version: ${{ parameters.version }}
+                  directory: $(Pipeline.Workspace)/installer
+                  description: Built by $(Build.DefinitionName) $(Build.BuildNumber)

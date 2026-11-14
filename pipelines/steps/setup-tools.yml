@@ -1,0 +1,19 @@
+# Installs the .NET SDK and restores the pinned local tools (wix) from .config/dotnet-tools.json.
+parameters:
+  - name: dotnetVersion
+    type: string
+    default: '10.x'
+  - name: toolManifestDirectory   # folder that contains .config/dotnet-tools.json
+    type: string
+    default: '$(Build.SourcesDirectory)'
+
+steps:
+  - task: UseDotNet@2
+    displayName: Install .NET SDK ${{ parameters.dotnetVersion }}
+    inputs:
+      packageType: sdk
+      version: ${{ parameters.dotnetVersion }}
+
+  - script: dotnet tool restore
+    displayName: Restore pinned WiX tool
+    workingDirectory: ${{ parameters.toolManifestDirectory }}

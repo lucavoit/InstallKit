@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The first InstallKit engine: WixSharp v2 (WiX 4+) on .NET Framework.
+    Only this project may reference WixSharp. A future InstallKit.WixSharp.Core engine
+    (net10.0-windows, WixSharp.Core) implements the same IInstallerEngine.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>InstallKit.WixSharp</RootNamespace>
+    <Description>WixSharp (WiX 4+, .NET Framework) engine for InstallKit.</Description>
+    <!-- WixSharp's own API is not nullable-annotated. -->
+    <Nullable>annotations</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixSharp_wix4" Version="2.14.2" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The modern UI references WixSharp's WPF dialogs; BrandingImages uses System.Drawing. -->
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\InstallKit.Abstractions\InstallKit.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

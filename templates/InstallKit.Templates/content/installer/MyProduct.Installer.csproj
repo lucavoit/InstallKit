@@ -1,0 +1,9 @@
+<Project Sdk="InstallKit.Sdk/INSTALLKIT_SDK_VERSION">
+  <PropertyGroup>
+    <!-- WixSharp (.NET Framework, all features) or WixSharpCore (.NET 10, preview) -->
+    <InstallKitEngine>INSTALLKIT_ENGINE</InstallKitEngine>
+  </PropertyGroup>
+  <ItemGroup>
+    <InstallerPayload Include="..\MyApp\MyApp.csproj" />
+  </ItemGroup>
+</Project>

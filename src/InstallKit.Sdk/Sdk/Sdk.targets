@@ -1,0 +1,157 @@
+<Project>
+  <!--
+    Set here (not in Sdk.props) so the project body can choose; must precede the .NET SDK targets.
+
+    InstallKitEngine:
+      WixSharp      WixSharp v2 on .NET Framework 4.8 (default, all features)
+      WixSharpCore  WixSharp.Core on .NET 10 (preview: no install events, no modern UI yet)
+    An installer project uses exactly one engine, so a build agent needs just the .NET SDK on Windows.
+  -->
+  <PropertyGroup>
+    <InstallKitEngine Condition="'$(InstallKitEngine)' == ''">WixSharp</InstallKitEngine>
+    <TargetFramework Condition="'$(TargetFramework)' == '' and '$(InstallKitEngine)' == 'WixSharp'">net48</TargetFramework>
+    <TargetFramework Condition="'$(TargetFramework)' == '' and '$(InstallKitEngine)' == 'WixSharpCore'">net10.0-windows</TargetFramework>
+    <!-- Lets installer code adapt with #if INSTALLKIT_ENGINE_WIXSHARPCORE. -->
+    <DefineConstants>$(DefineConstants);INSTALLKIT_ENGINE_$(InstallKitEngine.ToUpperInvariant())</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(InstallKitUseWpf)' == 'true'">
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <!-- Version handed to the installer. Pipelines pass -p:Version=1.2.3; prerelease suffixes are dropped. -->
+    <InstallKitVersion Condition="'$(InstallKitVersion)' == ''">$(Version)</InstallKitVersion>
+
+    <InstallKitOutputDir Condition="'$(InstallKitOutputDir)' == ''">$(MSBuildProjectDirectory)\$(BaseOutputPath)installer\$(Configuration)\</InstallKitOutputDir>
+    <InstallKitOutputDir>$([MSBuild]::EnsureTrailingSlash('$([System.IO.Path]::GetFullPath('$(InstallKitOutputDir)'))'))</InstallKitOutputDir>
+    <InstallKitIntermediateDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(IntermediateOutputPath)installkit\'))</InstallKitIntermediateDir>
+    <InstallKitPayloadDir>$(InstallKitIntermediateDir)payload\</InstallKitPayloadDir>
+    <InstallKitPayloadManifest>$(InstallKitIntermediateDir)payloads.txt</InstallKitPayloadManifest>
+    <InstallKitOutputsFile>$(InstallKitIntermediateDir)outputs.txt</InstallKitOutputsFile>
+
+    <!-- Pinned wix version from the nearest .config/dotnet-tools.json. -->
+    <_InstallKitToolRoot>$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildProjectDirectory)', '.config\dotnet-tools.json'))</_InstallKitToolRoot>
+    <_InstallKitToolManifest Condition="'$(_InstallKitToolRoot)' != ''">$(_InstallKitToolRoot)\.config\dotnet-tools.json</_InstallKitToolManifest>
+    <InstallKitWixVersion Condition="'$(InstallKitWixVersion)' == '' and '$(_InstallKitToolManifest)' != ''">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(_InstallKitToolManifest)')), '"wix"\s*:\s*\{[^}]*?"version"\s*:\s*"([^"]+)"').Groups[1].Value)</InstallKitWixVersion>
+    <_InstallKitWixMajor Condition="'$(InstallKitWixVersion)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(InstallKitWixVersion)', '^\d+').Value)</_InstallKitWixMajor>
+  </PropertyGroup>
+
+  <!-- Engine wiring: package (default) or project references when developing InstallKit itself. -->
+  <ItemGroup Condition="'$(InstallKitEngine)' == 'WixSharp'">
+    <AssemblyAttribute Include="InstallKit.InstallerEngineAttribute">
+      <_Parameter1>InstallKit.WixSharp.WixSharpEngine, InstallKit.WixSharp</_Parameter1>
+    </AssemblyAttribute>
+    <PackageReference Include="InstallKit.WixSharp" Version="$(InstallKitSdkVersion)" Condition="'$(InstallKitUseProjectReferences)' != 'true'" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(InstallKitEngine)' == 'WixSharpCore'">
+    <AssemblyAttribute Include="InstallKit.InstallerEngineAttribute">
+      <_Parameter1>InstallKit.WixSharp.WixSharpEngine, InstallKit.WixSharp.Core</_Parameter1>
+    </AssemblyAttribute>
+    <PackageReference Include="InstallKit.WixSharp.Core" Version="$(InstallKitSdkVersion)" Condition="'$(InstallKitUseProjectReferences)' != 'true'" />
+  </ItemGroup>
+
+  <Target Name="_InstallKitCheckEngine" BeforeTargets="CoreCompile">
+    <Error Code="IK005" Condition="'$(InstallKitEngine)' != 'WixSharp' and '$(InstallKitEngine)' != 'WixSharpCore'"
+           Text="Unknown InstallKitEngine '$(InstallKitEngine)'. Use WixSharp or WixSharpCore." />
+  </Target>
+
+  <!--
+    InstallerPayload: projects whose published output goes into the installer.
+      <InstallerPayload Include="..\MyApp\MyApp.csproj" />
+    Metadata:
+      Name               payload name used in code (default: project file name)
+      PublishProperties  extra properties, for example RuntimeIdentifier=win-x64;SelfContained=true
+  -->
+  <ItemDefinitionGroup>
+    <InstallerPayload>
+      <Name />
+      <PublishProperties />
+    </InstallerPayload>
+  </ItemDefinitionGroup>
+
+  <Target Name="InstallKitRestoreTools" Condition="'$(InstallKitRestoreTools)' == 'true'">
+    <Warning Code="IK002" Condition="'$(_InstallKitToolManifest)' == ''"
+             Text="No .config/dotnet-tools.json with a pinned wix version was found. Run 'dotnet new tool-manifest' and 'dotnet tool install wix --version 6.0.2' at the repository root." />
+    <Exec Command="dotnet tool restore" WorkingDirectory="$(_InstallKitToolRoot)" Condition="'$(_InstallKitToolManifest)' != ''" StandardOutputImportance="low" />
+  </Target>
+
+  <Target Name="InstallKitPublishPayloads">
+    <ItemGroup>
+      <_InstallKitPayload Include="@(InstallerPayload)">
+        <Name Condition="'%(InstallerPayload.Name)' == ''">%(InstallerPayload.Filename)</Name>
+      </_InstallKitPayload>
+      <_InstallKitPayload>
+        <PublishDir>$(InstallKitPayloadDir)%(Name)\</PublishDir>
+      </_InstallKitPayload>
+    </ItemGroup>
+
+    <!-- Start clean so files removed from the app don't linger in the installer. -->
+    <RemoveDir Directories="@(_InstallKitPayload->'%(PublishDir)')" />
+
+    <!-- Restore runs as its own call (unique session id) so publish sees the restored assets. -->
+    <MSBuild Projects="@(_InstallKitPayload)"
+             Targets="Restore"
+             Properties="Configuration=$(Configuration);MSBuildRestoreSessionId=$([System.Guid]::NewGuid());%(PublishProperties)" />
+    <MSBuild Projects="@(_InstallKitPayload)"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=%(PublishDir);%(PublishProperties)" />
+
+    <WriteLinesToFile File="$(InstallKitPayloadManifest)" Overwrite="true"
+                      Lines="@(_InstallKitPayload->'%(Name)=%(PublishDir)')" />
+  </Target>
+
+  <!--
+    Extension points: hook your own targets onto InstallKitBuild.
+      <Target Name="FetchPrereqs" BeforeTargets="InstallKitBuild"> ... </Target>
+      <Target Name="CopyInstallers" AfterTargets="InstallKitBuild"> @(InstallerOutput) ... </Target>
+  -->
+  <Target Name="InstallKitBuild"
+          AfterTargets="Build"
+          Condition="'$(InstallKitBuildOnBuild)' == 'true' and '$(DesignTimeBuild)' != 'true'"
+          DependsOnTargets="InstallKitRestoreTools;InstallKitPublishPayloads">
+
+    <Error Code="IK003" Condition="'$(OS)' != 'Windows_NT'"
+           Text="Building MSIs needs Windows (WiX and the WixSharp engine run on .NET Framework). Build on a Windows machine or agent, or set InstallKitBuildOnBuild=false." />
+
+    <Error Code="IK004"
+           Condition="'$(_InstallKitWixMajor)' != '' and $(_InstallKitWixMajor) &gt;= 7 and '$(InstallKitAcceptWixEula)' == ''"
+           Text="WiX $(InstallKitWixVersion) requires accepting its Open Source Maintenance Fee EULA (https://wixtoolset.org/osmf/). If it applies to you and you accept it, set &lt;InstallKitAcceptWixEula&gt;wix$(_InstallKitWixMajor)&lt;/InstallKitAcceptWixEula&gt;. Otherwise pin wix 6.0.2 or 5.0.2 in .config/dotnet-tools.json." />
+
+    <Delete Files="$(InstallKitOutputsFile)" />
+
+    <ItemGroup>
+      <_InstallKitEnv Include="INSTALLKIT_VERSION=$(InstallKitVersion)" />
+      <_InstallKitEnv Include="INSTALLKIT_OUTPUT_DIR=$(InstallKitOutputDir)" />
+      <_InstallKitEnv Include="INSTALLKIT_INTERMEDIATE_DIR=$(InstallKitIntermediateDir)" />
+      <_InstallKitEnv Include="INSTALLKIT_CONFIGURATION=$(Configuration)" />
+      <_InstallKitEnv Include="INSTALLKIT_PAYLOAD_MANIFEST=$(InstallKitPayloadManifest)" />
+      <_InstallKitEnv Include="INSTALLKIT_OUTPUTS_FILE=$(InstallKitOutputsFile)" />
+      <_InstallKitEnv Include="INSTALLKIT_WIX_VERSION=$(InstallKitWixVersion)" />
+      <_InstallKitEnv Include="INSTALLKIT_EMIT_SOURCE=$(InstallKitEmitSource)" />
+      <_InstallKitEnv Include="INSTALLKIT_SIGN_COMMAND=$(InstallKitSignCommand)" Condition="'$(InstallKitSignCommand)' != ''" />
+      <_InstallKitEnv Include="INSTALLKIT_WIX_ACCEPT_EULA=$(InstallKitAcceptWixEula)" Condition="'$(InstallKitAcceptWixEula)' != ''" />
+    </ItemGroup>
+
+    <!-- Run from the project folder so relative paths in the installer code (license, icon) just work. -->
+    <PropertyGroup>
+      <!-- .NET Framework builds an .exe; .NET 10 builds a .dll run through the dotnet host. -->
+      <_InstallKitRunCommand Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">&quot;$(TargetPath)&quot;</_InstallKitRunCommand>
+      <_InstallKitRunCommand Condition="'$(TargetFrameworkIdentifier)' != '.NETFramework'">dotnet &quot;$(TargetPath)&quot;</_InstallKitRunCommand>
+    </PropertyGroup>
+
+    <Exec Command="$(_InstallKitRunCommand)"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          EnvironmentVariables="@(_InstallKitEnv)" />
+
+    <ReadLinesFromFile File="$(InstallKitOutputsFile)" Condition="Exists('$(InstallKitOutputsFile)')">
+      <Output TaskParameter="Lines" ItemName="InstallerOutput" />
+    </ReadLinesFromFile>
+
+    <Message Importance="high" Text="$(MSBuildProjectName) -> %(InstallerOutput.Identity)" Condition="'@(InstallerOutput)' != ''" />
+  </Target>
+</Project>
