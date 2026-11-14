@@ -91,6 +91,8 @@ dotnet new installkit -n MyApp.Installer --product "My App" --manufacturer Conto
 # add --engine WixSharpCore for the .NET 10 preview engine
 # once per repository: pin the WiX toolset
 dotnet new tool-manifest
+# InstallKit needs the manifest at .config/dotnet-tools.json. The .NET 10 SDK creates dotnet-tools.json
+# in the root instead, so if that happens, move it: create a .config folder and move the file into it.
 dotnet tool install wix --version 6.0.2
 dotnet build MyApp.Installer -p:Version=1.0.0
 ```
@@ -137,7 +139,7 @@ APP_PUBLISH_DIR=/path/to/publish dotnet build MyApp.Installer -p:Version=1.2.3
 ## How it works
 
 1. `dotnet build` compiles the installer project as a small .NET Framework console app.
-2. The SDK runs `dotnet tool restore` so the `wix` version in your tool manifest (`.config/dotnet-tools.json`, or `dotnet-tools.json` in the repository root, as the .NET 10 SDK creates it) is used. WiX extensions are pinned to that same version, so newer extensions on NuGet can't silently break the build.
+2. The SDK runs `dotnet tool restore` so the `wix` version in `.config/dotnet-tools.json` is used. WiX extensions are pinned to that same version, so newer extensions on NuGet can't silently break the build.
 3. Each `<InstallerPayload>` project is published into `obj/installkit/payload/<Name>/`, starting from an empty folder each time.
 4. The SDK runs the program. `InstallerHost` validates the plan before WiX runs, then builds every MSI, then every bundle.
 5. The built files end up in `@(InstallerOutput)`, and the generated `.wxs` is kept in `obj/installkit/` for review.
