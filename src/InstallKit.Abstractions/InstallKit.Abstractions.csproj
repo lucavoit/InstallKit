@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Engine-neutral model of an installer. Nothing in here may reference WixSharp or WiX types:
+    this is the seam that lets us move from the .NET Framework WixSharp engine to WixSharp.Core
+    (or anything else) without touching user installer code.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>InstallKit</RootNamespace>
+    <Description>Engine-neutral installer model for InstallKit (MSI packages and bundles).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <!--
+      Source generator for the fluent builders (MsiBuilder, BundleBuilder, ServiceBuilder).
+      Not PrivateAssets: the builders derive from BuilderGenerator.Builder<T>, which ships in its lib folder.
+    -->
+    <PackageReference Include="BuilderGenerator" Version="3.1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Ship the install-action source generator to every project that references this package. -->
+    <ProjectReference Include="..\InstallKit.Generators\InstallKit.Generators.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None Include="..\InstallKit.Generators\bin\$(Configuration)\netstandard2.0\InstallKit.Generators.dll"
+          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="InstallKit.Abstractions.Tests" />
+  </ItemGroup>
+</Project>

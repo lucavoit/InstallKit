@@ -1,0 +1,75 @@
+# CI for InstallKit itself: test, pack, build the sample installer with our own templates,
+# and push the NuGet packages (SDK, engine, templates) to an Azure Artifacts feed.
+trigger:
+  branches:
+    include: [ main ]
+
+variables:
+  root: .
+  installKitVersion: 0.1.$(Build.BuildId)
+  nugetFeed: installkit   # Azure Artifacts feed for the InstallKit packages
+
+stages:
+  - stage: Packages
+    jobs:
+      - job: TestAndPack
+        pool:
+          vmImage: windows-latest
+        steps:
+          - template: pipelines/steps/setup-tools.yml
+            parameters:
+              toolManifestDirectory: $(Build.SourcesDirectory)/$(root)
+
+          - script: dotnet test $(root)/tests/InstallKit.Abstractions.Tests -c Release
+            displayName: Unit tests
+
+          - script: >-
+              dotnet pack $(root)/InstallKit.slnx -c Release
+              -p:InstallKitVersion=$(installKitVersion)
+              -o $(Build.ArtifactStagingDirectory)/packages
+            displayName: Pack SDK, engine and templates
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)/packages
+              artifact: packages
+
+  # Dogfood the templates on the sample with both engines (no publish; the sample is not a product).
+  # Each job only needs the .NET SDK on a Windows agent; the engines never need each other.
+  - stage: Samples
+    dependsOn: []
+    jobs:
+      - template: pipelines/jobs/build-installer.yml
+        parameters:
+          jobName: SampleWixSharp
+          artifactName: sample-wixsharp
+          setupProject: $(root)/samples/HelloService.Installer/HelloService.Installer.csproj
+          version: 1.0.$(Build.BuildId)
+          toolManifestDirectory: $(Build.SourcesDirectory)/$(root)
+
+      - template: pipelines/jobs/build-installer.yml
+        parameters:
+          jobName: SampleWixSharpCore
+          artifactName: sample-wixsharp-core
+          setupProject: $(root)/samples/HelloService.Installer.Core/HelloService.Installer.Core.csproj
+          version: 1.0.$(Build.BuildId)
+          toolManifestDirectory: $(Build.SourcesDirectory)/$(root)
+
+  - stage: PushPackages
+    dependsOn: [ Packages, Samples ]
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - job: Push
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: none
+          - download: current
+            artifact: packages
+          - task: DotNetCoreCLI@2
+            displayName: Push to Azure Artifacts
+            inputs:
+              command: push
+              packagesToPush: $(Pipeline.Workspace)/packages/*.nupkg
+              nuGetFeedType: internal
+              publishVstsFeed: $(nugetFeed)

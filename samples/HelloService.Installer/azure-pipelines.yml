@@ -1,0 +1,28 @@
+# Example consumer pipeline. In your repo, point the repository resource at wherever the
+# InstallKit templates live and pin it to a tag.
+trigger:
+  branches:
+    include: [ main ]
+
+resources:
+  repositories:
+    - repository: installkit
+      type: github            # or 'git' for an Azure Repos repository
+      name: lucavoit/InstallKit
+      endpoint: github        # service connection name
+      ref: refs/heads/main    # pin to a tag in real use, e.g. refs/tags/installkit-v0.1.0
+
+variables:
+  version: 1.0.$(Build.BuildId)
+
+stages:
+  - template: pipelines/stages/installer.yml@installkit
+    parameters:
+      setupProject: samples/HelloService.Installer/HelloService.Installer.csproj
+      version: $(version)
+      feed: MyProject/installers
+      packageName: hello-service
+      # Signing is yours to plug in. For example:
+      # preBuildSteps:
+      #   - task: AzureCLI@2 ... # log in, install AzureSignTool
+      # signCommand: AzureSignTool sign -kvu $(KeyVaultUrl) -kvm -kvc $(CertName) -tr http://timestamp.digicert.com {file}

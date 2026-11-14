@@ -1,0 +1,29 @@
+<Project>
+  <!--
+    The same installer as ../HelloService.Installer, built with the WixSharp.Core (.NET 10) preview engine.
+    Its install event is compiled to native code, so it needs the C++ build tools on the build machine.
+    In your own repo: <Project Sdk="InstallKit.Sdk/0.1.0"> plus <InstallKitEngine>WixSharpCore</InstallKitEngine>.
+  -->
+  <PropertyGroup>
+    <InstallKitUseProjectReferences>true</InstallKitUseProjectReferences>
+  </PropertyGroup>
+  <Import Project="..\..\src\InstallKit.Sdk\Sdk\Sdk.props" />
+
+  <PropertyGroup>
+    <InstallKitEngine>WixSharpCore</InstallKitEngine>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\HelloService.Installer\Program.cs" Link="Program.cs" />
+    <InstallerPayload Include="..\HelloService\HelloService.csproj"
+                      PublishProperties="RuntimeIdentifier=win-x64;SelfContained=true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InstallKit.WixSharp.Core\InstallKit.WixSharp.Core.csproj" />
+    <!-- In this repo the generator comes from source; the InstallKit.Abstractions package ships it automatically. -->
+    <ProjectReference Include="..\..\src\InstallKit.Generators\InstallKit.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <Import Project="..\..\src\InstallKit.Sdk\Sdk\Sdk.targets" />
+</Project>

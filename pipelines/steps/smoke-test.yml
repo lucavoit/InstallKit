@@ -1,0 +1,37 @@
+# Installs every MSI silently, then uninstalls it. Fails on a non-zero msiexec exit code.
+# Runs on the (disposable) hosted agent; don't use it on a self-hosted agent you care about.
+parameters:
+  - name: installerDirectory
+    type: string
+    default: '$(Build.ArtifactStagingDirectory)/installer'
+  - name: logsArtifact            # must be unique per job
+    type: string
+    default: msi-logs
+
+steps:
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      $logs = Join-Path '$(Agent.TempDirectory)' 'msi-logs'
+      New-Item -ItemType Directory -Force $logs | Out-Null
+      $msis = Get-ChildItem '${{ parameters.installerDirectory }}' -Filter *.msi
+      if (-not $msis) { throw 'No MSI found to smoke test.' }
+
+      function Invoke-Msi($arguments, $log) {
+        $p = Start-Process msiexec.exe -ArgumentList "$arguments /qn /norestart /l*v `"$log`"" -Wait -PassThru
+        if ($p.ExitCode -notin 0, 3010) { Get-Content $log -Tail 50; throw "msiexec $arguments failed with $($p.ExitCode)" }
+      }
+
+      foreach ($msi in $msis) {
+        Write-Host "Installing $($msi.Name)"
+        Invoke-Msi "/i `"$($msi.FullName)`"" (Join-Path $logs "$($msi.BaseName).install.log")
+        Write-Host "Uninstalling $($msi.Name)"
+        Invoke-Msi "/x `"$($msi.FullName)`"" (Join-Path $logs "$($msi.BaseName).uninstall.log")
+      }
+    displayName: Smoke test MSI install/uninstall
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish msiexec logs
+    condition: always()
+    inputs:
+      targetPath: '$(Agent.TempDirectory)/msi-logs'
+      artifact: ${{ parameters.logsArtifact }}-$(System.JobAttempt)

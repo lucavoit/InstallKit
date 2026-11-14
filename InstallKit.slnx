@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/InstallKit.Abstractions/InstallKit.Abstractions.csproj" />
+    <Project Path="src/InstallKit.Generators/InstallKit.Generators.csproj" />
+    <Project Path="src/InstallKit.WixSharp/InstallKit.WixSharp.csproj" />
+    <Project Path="src/InstallKit.WixSharp.Core/InstallKit.WixSharp.Core.csproj" />
+    <Project Path="src/InstallKit.Sdk/InstallKit.Sdk.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/HelloService/HelloService.csproj" />
+    <Project Path="samples/HelloService.Installer/HelloService.Installer.csproj" />
+    <Project Path="samples/HelloService.Installer.Core/HelloService.Installer.Core.csproj" />
+  </Folder>
+  <Folder Name="/templates/">
+    <Project Path="templates/InstallKit.Templates/InstallKit.Templates.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/InstallKit.Abstractions.Tests/InstallKit.Abstractions.Tests.csproj" />
+  </Folder>
+</Solution>

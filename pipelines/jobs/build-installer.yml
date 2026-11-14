@@ -1,0 +1,84 @@
+# Job: build (and optionally smoke test) an installer, then publish it as a pipeline artifact.
+parameters:
+  - name: setupProject
+    type: string
+  - name: version
+    type: string
+  - name: configuration
+    type: string
+    default: Release
+  - name: jobName
+    type: string
+    default: BuildInstaller
+  - name: pool
+    type: object
+    default:
+      vmImage: windows-latest
+  - name: dotnetVersion
+    type: string
+    default: '10.x'
+  - name: toolManifestDirectory
+    type: string
+    default: '$(Build.SourcesDirectory)'
+  - name: artifactName
+    type: string
+    default: installer
+  - name: signCommand
+    type: string
+    default: ''
+  - name: extraBuildArguments
+    type: string
+    default: ''
+  - name: smokeTest
+    type: boolean
+    default: true
+  # Your own steps: log in to a signing service, install a signing tool, fetch prerequisites, ...
+  - name: preBuildSteps
+    type: stepList
+    default: []
+  # Runs after the build; installers are in $(Build.ArtifactStagingDirectory)/installer.
+  - name: postBuildSteps
+    type: stepList
+    default: []
+
+jobs:
+  - job: ${{ parameters.jobName }}
+    displayName: Build installer (${{ parameters.jobName }})
+    pool: ${{ parameters.pool }}
+    variables:
+      installerDirectory: $(Build.ArtifactStagingDirectory)/installer
+    steps:
+      - checkout: self
+        fetchDepth: 1
+
+      - template: ../steps/setup-tools.yml
+        parameters:
+          dotnetVersion: ${{ parameters.dotnetVersion }}
+          toolManifestDirectory: ${{ parameters.toolManifestDirectory }}
+
+      - ${{ each step in parameters.preBuildSteps }}:
+          - ${{ step }}
+
+      - template: ../steps/build-installer.yml
+        parameters:
+          setupProject: ${{ parameters.setupProject }}
+          version: ${{ parameters.version }}
+          configuration: ${{ parameters.configuration }}
+          outputDirectory: $(installerDirectory)
+          signCommand: ${{ parameters.signCommand }}
+          extraArguments: ${{ parameters.extraBuildArguments }}
+
+      - ${{ each step in parameters.postBuildSteps }}:
+          - ${{ step }}
+
+      - ${{ if parameters.smokeTest }}:
+          - template: ../steps/smoke-test.yml
+            parameters:
+              installerDirectory: $(installerDirectory)
+              logsArtifact: ${{ parameters.artifactName }}-msi-logs
+
+      - task: PublishPipelineArtifact@1
+        displayName: Publish installer artifact
+        inputs:
+          targetPath: $(installerDirectory)
+          artifact: ${{ parameters.artifactName }}

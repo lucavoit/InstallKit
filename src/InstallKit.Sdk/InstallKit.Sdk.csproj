@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Packs the MSBuild SDK used by installer projects: <Project Sdk="InstallKit.Sdk/x.y.z">.
+    Nothing is compiled; the package only carries Sdk/Sdk.props and Sdk/Sdk.targets.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageType>MSBuildSdk</PackageType>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <Description>MSBuild SDK for InstallKit installer projects: dotnet build produces your MSI and setup bundle.</Description>
+    <_VersionPropsFile>$(IntermediateOutputPath)InstallKit.Version.props</_VersionPropsFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Sdk\**" Pack="true" PackagePath="Sdk\" />
+  </ItemGroup>
+
+  <!-- Stamp the SDK version so installer projects pull engine packages of the same version. -->
+  <Target Name="_WriteInstallKitVersionProps" BeforeTargets="_GetPackageFiles">
+    <WriteLinesToFile File="$(_VersionPropsFile)" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="&lt;Project&gt;&lt;PropertyGroup&gt;&lt;InstallKitSdkVersion&gt;$(Version)&lt;/InstallKitSdkVersion&gt;&lt;/PropertyGroup&gt;&lt;/Project&gt;" />
+    <ItemGroup>
+      <None Include="$(_VersionPropsFile)" Pack="true" PackagePath="Sdk\InstallKit.Version.props" />
+    </ItemGroup>
+  </Target>
+</Project>
