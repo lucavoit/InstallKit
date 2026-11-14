@@ -66,7 +66,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Build sample installer
-        run: dotnet build ${{ matrix.project }} -c Release -p:Version=1.0.${{ github.run_number }} "-p:InstallKitOutputDir=${{ runner.temp }}/sample/"
+        run: dotnet build ${{ matrix.project }} -c Release -p:InstallKitVersion=1.0.${{ github.run_number }} "-p:InstallKitOutputDir=${{ runner.temp }}/sample/"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -101,10 +101,10 @@ jobs:
         run: dotnet tool restore
 
       - name: Build QA installer 1.0.0
-        run: dotnet build ${{ matrix.project }} -c Release -p:Version=1.0.0 "-p:InstallKitOutputDir=${{ env.QA_DIR }}/1.0.0/"
+        run: dotnet build ${{ matrix.project }} -c Release -p:InstallKitVersion=1.0.0 "-p:InstallKitOutputDir=${{ env.QA_DIR }}/1.0.0/"
 
       - name: Build QA installer 1.1.0
-        run: dotnet build ${{ matrix.project }} -c Release -p:Version=1.1.0 "-p:InstallKitOutputDir=${{ env.QA_DIR }}/1.1.0/"
+        run: dotnet build ${{ matrix.project }} -c Release -p:InstallKitVersion=1.1.0 "-p:InstallKitOutputDir=${{ env.QA_DIR }}/1.1.0/"
 
       - name: Install, upgrade, repair, uninstall and assert
         shell: pwsh

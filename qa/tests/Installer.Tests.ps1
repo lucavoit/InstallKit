@@ -21,7 +21,9 @@ BeforeAll {
     $script:StartMenu   = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'InstallKit\InstallKit QA Demo'
     $script:DesktopLink = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'InstallKit QA Demo.lnk'
     $script:Evidence    = Join-Path $env:ProgramData 'InstallKitQa'
-    $script:Uninstall   = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+    # The bundle's engine is 32-bit, so its entry lives in the WOW6432Node view; look in both.
+    $script:UninstallKeys = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
 
     New-Item -ItemType Directory -Force $LogDir | Out-Null
 
@@ -44,8 +46,9 @@ BeforeAll {
     }
 
     # Add/Remove Programs entries for the MSI itself (WindowsInstaller = 1) and for the bundle.
-    function Get-MsiEntries    { @(Get-ChildItem $Uninstall | Get-ItemProperty | Where-Object { $_.DisplayName -eq $ProductName -and $_.WindowsInstaller -eq 1 }) }
-    function Get-BundleEntries { @(Get-ChildItem $Uninstall | Get-ItemProperty | Where-Object { $_.DisplayName -eq $ProductName -and $_.BundleUpgradeCode }) }
+    function Get-Entries { @(Get-ChildItem $UninstallKeys -ErrorAction SilentlyContinue | Get-ItemProperty | Where-Object { $_.DisplayName -eq $ProductName }) }
+    function Get-MsiEntries    { @(Get-Entries | Where-Object { $_.WindowsInstaller -eq 1 }) }
+    function Get-BundleEntries { @(Get-Entries | Where-Object { $_.WindowsInstaller -ne 1 }) }
 
     function Wait-Heartbeat {
         $file = Join-Path $InstallDir 'heartbeat.txt'
