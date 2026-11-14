@@ -10,7 +10,28 @@
     <InstallKitVersion Condition="'$(InstallKitVersion)' == ''">0.1.0</InstallKitVersion>
     <Version>$(InstallKitVersion)</Version>
     <Authors>Luca</Authors>
+    <Copyright>Copyright (c) 2026 Luca</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/lucavoit/InstallKit</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>installer;msi;wix;wixsharp;windows;setup;bundle;msbuild</PackageTags>
+    <PackageReleaseNotes>https://github.com/lucavoit/InstallKit/releases</PackageReleaseNotes>
+
+    <!-- Source Link (built into the .NET SDK): lets debuggers fetch the source for these packages from GitHub. -->
+    <RepositoryUrl>https://github.com/lucavoit/InstallKit</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts/packages</PackageOutputPath>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <!-- Reproducible builds with normalised paths, on CI only. -->
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The package page on nuget.org shows the repository README. -->
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
 </Project>

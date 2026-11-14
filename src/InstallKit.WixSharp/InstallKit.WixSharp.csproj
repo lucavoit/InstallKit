@@ -10,6 +10,9 @@
     <Description>WixSharp (WiX 4+, .NET Framework) engine for InstallKit.</Description>
     <!-- WixSharp's own API is not nullable-annotated. -->
     <Nullable>annotations</Nullable>
+    <!-- Symbol package (.snupkg) next to the .nupkg, pushed to the nuget.org symbol server. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="WixSharp_wix4" Version="2.14.2" />

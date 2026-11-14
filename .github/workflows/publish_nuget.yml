@@ -74,7 +74,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: packages
-          path: artifacts/packages/*.nupkg
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
           if-no-files-found: error
 
   # Build the installers from these exact packages before they are published.
@@ -135,5 +137,8 @@ jobs:
           user: ${{ secrets.NUGET_USER }}
 
       # --skip-duplicate lets a failed run be re-run without erroring on packages that already went up.
-      - name: Push
+      - name: Push packages
         run: dotnet nuget push "packages/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Push symbol packages
+        run: dotnet nuget push "packages/*.snupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
