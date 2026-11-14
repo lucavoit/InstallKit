@@ -70,6 +70,7 @@ You can still set properties directly, with `plan.Msi("My App", msi => { msi.Man
 | `pipelines/` | Azure DevOps step, job and stage templates. |
 | `samples/` | A Windows service with an MSI and a bundle, plus an example `azure-pipelines.yml`. |
 | `tests/` | Unit tests for the model, version handling and validation. |
+| `qa/` | End-to-end QA: a demo installer that uses most features, plus Pester tests that install, upgrade, repair and uninstall it on a Windows agent. |
 
 ## Getting started
 
@@ -275,7 +276,7 @@ stages:
 
 Download a published installer with `az artifacts universal download --feed installers --name my-app --version 1.2.345 --path .`.
 
-[`azure-pipelines.yml`](azure-pipelines.yml) in this repository is InstallKit's own CI. It runs the tests, packs the NuGet packages, builds the sample with these templates and pushes the packages to a feed.
+These templates are for your own pipelines. InstallKit itself is built with GitHub Actions; see [Contributing](#contributing).
 
 ## What target machines need
 
@@ -357,10 +358,28 @@ Only WiX 6 and 7 are confirmed to work with WixSharp 2.14.2; test 5.0.2 before y
 
 ## Contributing
 
-Issues and pull requests are welcome. Please open an issue first for larger changes. Run the unit tests with:
+Issues and pull requests are welcome. Please open an issue first for larger changes. [CI](.github/workflows/ci.yml) runs on every pull request and push to `main`: unit tests, packing, both sample installers and the end-to-end QA. Run the unit tests locally with:
 
 ```bash
 dotnet test tests/InstallKit.Abstractions.Tests -c Release
+```
+
+## QA
+
+The `qa` jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) build the QA demo installer as 1.0.0 and 1.1.0 with each engine, then run [`qa/tests/Installer.Tests.ps1`](qa/tests/Installer.Tests.ps1) on a GitHub-hosted Windows runner. It checks:
+
+- **Install:** the Add/Remove Programs entry, payload and extra files, Start menu and desktop shortcuts, the running service, the `OnAfterInstall` handler and `RunAfterInstall` command, and a property passed on the command line.
+- **Upgrade:** 1.1.0 replaces 1.0.0, and `RunBeforeUninstall` does not run.
+- **Repair:** a deleted file is restored.
+- **Uninstall:** `RunBeforeUninstall` runs, and the service, files, shortcuts and Add/Remove Programs entry are removed.
+- **Bundle:** `QaDemoSetup.exe` installs and uninstalls the same product.
+
+The tests change the machine, so only run them on a disposable one. Locally, from an elevated PowerShell:
+
+```powershell
+dotnet build qa/QaDemo.Installer -c Release -p:InstallKitVersion=1.0.0 -p:InstallKitOutputDir=$PWD/out/1.0.0/
+dotnet build qa/QaDemo.Installer -c Release -p:InstallKitVersion=1.1.0 -p:InstallKitOutputDir=$PWD/out/1.1.0/
+./qa/tests/Invoke-Qa.ps1 -V1 out/1.0.0 -V2 out/1.1.0
 ```
 
 ## License

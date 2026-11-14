@@ -11,6 +11,11 @@
     <Project Path="samples/HelloService.Installer/HelloService.Installer.csproj" />
     <Project Path="samples/HelloService.Installer.Core/HelloService.Installer.Core.csproj" />
   </Folder>
+  <Folder Name="/qa/">
+    <Project Path="qa/QaDemo/QaDemo.csproj" />
+    <Project Path="qa/QaDemo.Installer/QaDemo.Installer.csproj" />
+    <Project Path="qa/QaDemo.Installer.Core/QaDemo.Installer.Core.csproj" />
+  </Folder>
   <Folder Name="/templates/">
     <Project Path="templates/InstallKit.Templates/InstallKit.Templates.csproj" />
   </Folder>

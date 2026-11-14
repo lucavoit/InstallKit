@@ -1,0 +1,24 @@
+<Project>
+  <!-- The same QA demo installer, built with the WixSharp.Core (.NET 10) preview engine. -->
+  <PropertyGroup>
+    <InstallKitUseProjectReferences>true</InstallKitUseProjectReferences>
+  </PropertyGroup>
+  <Import Project="..\..\src\InstallKit.Sdk\Sdk\Sdk.props" />
+
+  <PropertyGroup>
+    <InstallKitEngine>WixSharpCore</InstallKitEngine>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\QaDemo.Installer\Program.cs" Link="Program.cs" />
+    <InstallerPayload Include="..\QaDemo\QaDemo.csproj"
+                      PublishProperties="RuntimeIdentifier=win-x64;SelfContained=true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InstallKit.WixSharp.Core\InstallKit.WixSharp.Core.csproj" />
+    <ProjectReference Include="..\..\src\InstallKit.Generators\InstallKit.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <Import Project="..\..\src\InstallKit.Sdk\Sdk\Sdk.targets" />
+</Project>
