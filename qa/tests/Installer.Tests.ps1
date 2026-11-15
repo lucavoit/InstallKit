@@ -81,6 +81,7 @@ BeforeAll {
 
     function Assert-Removed {
         Get-Service $ServiceName -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Service 'InstallKitQaWorker' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-MsiEntries | Should -HaveCount 0
         Join-Path $InstallDir 'QaDemo.exe' | Should -Not -Exist
         Join-Path $InstallDir 'config' | Should -Not -Exist
@@ -308,6 +309,22 @@ Describe 'Changing features of the installed product' {
         Invoke-Msi "/i $((Get-MsiEntries)[0].PSChildName) ADDLOCAL=Samples" '3b-add-feature'
         Join-Path $InstallDir 'samples\sample.txt' | Should -Exist
         Join-Path $InstallDir 'docs\readme.txt' | Should -Exist
+    }
+
+    It 'installs a service that belongs to a feature only when that feature is installed' {
+        Get-Service 'InstallKitQaWorker' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Join-Path $InstallDir 'worker' | Should -Not -Exist
+
+        Invoke-Msi "/i $((Get-MsiEntries)[0].PSChildName) ADDLOCAL=Worker" '3b2-add-worker'
+        $service = Get-Service 'InstallKitQaWorker'
+        $service.Status | Should -Be 'Running'
+        Join-Path $InstallDir 'worker\QaDemo.exe' | Should -Exist
+        (Get-Service $ServiceName).Status | Should -Be 'Running'      # the service of the core is untouched
+
+        Invoke-Msi "/i $((Get-MsiEntries)[0].PSChildName) REMOVE=Worker" '3b3-remove-worker'
+        Get-Service 'InstallKitQaWorker' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Join-Path $InstallDir 'worker\QaDemo.exe' | Should -Not -Exist
+        (Get-Service $ServiceName).Status | Should -Be 'Running'
     }
 
     It 'removes a feature with REMOVE and keeps the rest' {

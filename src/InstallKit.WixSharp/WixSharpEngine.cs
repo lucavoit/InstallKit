@@ -430,7 +430,11 @@ namespace InstallKit.WixSharp
 
                     foreach (var entry in specialHere)
                     {
-                        items.Add(new WixFile(Path.Combine(source, InstalledFileName(entry.Key)), entry.Value.ToArray()));
+                        var file = new WixFile(Path.Combine(source, InstalledFileName(entry.Key)), entry.Value.ToArray());
+                        // The file carries a service or an XML edit, so it needs its feature itself: only the wildcard below sets it otherwise.
+                        if (payload.Feature != null)
+                            file.Feature = features[new OptionalFeature(payload.Feature).Id];
+                        items.Add(file);
                         special.Remove(entry.Key);
                     }
 
