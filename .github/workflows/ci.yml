@@ -109,13 +109,17 @@ jobs:
       - name: Build QA installer 1.1.0
         run: dotnet build ${{ matrix.project }} -c Release -p:InstallKitVersion=1.1.0 "-p:InstallKitOutputDir=${{ env.QA_DIR }}/1.1.0/"
 
+      # A patch release of the first line, to test that it replaces 1.0.0 while 1.1.0 stays installed side by side.
+      - name: Build QA installer 1.0.1
+        run: dotnet build ${{ matrix.project }} -c Release -p:InstallKitVersion=1.0.1 "-p:InstallKitOutputDir=${{ env.QA_DIR }}/1.0.1/"
+
       - name: Check the installkit tool against the built MSIs
         shell: pwsh
         run: ./qa/tests/Invoke-ToolChecks.ps1 -V1 "$env:QA_DIR/1.0.0" -V2 "$env:QA_DIR/1.1.0"
 
       - name: Install, upgrade, repair, uninstall and assert
         shell: pwsh
-        run: ./qa/tests/Invoke-Qa.ps1 -V1 "$env:QA_DIR/1.0.0" -V2 "$env:QA_DIR/1.1.0" -LogDir "$env:QA_DIR/logs" -ResultFile "$env:QA_DIR/qa-results.xml"
+        run: ./qa/tests/Invoke-Qa.ps1 -V1 "$env:QA_DIR/1.0.0" -V2 "$env:QA_DIR/1.1.0" -V1Patch "$env:QA_DIR/1.0.1" -LogDir "$env:QA_DIR/logs" -ResultFile "$env:QA_DIR/qa-results.xml"
 
       - name: Upload installers, logs and results
         if: always()

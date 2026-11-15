@@ -15,6 +15,7 @@ Not released yet:
 - Roslyn analyzers for upgrade codes and builder creation (`IK300` to `IK303`)
 - `installkit` command line tool with `new-guid`, `inspect` and `diff` (run from source)
 - Folder permissions on the install folder and its subfolders
+- Versions that install side by side (per major version, per minor version or every version)
 - Bundle prerequisite helpers for the VC++ redistributable, .NET runtimes and WebView2, from an embedded file or a pinned download
 
 ## Now
@@ -22,7 +23,6 @@ Not released yet:
 In progress or next up.
 
 **Installer model** (fluent builders, engine-neutral, validated before WiX runs):
-- Multi-instance (side-by-side) installs and `.mst` transforms for per-customer variants
 
 **Tooling and runtime:**
 - Code fixes for the analyzers, and analyzers for more of the `IKxxx` checks
@@ -53,6 +53,7 @@ In progress or next up.
 - GitLab CI and Jenkins snippets
 - SBOM and provenance (SPDX or CycloneDX, SLSA attestations)
 - An `InstallKit.Runtime` library for installed apps
+- True single-MSI multi-instance installs (instance transforms, `INSTANCEID`) and per-customer `.mst` variants; side-by-side versions cover the need for now
 
 ## Not planned
 

@@ -93,6 +93,12 @@ namespace InstallKit
                 CheckCloseApplications(errors, msi, label);
                 CheckFolderPermissions(errors, msi, label);
 
+                if (msi.AppliedSideBySideLine != null && !string.IsNullOrWhiteSpace(msi.InstallDirectory) &&
+                    msi.InstallDirectory!.IndexOf(msi.AppliedSideBySideLine, StringComparison.Ordinal) < 0)
+                    errors.Add(new ValidationError("IK270",
+                        $"{label} installs side by side but its install directory '{msi.InstallDirectory}' does not contain the version line '{msi.AppliedSideBySideLine}', so versions would share one folder. " +
+                        $"Include it, for example {msi.InstallDirectory}\\{msi.AppliedSideBySideLine}, or leave InstallDirectory unset."));
+
                 foreach (var command in msi.Commands)
                 {
                     if (string.IsNullOrWhiteSpace(command.Path))
@@ -132,6 +138,13 @@ namespace InstallKit
                                 "Set one, for example a registry or file search result."));
                             break;
                     }
+                }
+
+                foreach (var chained in bundle.Chain.Items.OfType<MsiChainItem>().Select(m => m.Definition).Where(d => d != null && d.SideBySide != SideBySideMode.None))
+                {
+                    if (bundle.SideBySide == SideBySideMode.None)
+                        errors.Add(new ValidationError("IK271",
+                            $"{label} chains MSI '{chained!.Name}', which installs side by side, but the bundle does not. A newer bundle would then replace the older one together with its MSIs. Set the bundle's SideBySide to the same mode."));
                 }
 
                 var variables = new HashSet<string>(StringComparer.Ordinal);
