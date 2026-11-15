@@ -627,8 +627,13 @@ Only WiX 6 and 7 are confirmed to work with WixSharp 2.14.2; test 5.0.2 before y
 Issues and pull requests are welcome. Please open an issue first for larger changes. [CI](.github/workflows/ci.yml) runs on every pull request and push to `main`: unit tests, packing, both sample installers and the end-to-end QA. Run the unit tests locally with:
 
 ```bash
-dotnet test tests/InstallKit.Abstractions.Tests -c Release
+dotnet test tests/InstallKit.Abstractions.Tests -c Release    # model, builders, validation, analyzers
+dotnet test tests/InstallKit.WixSharp.Tests -c Release        # the modern dialogs' XML
+dotnet test tests/InstallKit.WixSharp.Engine.Tests -c Release # the engine: the WiX source it writes for a model
+dotnet test tests/InstallKit.Tool.Tests -c Release            # the installkit tool
 ```
+
+The engine tests compile the engine source into a test project and read the WiX source that comes out, so they need neither Windows nor WiX. They guard what used to be found only by the Windows CI run.
 
 ## QA
 

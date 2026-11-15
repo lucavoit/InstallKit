@@ -41,7 +41,15 @@ namespace InstallKit.WixSharp
         public string BuildMsi(MsiDefinition msi, InstallerContext context)
         {
             ConfigureToolset(context);
+            return CreateMsiProject(msi, context).BuildMsi();
+        }
 
+        /// <summary>
+        /// Maps the model to a WixSharp project: everything BuildMsi does except picking the WiX tools and running them.
+        /// Separate so tests can generate the WiX source of a model without WiX.
+        /// </summary>
+        internal static Project CreateMsiProject(MsiDefinition msi, InstallerContext context)
+        {
             // Environment variables live in the install directory. WixSharp only accepts registry values at the
             // top level of the project, where it creates a component for each one.
             var installContents = BuildPayloadEntities(msi, context).ToList();
@@ -132,13 +140,26 @@ namespace InstallKit.WixSharp
             foreach (var customize in msi.EngineCustomizations.OfType<Action<Project>>())
                 customize(project);
 
-            return project.BuildMsi();
+            return project;
         }
 
         public string BuildBundle(BundleDefinition bundle, IReadOnlyDictionary<MsiDefinition, string> builtMsis, InstallerContext context)
         {
             ConfigureToolset(context);
 
+            var wixBundle = CreateBundleProject(bundle, builtMsis, context);
+
+            var output = wixBundle.Build(Path.Combine(context.OutputDirectory, bundle.ResolvedOutputFileName + ".exe"));
+
+            if (context.Signer != null && IOFile.Exists(output))
+                SignBundle(output, context);
+
+            return output;
+        }
+
+        /// <summary>The bundle counterpart of <see cref="CreateMsiProject"/>: everything except running WiX and signing.</summary>
+        internal static Bundle CreateBundleProject(BundleDefinition bundle, IReadOnlyDictionary<MsiDefinition, string> builtMsis, InstallerContext context)
+        {
             var chain = bundle.Chain.Items.Select(item => ToChainItem(item, builtMsis)).ToArray();
 
             var wixBundle = new Bundle(bundle.Name, chain)
@@ -173,12 +194,7 @@ namespace InstallKit.WixSharp
             foreach (var customize in bundle.EngineCustomizations.OfType<Action<Bundle>>())
                 customize(wixBundle);
 
-            var output = wixBundle.Build(Path.Combine(context.OutputDirectory, bundle.ResolvedOutputFileName + ".exe"));
-
-            if (context.Signer != null && IOFile.Exists(output))
-                SignBundle(output, context);
-
-            return output;
+            return wixBundle;
         }
 
         /// <summary>Adds the lookups that prerequisite helpers need: registry values and installed .NET runtimes.</summary>

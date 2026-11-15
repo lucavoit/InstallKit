@@ -63,6 +63,9 @@ jobs:
       - name: Modern dialog tests
         run: dotnet test tests/InstallKit.WixSharp.Tests -c Release
 
+      - name: Engine tests
+        run: dotnet test tests/InstallKit.WixSharp.Engine.Tests -c Release
+
       - name: Pack
         run: dotnet pack InstallKit.slnx -c Release -p:InstallKitVersion=${{ steps.version.outputs.version }}
 
