@@ -13,6 +13,7 @@ Not released yet:
 - Closing (and optionally ending) running programs before an install, upgrade or uninstall
 - Optional features that users can leave out, chosen in the feature tree or with `ADDLOCAL`
 - Roslyn analyzers for upgrade codes and builder creation (`IK300` to `IK303`)
+- `installkit` command line tool with `new-guid`, `inspect` and `diff` (run from source)
 
 ## Now
 
@@ -24,7 +25,7 @@ In progress or next up.
 
 **Tooling and runtime:**
 - Code fixes for the analyzers, and analyzers for more of the `IKxxx` checks
-- An `installkit` dotnet tool: `inspect`, `diff` and `verify` for MSI files, plus `new-guid`
+- Publish the `installkit` tool as a dotnet tool and add `verify` (signatures, upgrade-code collisions)
 - Folder permissions (grant an account rights on the install folder or a subfolder)
 
 ## Later

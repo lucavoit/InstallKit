@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The installkit command line tool: new-guid, inspect and diff for MSI files.
+    Reading an MSI needs Windows (it uses the Windows Installer API through WiX's DTF library); the rest is portable.
+    Not packed yet: publishing it as a dotnet tool needs a trusted publishing policy for the new package id on
+    nuget.org first. Run it from source with dotnet run and the project path.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <AssemblyName>installkit</AssemblyName>
+    <RootNamespace>InstallKit.Tool</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <PackAsTool>false</PackAsTool>
+    <ToolCommandName>installkit</ToolCommandName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Dtf.WindowsInstaller" Version="4.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="InstallKit.Tool.Tests" />
+  </ItemGroup>
+</Project>
