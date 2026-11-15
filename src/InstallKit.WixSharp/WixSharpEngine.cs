@@ -42,13 +42,14 @@ namespace InstallKit.WixSharp
         {
             ConfigureToolset(context);
 
-            // Registry values (and later the other system settings) live in the install directory's components.
+            // Environment variables live in the install directory. WixSharp only accepts registry values at the
+            // top level of the project, where it creates a component for each one.
             var installContents = BuildPayloadEntities(msi, context).ToList();
-            installContents.AddRange(msi.RegistryEntries.Select(ToRegValue));
             installContents.AddRange(msi.EnvironmentVariables.Select((v, i) => ToEnvironmentVariable(v, i, msi.Scope)));
 
             var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, installContents.ToArray());
             var entities = new List<WixEntity> { installDir };
+            entities.AddRange(msi.ResolvedRegistryEntries.Select(ToRegValue));
             entities.AddRange(BuildShortcutDirs(msi));
             entities.AddRange(msi.Commands.Select(ToAction));
 
@@ -386,8 +387,10 @@ namespace InstallKit.WixSharp
             // Every value needs its own id: two default values would otherwise both be called "RegValue".
             var value = new RegValue(new Id($"InstallKitReg{index + 1}"), hive, entry.Key, entry.Name ?? string.Empty,
                 entry.Kind == RegistryValueKind.DWord ? (object)entry.DWordValue!.Value : entry.Value);
-            if (entry.Kind == RegistryValueKind.ExpandString)
-                value.Type = "expandable";
+            // WixSharp turns any value that contains '%' (such as "%1" in an open command) into REG_EXPAND_SZ
+            // on its own, so say what is meant.
+            if (entry.Kind != RegistryValueKind.DWord)
+                value.Type = entry.Kind == RegistryValueKind.ExpandString ? "expandable" : "string";
             return value;
         }
 

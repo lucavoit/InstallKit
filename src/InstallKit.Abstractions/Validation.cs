@@ -86,6 +86,7 @@ namespace InstallKit
 
                 CheckRegistry(errors, msi, label);
                 CheckEnvironment(errors, label, msi);
+                CheckAssociations(errors, msi, context, label);
 
                 foreach (var command in msi.Commands)
                 {
@@ -192,6 +193,42 @@ namespace InstallKit
                 else if (variable.Action != EnvironmentVariableAction.Set && variable.Value.IndexOf(';') >= 0)
                     errors.Add(new ValidationError("IK183", $"{label}: the {variable.Name} entry '{variable.Value}' contains ';'. Add one folder per entry."));
             }
+        }
+
+        static void CheckAssociations(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label)
+        {
+            var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var association in msi.FileAssociations)
+            {
+                if (!FileAssociation.IsValidExtension(association.Extension))
+                    errors.Add(new ValidationError("IK190", $"{label}: '{association.Extension}' is not a valid file extension. Write it with its dot, for example \".foo\"."));
+                else if (!extensions.Add(association.Extension))
+                    errors.Add(new ValidationError("IK193", $"{label} associates '{association.Extension}' more than once."));
+
+                if (!string.IsNullOrWhiteSpace(association.ProgId) && !FileAssociation.IsValidProgId(association.ProgId!))
+                    errors.Add(new ValidationError("IK194", $"{label}: the ProgId '{association.ProgId}' must start with a letter and contain only letters, digits, '.' and '_'."));
+
+                CheckHandler(errors, msi, context, label, association.ResolveExecutable(msi), $"file association '{association.Extension}'");
+            }
+
+            var schemes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var protocol in msi.UrlProtocols)
+            {
+                if (!UrlProtocol.IsValidScheme(protocol.Scheme))
+                    errors.Add(new ValidationError("IK191", $"{label}: '{protocol.Scheme}' is not a valid URL scheme. Use letters, digits, '+', '-' and '.', starting with a letter, and no '://'."));
+                else if (!schemes.Add(protocol.Scheme))
+                    errors.Add(new ValidationError("IK195", $"{label} registers the URL scheme '{protocol.Scheme}' more than once."));
+
+                CheckHandler(errors, msi, context, label, protocol.ResolveExecutable(msi), $"URL protocol '{protocol.Scheme}'");
+            }
+        }
+
+        static void CheckHandler(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label, string executable, string what)
+        {
+            if (string.IsNullOrWhiteSpace(executable))
+                errors.Add(new ValidationError("IK192", $"{label}: the {what} has no program. Pass the executable, or set MainExecutable."));
+            else
+                CheckInstalledFile(errors, msi, context, label, executable, what);
         }
 
         static void CheckInstalledFile(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label, string? path, string what)

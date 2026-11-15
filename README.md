@@ -240,6 +240,22 @@ MsiBuilder.Create("My App")
 - **Already running programs:** they keep the old environment. A new terminal or program sees the change.
 - **Checked before WiX runs:** setting `PATH` as a whole fails with `IK182` (use `WithPathEntry`), a `;` inside one entry with `IK183`.
 
+### File associations and URL protocols
+
+```csharp
+MsiBuilder.Create("My App")
+    .WithMainExecutable("MyApp.exe")
+    .WithFileAssociation(".foo", "Foo document")                         // opens with MyApp.exe "%1"
+    .WithFileAssociation(".bar", "Bar file", "tools/Viewer.exe")         // another program of the product
+    .WithUrlProtocol("myapp", "My App link");                            // myapp://... starts MyApp.exe "myapp://..."
+```
+
+- **Program:** defaults to `MainExecutable`; pass a path relative to the install directory to use another one. It must be in a payload (`IK121`), and one of the two must be given (`IK192`).
+- **ProgId:** defaults to the output file name plus the extension (`MyApp.foo`); the fourth argument of `WithFileAssociation` sets it.
+- **What it writes:** plain registry values under `HKEY_CLASSES_ROOT` (the extension's default value, the ProgId with an icon and an `open` command), so uninstall removes them like any other value.
+- **Not forced on users:** Windows 10 and 11 keep the user's own "Open with" choice for an extension; the association only registers your program as a candidate and the default for extensions nobody else claimed.
+- **Checked before WiX runs:** an invalid extension (`IK190`), scheme (`IK191`) or ProgId (`IK194`), and duplicates (`IK193`, `IK195`).
+
 ## UI and branding
 
 | `Ui` | Dialogs |

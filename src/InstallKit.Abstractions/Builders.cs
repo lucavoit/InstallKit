@@ -69,6 +69,20 @@ namespace InstallKit
         public MsiBuilder WithPathEntry(string path, bool prepend = false) =>
             WithEnvironmentVariable("PATH", path, prepend ? EnvironmentVariableAction.Prepend : EnvironmentVariableAction.Append);
 
+        /// <inheritdoc cref="MsiDefinition.AddFileAssociation"/>
+        public MsiBuilder WithFileAssociation(string extension, string description, string? executable = null, string? progId = null)
+        {
+            ListOf(FileAssociations, WithFileAssociations).Add(new FileAssociation(extension, description, executable, progId));
+            return this;
+        }
+
+        /// <inheritdoc cref="MsiDefinition.AddUrlProtocol"/>
+        public MsiBuilder WithUrlProtocol(string scheme, string description, string? executable = null)
+        {
+            ListOf(UrlProtocols, WithUrlProtocols).Add(new UrlProtocol(scheme, description, executable));
+            return this;
+        }
+
         /// <summary>Sets a public MSI property.</summary>
         public MsiBuilder WithProperty(string name, string value)
         {
