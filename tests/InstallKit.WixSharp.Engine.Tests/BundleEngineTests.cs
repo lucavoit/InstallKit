@@ -19,7 +19,7 @@ public class BundleEngineTests
         var workspace = new Wxs.Workspace();
         var installer = System.IO.Path.Combine(workspace.Payload, "Svc.exe");
 
-        var wxs = Wxs.Bundle(workspace, Bundle().WithVcRedist(installer));
+        var wxs = Wxs.Bundle(workspace, Bundle().Prerequisites(p => p.VcRedist(installer)));
 
         var package = wxs.One("ExePackage");
         Assert.EndsWith("Svc.exe", A(package, "SourceFile"));
@@ -34,7 +34,7 @@ public class BundleEngineTests
     {
         var workspace = new Wxs.Workspace();
 
-        var wxs = Wxs.Bundle(workspace, Bundle().WithWebView2(PrerequisiteInstaller.FromDownload("https://go.microsoft.com/fwlink/p/?LinkId=2124703", Hash, 1_800_000, "MicrosoftEdgeWebview2Setup.exe")));
+        var wxs = Wxs.Bundle(workspace, Bundle().Prerequisites(p => p.WebView2(PrerequisiteInstaller.FromDownload("https://go.microsoft.com/fwlink/p/?LinkId=2124703", Hash, 1_800_000, "MicrosoftEdgeWebview2Setup.exe"))));
 
         // WiX rejects a payload element on a package that also has any of these (WIX0372).
         var package = wxs.One("ExePackage");
@@ -54,7 +54,7 @@ public class BundleEngineTests
         var workspace = new Wxs.Workspace();
         var installer = System.IO.Path.Combine(workspace.Payload, "Svc.exe");
 
-        var wxs = Wxs.Bundle(workspace, Bundle().WithVcRedist(installer).WithVcRedist(installer, PrerequisiteArchitecture.X86).WithWebView2(installer));
+        var wxs = Wxs.Bundle(workspace, Bundle().Prerequisites(p => p.VcRedist(installer).VcRedist(installer, PrerequisiteArchitecture.X86).WebView2(installer)));
 
         var searches = wxs.All("RegistrySearch").ToDictionary(s => A(s, "Variable")!);
         var x64 = searches["InstallKitVcRedistX64"];
@@ -71,7 +71,7 @@ public class BundleEngineTests
         var workspace = new Wxs.Workspace();
         var installer = System.IO.Path.Combine(workspace.Payload, "Svc.exe");
 
-        var wxs = Wxs.Bundle(workspace, Bundle().WithDotNetRuntime(DotNetRuntimeKind.WindowsDesktop, 8, installer).WithDotNetRuntime(DotNetRuntimeKind.AspNetCore, 8, installer, PrerequisiteArchitecture.Arm64));
+        var wxs = Wxs.Bundle(workspace, Bundle().Prerequisites(p => p.DotNetRuntime(DotNetRuntimeKind.WindowsDesktop, 8, installer).DotNetRuntime(DotNetRuntimeKind.AspNetCore, 8, installer, PrerequisiteArchitecture.Arm64)));
 
         var searches = wxs.All("DotNetCoreSearch").ToDictionary(s => A(s, "Variable")!);
         Assert.Equal(("desktop", "x64", "8"), (A(searches["InstallKitDotNetWindowsDesktop8X64"], "RuntimeType"), A(searches["InstallKitDotNetWindowsDesktop8X64"], "Platform"), A(searches["InstallKitDotNetWindowsDesktop8X64"], "MajorVersion")));
@@ -87,7 +87,7 @@ public class BundleEngineTests
         var msi = plan.Msi(workspace.App());
         var installer = System.IO.Path.Combine(workspace.Payload, "Svc.exe");
 
-        var wxs = Wxs.Bundle(workspace, Bundle().WithVcRedist(installer).WithMsi(msi), msi);
+        var wxs = Wxs.Bundle(workspace, Bundle().Prerequisites(p => p.VcRedist(installer)).Packages(k => k.Msi(msi)), msi);
 
         var chain = wxs.One("Chain").Elements().Select(e => e.Name.LocalName).ToList();
         Assert.Equal(new[] { "ExePackage", "MsiPackage" }, chain);

@@ -11,7 +11,7 @@ public class PromptedPropertyTests
         var dir = Directory.CreateTempSubdirectory().FullName;
         File.WriteAllText(Path.Combine(dir, "App.exe"), "");
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--payload", $"App={dir}", "--output", dir }));
-        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App");
+        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App"));
         return (plan, builder);
     }
 
@@ -21,8 +21,9 @@ public class PromptedPropertyTests
     public void Builder_and_property_style_collect_prompts()
     {
         var msi = MsiBuilder.Create("App")
-            .WithPromptedProperty("SERVER", "Server address", "localhost", required: true)
-            .WithPromptedProperty("PORT", "Port")
+            .Settings(s => s
+                .Prompt("SERVER", "Server address", "localhost", required: true)
+                .Prompt("PORT", "Port"))
             .Build();
 
         Assert.Equal(("SERVER", "Server address", "localhost", true), (msi.PromptedProperties[0].Name, msi.PromptedProperties[0].Label, msi.PromptedProperties[0].DefaultValue, msi.PromptedProperties[0].Required));
@@ -36,7 +37,7 @@ public class PromptedPropertyTests
     public void Valid_prompts_pass()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithPromptedProperty("SERVER", "Server", "x").WithPromptedProperty("DB_NAME", "Database").WithPromptedProperty("_P2", "Other", required: true));
+        plan.Msi(builder.Settings(s => s.Prompt("SERVER", "Server", "x").Prompt("DB_NAME", "Database").Prompt("_P2", "Other", required: true)));
 
         Assert.Empty(Codes(plan));
     }
@@ -50,20 +51,20 @@ public class PromptedPropertyTests
     public void A_property_name_must_be_upper_case_with_digits_and_underscores(string name)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithPromptedProperty(name, "Label"));
+        plan.Msi(builder.Settings(s => s.Prompt(name, "Label")));
 
         Assert.Contains("IK280", Codes(plan));
     }
 
     [Fact]
-    public void A_name_defined_twice_or_also_set_with_WithProperty_is_reported()
+    public void A_name_defined_twice_or_also_set_as_a_property_is_reported()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithPromptedProperty("SERVER", "a").WithPromptedProperty("SERVER", "b"));
+        plan.Msi(builder.Settings(s => s.Prompt("SERVER", "a").Prompt("SERVER", "b")));
         Assert.Contains("IK281", Codes(plan));
 
         var (plan2, builder2) = NewPlan();
-        plan2.Msi(builder2.WithProperty("MODE", "x").WithPromptedProperty("MODE", "Mode"));
+        plan2.Msi(builder2.Settings(s => s.Property("MODE", "x").Prompt("MODE", "Mode")));
         Assert.Contains("IK281", Codes(plan2));
     }
 
@@ -71,7 +72,7 @@ public class PromptedPropertyTests
     public void A_prompt_needs_a_label()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithPromptedProperty("SERVER", " "));
+        plan.Msi(builder.Settings(s => s.Prompt("SERVER", " ")));
 
         Assert.Contains("IK282", Codes(plan));
     }
@@ -80,7 +81,7 @@ public class PromptedPropertyTests
     public void Only_three_prompts_fit_on_the_page()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithPromptedProperty("A", "a").WithPromptedProperty("B", "b").WithPromptedProperty("C", "c").WithPromptedProperty("D", "d"));
+        plan.Msi(builder.Settings(s => s.Prompt("A", "a").Prompt("B", "b").Prompt("C", "c").Prompt("D", "d")));
 
         Assert.Contains("IK283", Codes(plan));
     }
@@ -92,7 +93,7 @@ public class PromptedPropertyTests
     public void Properties_that_windows_installer_uses_are_reserved(string name)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithPromptedProperty(name, "Label"));
+        plan.Msi(builder.Settings(s => s.Prompt(name, "Label")));
 
         Assert.Contains("IK284", Codes(plan));
     }

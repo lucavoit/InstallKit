@@ -62,7 +62,7 @@ public class HostTests
     {
         var dir = Directory.CreateTempSubdirectory().FullName;
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--output", dir, "--intermediate", Path.Combine(dir, "obj") }));
-        var msi = plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithDirectory(dir).WithModernUi(true));
+        var msi = plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Directory(dir)).Appearance(a => a.Modern(true)));
 
         InstallerHost.Build(plan, new FakeEngine());
 
@@ -74,7 +74,7 @@ public class HostTests
     {
         var dir = Directory.CreateTempSubdirectory().FullName;
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--output", dir }));
-        plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithDirectory(dir).OnLoad(e => e.Log("hi")));
+        plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Directory(dir)).Lifecycle(l => l.OnLoad(e => e.Log("hi"))));
 
         var ex = Assert.Throws<InstallerValidationException>(() => InstallerHost.Build(plan, new FakeEngine()));
         Assert.Equal("IK201", ex.Errors[0].Code);

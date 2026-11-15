@@ -76,7 +76,7 @@ namespace InstallKit
 
         /// <summary>
         /// Runs on the target machine, not during the build. It must be a static method passed as a
-        /// method group (<c>.OnAfterInstall(Setup.Configure)</c>): the InstallKit source generator turns it
+        /// method group (<c>.Lifecycle(l => l.OnAfterInstall(Setup.Configure))</c>): the InstallKit source generator turns it
         /// into a custom action entry point, which lambdas and instance methods cannot be.
         /// </summary>
         public Action<InstallEvent> Handler { get; }
@@ -93,7 +93,7 @@ namespace InstallKit
 
             var method = invocations[0].Method;
             if (!method.IsStatic || method.Name.IndexOf('<') >= 0)
-                return "it is a lambda, local function or instance method. Pass a static method instead, for example .OnAfterInstall(Setup.Configure)";
+                return "it is a lambda, local function or instance method. Pass a static method instead, for example .Lifecycle(l => l.OnAfterInstall(Setup.Configure))";
 
             return null;
         }

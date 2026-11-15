@@ -42,10 +42,11 @@ public class InstallEventTests
 
         plan.Msi(MsiBuilder.Create("App")
             .WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001")
-            .WithPayload("App")
-            .WithAccentColor("blue")
-            .OnAfterInstall(e => e.Log(captured))
-            .RunAfterInstall(""));
+            .Content(c => c.Payload("App"))
+            .Appearance(a => a.AccentColor("blue"))
+            .Lifecycle(l => l
+                .OnAfterInstall(e => e.Log(captured))
+                .RunAfterInstall("")));
 
         var codes = InstallerValidator.Validate(plan).Select(e => e.Code).ToArray();
         Assert.Contains("IK150", codes);
@@ -57,12 +58,14 @@ public class InstallEventTests
     public void Builder_collects_handlers_commands_and_branding()
     {
         var msi = MsiBuilder.Create("App")
-            .WithModernUi(chooseInstallDir: true)
-            .WithAccentColor("#112233")
-            .OnBeforeInstall(StaticHandler)
-            .OnAfterInstall(StaticHandler, "MODE", " ")
-            .RunAfterInstall("tool.exe", "--init", c => c.Elevated = false)
-            .RunBeforeUninstall("tool.exe", "--cleanup")
+            .Appearance(a => a
+                .Modern(chooseInstallDir: true)
+                .AccentColor("#112233"))
+            .Lifecycle(l => l
+                .OnBeforeInstall(StaticHandler)
+                .OnAfterInstall(StaticHandler, "MODE", " ")
+                .RunAfterInstall("tool.exe", "--init", c => c.Elevated = false)
+                .RunBeforeUninstall("tool.exe", "--cleanup"))
             .Build();
 
         Assert.Equal(InstallerUi.ModernInstallDir, msi.Ui);

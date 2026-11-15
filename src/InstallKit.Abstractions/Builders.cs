@@ -18,22 +18,86 @@ namespace InstallKit
         /// <summary>Starts an MSI with every default applied.</summary>
         public static MsiBuilder Create(string name) => new MsiBuilder().WithValuesFrom(new MsiDefinition(name));
 
+        // The public surface of the MSI builder: scalar settings are the generated With<Property> methods, everything
+        // else is grouped by what it does. A group takes a lambda over a small builder (see BuilderGroups.cs), the same
+        // way WithService and the bundle's chain items do.
+
+        /// <summary>Files that are always installed: published projects and directories.</summary>
+        public MsiBuilder Content(Action<ContentBuilder> configure)
+        {
+            configure(new ContentBuilder(this, null));
+            return this;
+        }
+
+        /// <summary>
+        /// An optional part of the product that users can leave out, together with the files it installs. Files that are not
+        /// added inside a feature are always installed.
+        /// </summary>
+        /// <param name="name">The name users see in the feature tree. Also what <c>ADDLOCAL</c> and <c>REMOVE</c> on the command line refer to (without spaces).</param>
+        /// <param name="description">Shown under the name in the feature tree.</param>
+        /// <param name="content">The files of the feature.</param>
+        /// <param name="installedByDefault">Whether the feature is installed when the user does not choose. Default <c>true</c>.</param>
+        public MsiBuilder Feature(string name, string? description, Action<ContentBuilder> content, bool installedByDefault = true)
+        {
+            ListOf(Features, WithFeatures).Add(new OptionalFeature(name, description, installedByDefault));
+            content(new ContentBuilder(this, name));
+            return this;
+        }
+
+        /// <inheritdoc cref="Feature(string, string, Action{ContentBuilder}, bool)"/>
+        public MsiBuilder Feature(string name, Action<ContentBuilder> content, bool installedByDefault = true) => Feature(name, null, content, installedByDefault);
+
+        /// <summary>The dialogs and branding of the installer.</summary>
+        public MsiBuilder Appearance(Action<AppearanceBuilder> configure)
+        {
+            configure(new AppearanceBuilder(this));
+            return this;
+        }
+
+        /// <summary>Changes the installer makes to the machine: registry, environment, firewall, services, permissions and XML edits.</summary>
+        public MsiBuilder Machine(Action<MachineBuilder> configure)
+        {
+            configure(new MachineBuilder(this));
+            return this;
+        }
+
+        /// <summary>Windows shell integration: file types, URL protocols and shortcuts.</summary>
+        public MsiBuilder Shell(Action<ShellBuilder> configure)
+        {
+            configure(new ShellBuilder(this));
+            return this;
+        }
+
+        /// <summary>What happens around the install: applications to close, install events and commands to run.</summary>
+        public MsiBuilder Lifecycle(Action<LifecycleBuilder> configure)
+        {
+            configure(new LifecycleBuilder(this));
+            return this;
+        }
+
+        /// <summary>MSI properties: fixed values, and values the modern dialogs ask the user for.</summary>
+        public MsiBuilder Settings(Action<SettingsBuilder> configure)
+        {
+            configure(new SettingsBuilder(this));
+            return this;
+        }
+
         /// <summary>Includes the published output of an <c>&lt;InstallerPayload&gt;</c> project. Pass <paramref name="feature"/> to make these files optional.</summary>
-        public MsiBuilder WithPayload(string payloadName, string? targetSubdirectory = null, string? feature = null)
+        internal MsiBuilder AddPayload(string payloadName, string? targetSubdirectory = null, string? feature = null)
         {
             ListOf(Payloads, WithPayloads).Add(PayloadSource.FromPayload(payloadName, targetSubdirectory, feature));
             return this;
         }
 
         /// <summary>Includes every file of a directory (recursively).</summary>
-        public MsiBuilder WithDirectory(string sourceDirectory, string? targetSubdirectory = null, string? feature = null)
+        internal MsiBuilder AddDirectory(string sourceDirectory, string? targetSubdirectory = null, string? feature = null)
         {
             ListOf(Payloads, WithPayloads).Add(PayloadSource.FromDirectory(sourceDirectory, targetSubdirectory, feature));
             return this;
         }
 
         /// <summary>Installs the executable (relative to the install directory) as a Windows service.</summary>
-        public MsiBuilder WithService(string executable, string serviceName, Func<ServiceBuilder, ServiceBuilder>? configure = null)
+        internal MsiBuilder AddService(string executable, string serviceName, Func<ServiceBuilder, ServiceBuilder>? configure = null)
         {
             var builder = ServiceBuilder.Create(executable, serviceName);
             ListOf(Services, WithServices).Add((configure?.Invoke(builder) ?? builder).Build());
@@ -46,18 +110,18 @@ namespace InstallKit
         /// <param name="name">The value name, or <c>null</c> for the key's default value.</param>
         /// <param name="value">The value. MSI formatted text such as <c>[INSTALLDIR]</c> is expanded.</param>
         /// <param name="kind">The value type.</param>
-        public MsiBuilder WithRegistryValue(RegistryHive hive, string key, string? name, string value, RegistryValueKind kind = RegistryValueKind.String)
+        internal MsiBuilder AddRegistryValue(RegistryHive hive, string key, string? name, string value, RegistryValueKind kind = RegistryValueKind.String)
         {
             ListOf(RegistryEntries, WithRegistryEntries).Add(new RegistryEntry(hive, key, name, value, kind));
             return this;
         }
 
         /// <summary>Writes a <c>REG_DWORD</c> registry value on install and removes it on uninstall.</summary>
-        public MsiBuilder WithRegistryValue(RegistryHive hive, string key, string? name, int value) =>
-            WithRegistryValue(hive, key, name, value.ToString(System.Globalization.CultureInfo.InvariantCulture), RegistryValueKind.DWord);
+        internal MsiBuilder AddRegistryValue(RegistryHive hive, string key, string? name, int value) =>
+            AddRegistryValue(hive, key, name, value.ToString(System.Globalization.CultureInfo.InvariantCulture), RegistryValueKind.DWord);
 
         /// <summary>Sets, appends to or prepends to an environment variable. The change is undone on uninstall.</summary>
-        public MsiBuilder WithEnvironmentVariable(string name, string value, EnvironmentVariableAction action = EnvironmentVariableAction.Set)
+        internal MsiBuilder AddEnvironmentVariable(string name, string value, EnvironmentVariableAction action = EnvironmentVariableAction.Set)
         {
             ListOf(EnvironmentVariables, WithEnvironmentVariables).Add(new EnvironmentVariableEntry(name, value, action));
             return this;
@@ -66,25 +130,25 @@ namespace InstallKit
         /// <summary>Adds a folder to <c>PATH</c> and removes it again on uninstall.</summary>
         /// <param name="path">The folder, for example <c>[INSTALLDIR]bin</c>.</param>
         /// <param name="prepend">Put the folder at the start of <c>PATH</c> instead of the end.</param>
-        public MsiBuilder WithPathEntry(string path, bool prepend = false) =>
-            WithEnvironmentVariable("PATH", path, prepend ? EnvironmentVariableAction.Prepend : EnvironmentVariableAction.Append);
+        internal MsiBuilder AddPathEntry(string path, bool prepend = false) =>
+            AddEnvironmentVariable("PATH", path, prepend ? EnvironmentVariableAction.Prepend : EnvironmentVariableAction.Append);
 
         /// <inheritdoc cref="MsiDefinition.AddFileAssociation"/>
-        public MsiBuilder WithFileAssociation(string extension, string description, string? executable = null, string? progId = null)
+        internal MsiBuilder AddFileAssociation(string extension, string description, string? executable = null, string? progId = null)
         {
             ListOf(FileAssociations, WithFileAssociations).Add(new FileAssociation(extension, description, executable, progId));
             return this;
         }
 
         /// <inheritdoc cref="MsiDefinition.AddUrlProtocol"/>
-        public MsiBuilder WithUrlProtocol(string scheme, string description, string? executable = null)
+        internal MsiBuilder AddUrlProtocol(string scheme, string description, string? executable = null)
         {
             ListOf(UrlProtocols, WithUrlProtocols).Add(new UrlProtocol(scheme, description, executable));
             return this;
         }
 
         /// <inheritdoc cref="MsiDefinition.AddFirewallRule"/>
-        public MsiBuilder WithFirewallRule(string name, string? port = null, FirewallProtocol protocol = FirewallProtocol.Tcp, string? executable = null,
+        internal MsiBuilder AddFirewallRule(string name, string? port = null, FirewallProtocol protocol = FirewallProtocol.Tcp, string? executable = null,
             FirewallScope scope = FirewallScope.Any, FirewallProfile profile = FirewallProfile.All)
         {
             ListOf(FirewallRules, WithFirewallRules).Add(new FirewallRule(name, port, protocol, executable, scope, profile));
@@ -92,42 +156,35 @@ namespace InstallKit
         }
 
         /// <inheritdoc cref="MsiDefinition.AddXmlValue"/>
-        public MsiBuilder WithXmlValue(string file, string xpath, string value)
+        internal MsiBuilder AddXmlValue(string file, string xpath, string value)
         {
             ListOf(XmlValues, WithXmlValues).Add(new XmlValue(file, xpath, value));
             return this;
         }
 
         /// <inheritdoc cref="MsiDefinition.AddCloseApplication"/>
-        public MsiBuilder WithCloseApplication(string processName, bool terminate = false, int timeoutSeconds = 5)
+        internal MsiBuilder AddCloseApplication(string processName, bool terminate = false, int timeoutSeconds = 5)
         {
             ListOf(CloseApplications, WithCloseApplications).Add(new CloseApplicationRule(processName, terminate, timeoutSeconds));
             return this;
         }
 
-        /// <inheritdoc cref="MsiDefinition.AddFeature"/>
-        public MsiBuilder WithFeature(string name, string? description = null, bool installedByDefault = true)
-        {
-            ListOf(Features, WithFeatures).Add(new OptionalFeature(name, description, installedByDefault));
-            return this;
-        }
-
         /// <inheritdoc cref="MsiDefinition.AddFolderPermission"/>
-        public MsiBuilder WithFolderPermission(string account, FolderRights rights, string? folder = null)
+        internal MsiBuilder AddFolderPermission(string account, FolderRights rights, string? folder = null)
         {
             ListOf(FolderPermissions, WithFolderPermissions).Add(new FolderPermission(account, rights, folder));
             return this;
         }
 
         /// <inheritdoc cref="MsiDefinition.AddPromptedProperty"/>
-        public MsiBuilder WithPromptedProperty(string name, string label, string? defaultValue = null, bool required = false)
+        internal MsiBuilder AddPromptedProperty(string name, string label, string? defaultValue = null, bool required = false)
         {
             ListOf(PromptedProperties, WithPromptedProperties).Add(new PromptedProperty(name, label, defaultValue, required));
             return this;
         }
 
         /// <summary>Sets a public MSI property.</summary>
-        public MsiBuilder WithProperty(string name, string value)
+        internal MsiBuilder AddProperty(string name, string value)
         {
             var properties = Properties.Value;
             if (properties == null)
@@ -140,13 +197,13 @@ namespace InstallKit
             return this;
         }
 
-        public MsiBuilder WithStartMenuShortcut(bool enabled = true)
+        internal MsiBuilder SetStartMenuShortcut(bool enabled = true)
         {
             ShortcutsOf().StartMenu = enabled;
             return this;
         }
 
-        public MsiBuilder WithDesktopShortcut(bool enabled = true)
+        internal MsiBuilder SetDesktopShortcut(bool enabled = true)
         {
             ShortcutsOf().Desktop = enabled;
             return this;
@@ -160,42 +217,42 @@ namespace InstallKit
         }
 
         /// <summary>Uses the native modern dialogs (see <see cref="InstallerUi.Modern"/>).</summary>
-        public MsiBuilder WithModernUi(bool chooseInstallDir = false) =>
+        internal MsiBuilder UseModernUi(bool chooseInstallDir = false) =>
             WithUi(chooseInstallDir ? InstallerUi.ModernInstallDir : InstallerUi.Modern);
 
         /// <summary>Uses the WPF dialogs, for custom XAML dialogs (see <see cref="InstallerUi.ModernWpf"/>).</summary>
-        public MsiBuilder WithWpfUi() => WithUi(InstallerUi.ModernWpf);
+        internal MsiBuilder UseWpfUi() => WithUi(InstallerUi.ModernWpf);
 
-        public MsiBuilder WithAccentColor(string hexColor)
+        internal MsiBuilder SetAccentColor(string hexColor)
         {
             BrandingOf().AccentColor = hexColor;
             return this;
         }
 
-        public MsiBuilder WithLogo(string logoFile)
+        internal MsiBuilder SetLogo(string logoFile)
         {
             BrandingOf().LogoFile = logoFile;
             return this;
         }
 
         /// <inheritdoc cref="MsiDefinition.OnLoad"/>
-        public MsiBuilder OnLoad(Action<InstallEvent> handler, params string[] usesProperties) =>
+        internal MsiBuilder AddOnLoad(Action<InstallEvent> handler, params string[] usesProperties) =>
             AddHandler(InstallStage.Load, handler, usesProperties);
 
         /// <inheritdoc cref="MsiDefinition.OnBeforeInstall"/>
-        public MsiBuilder OnBeforeInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
+        internal MsiBuilder AddOnBeforeInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
             AddHandler(InstallStage.BeforeInstall, handler, usesProperties);
 
         /// <inheritdoc cref="MsiDefinition.OnAfterInstall"/>
-        public MsiBuilder OnAfterInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
+        internal MsiBuilder AddOnAfterInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
             AddHandler(InstallStage.AfterInstall, handler, usesProperties);
 
         /// <inheritdoc cref="MsiDefinition.RunAfterInstall"/>
-        public MsiBuilder RunAfterInstall(string path, string? arguments = null, Action<RunCommand>? configure = null) =>
+        internal MsiBuilder AddRunAfterInstall(string path, string? arguments = null, Action<RunCommand>? configure = null) =>
             AddCommand(new RunCommand(path, arguments, RunCommandTiming.AfterInstall), configure);
 
         /// <inheritdoc cref="MsiDefinition.RunBeforeUninstall"/>
-        public MsiBuilder RunBeforeUninstall(string path, string? arguments = null, Action<RunCommand>? configure = null) =>
+        internal MsiBuilder AddRunBeforeUninstall(string path, string? arguments = null, Action<RunCommand>? configure = null) =>
             AddCommand(new RunCommand(path, arguments, RunCommandTiming.BeforeUninstall), configure);
 
         MsiBuilder AddHandler(InstallStage stage, Action<InstallEvent> handler, string[] usesProperties)
@@ -256,65 +313,30 @@ namespace InstallKit
         /// <summary>Starts a bundle with every default applied.</summary>
         public static BundleBuilder Create(string name) => new BundleBuilder().WithValuesFrom(new BundleDefinition(name));
 
-        /// <summary>Installs a .NET Framework redistributable when it is missing.</summary>
-        public BundleBuilder WithNetFramework(NetFrameworkVersion version)
+        // Scalar settings are the generated With<Property> methods. The chain is built with two groups: prerequisites
+        // (installed when missing) and packages (your MSIs and executables). Items are chained in the order they are added,
+        // so call Prerequisites before Packages to install them first.
+
+        /// <summary>Software that has to be on the machine before the packages: .NET, the Visual C++ runtime, WebView2.</summary>
+        public BundleBuilder Prerequisites(Action<PrerequisitesBuilder> configure)
         {
-            ChainOf().NetFramework(version);
+            configure(new PrerequisitesBuilder(ChainOf()));
             return this;
         }
 
-        /// <summary>Chains an MSI defined in the same plan; it is built first.</summary>
-        public BundleBuilder WithMsi(MsiDefinition msi, Action<MsiChainItem>? configure = null)
+        /// <summary>The MSIs and executables the bundle installs.</summary>
+        public BundleBuilder Packages(Action<PackagesBuilder> configure)
         {
-            ChainOf().Msi(msi, configure);
+            configure(new PackagesBuilder(ChainOf()));
             return this;
         }
 
-        /// <summary>Chains an existing MSI file.</summary>
-        public BundleBuilder WithMsi(string msiPath, Action<MsiChainItem>? configure = null)
+        /// <summary>The logo and other branding of the setup window.</summary>
+        public BundleBuilder Appearance(Action<BundleAppearanceBuilder> configure)
         {
-            ChainOf().Msi(msiPath, configure);
+            configure(new BundleAppearanceBuilder(this));
             return this;
         }
-
-        /// <summary>Chains an executable installer. Set a DetectCondition so it is skipped when present.</summary>
-        public BundleBuilder WithExe(string exePath, Action<ExeChainItem>? configure = null)
-        {
-            ChainOf().Exe(exePath, configure);
-            return this;
-        }
-
-        /// <inheritdoc cref="BundleChain.VcRedist"/>
-        public BundleBuilder WithVcRedist(PrerequisiteInstaller installer, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64)
-        {
-            ChainOf().VcRedist(installer, architecture);
-            return this;
-        }
-
-        /// <summary>Installs the Visual C++ Redistributable from an installer file that is embedded into the setup.</summary>
-        public BundleBuilder WithVcRedist(string installerPath, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64) =>
-            WithVcRedist(PrerequisiteInstaller.FromFile(installerPath), architecture);
-
-        /// <inheritdoc cref="BundleChain.DotNetRuntime"/>
-        public BundleBuilder WithDotNetRuntime(DotNetRuntimeKind kind, int majorVersion, PrerequisiteInstaller installer, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64)
-        {
-            ChainOf().DotNetRuntime(kind, majorVersion, installer, architecture);
-            return this;
-        }
-
-        /// <summary>Installs a .NET runtime from an installer file that is embedded into the setup.</summary>
-        public BundleBuilder WithDotNetRuntime(DotNetRuntimeKind kind, int majorVersion, string installerPath, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64) =>
-            WithDotNetRuntime(kind, majorVersion, PrerequisiteInstaller.FromFile(installerPath), architecture);
-
-        /// <inheritdoc cref="BundleChain.WebView2"/>
-        public BundleBuilder WithWebView2(PrerequisiteInstaller installer)
-        {
-            ChainOf().WebView2(installer);
-            return this;
-        }
-
-        /// <summary>Installs the WebView2 Runtime from an installer file that is embedded into the setup.</summary>
-        public BundleBuilder WithWebView2(string installerPath) => WithWebView2(PrerequisiteInstaller.FromFile(installerPath));
 
         /// <summary>Adds an engine-specific customization. Prefer the engine package's extension methods.</summary>
         public BundleBuilder WithEngineCustomization(object customization)
@@ -323,7 +345,7 @@ namespace InstallKit
             return this;
         }
 
-        public BundleBuilder WithLogo(string logoFile)
+        internal BundleBuilder SetLogo(string logoFile)
         {
             var branding = Branding.Value;
             if (branding == null)

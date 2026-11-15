@@ -73,7 +73,7 @@ try {
     }
 
     # The template points at a payload project; a consumer with prebuilt files drops that line
-    # and describes the files with WithDirectory instead.
+    # and describes the files with Content(c => c.Directory(...)) instead.
     $project = Join-Path $solution 'Consumer.Installer\Consumer.Installer.csproj'
     (Get-Content $project -Raw) -replace '(?s)\s*<ItemGroup>\s*<InstallerPayload[^>]*/>\s*</ItemGroup>', '' | Set-Content $project
 
@@ -90,14 +90,14 @@ return InstallerHost.Run(args, plan =>
         .WithManufacturer("Consumer")
         .WithUpgradeCode("4b8e1f20-6d37-4c95-a1e4-9c2d70f35b18")
         .WithOutputFileName("ConsumerDemo")
-        .WithDirectory(payloadDir)
+        .Content(c => c.Directory(payloadDir))
         .WithMainExecutable("app.exe"));
 
     plan.Bundle(BundleBuilder.Create("Consumer Demo")
         .WithManufacturer("Consumer")
         .WithUpgradeCode("d3a79c15-82be-4f06-b5d1-7e0a4c96f2b3")
         .WithOutputFileName("ConsumerDemoSetup")
-        .WithMsi(app));
+        .Packages(k => k.Msi(app)));
 });
 '@
 

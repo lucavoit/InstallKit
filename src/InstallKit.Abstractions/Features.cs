@@ -1,8 +1,8 @@
 namespace InstallKit
 {
     /// <summary>
-    /// An optional part of the product (documentation, samples, plug-ins) that can be left out. Add files to it with the
-    /// <c>feature</c> argument of <c>WithPayload</c> and <c>WithDirectory</c>. Everything not assigned to a feature is always installed.
+    /// An optional part of the product (documentation, samples, plug-ins) that can be left out. Declare it, with the files it
+    /// installs, using <see cref="MsiBuilder.Feature(string, string, System.Action{ContentBuilder}, bool)"/>. Everything not assigned to a feature is always installed.
     /// </summary>
     public sealed class OptionalFeature
     {

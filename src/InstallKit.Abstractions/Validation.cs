@@ -219,12 +219,12 @@ namespace InstallKit
             {
                 var id = new OptionalFeature(payload.Feature!).Id;
                 if (!declared.ContainsKey(id))
-                    errors.Add(new ValidationError("IK242", $"{label}: files are assigned to the feature '{payload.Feature}', which is not declared. Add .WithFeature(\"{payload.Feature}\")."));
+                    errors.Add(new ValidationError("IK242", $"{label}: files are assigned to the feature '{payload.Feature}', which is not declared. Declare it with .Feature(\"{payload.Feature}\", ...) or MsiDefinition.AddFeature."));
                 used.Add(id);
             }
 
             foreach (var feature in declared.Values.Where(f => !used.Contains(f.Id)))
-                errors.Add(new ValidationError("IK243", $"{label}: the feature '{feature.Name}' has no files. Pass feature: \"{feature.Name}\" to WithPayload or WithDirectory."));
+                errors.Add(new ValidationError("IK243", $"{label}: the feature '{feature.Name}' has no files. Add them inside .Feature(\"{feature.Name}\", f => f.Payload(...)) or .Directory(...)."));
         }
 
         static void CheckRegistry(List<ValidationError> errors, MsiDefinition msi, string label)
@@ -250,7 +250,7 @@ namespace InstallKit
                 else if (string.IsNullOrWhiteSpace(variable.Value))
                     errors.Add(new ValidationError("IK181", $"{label}: the environment variable '{variable.Name}' has no value."));
                 else if (variable.IsPath && variable.Action == EnvironmentVariableAction.Set)
-                    errors.Add(new ValidationError("IK182", $"{label}: setting PATH would replace the whole variable. Use WithPathEntry(...) to add a folder, or WithEnvironmentVariable(\"PATH\", ..., EnvironmentVariableAction.Append)."));
+                    errors.Add(new ValidationError("IK182", $"{label}: setting PATH would replace the whole variable. Use Machine(m => m.PathEntry(...)) to add a folder, or m.EnvironmentVariable(\"PATH\", ..., EnvironmentVariableAction.Append)."));
                 else if (variable.Action != EnvironmentVariableAction.Set && variable.Value.IndexOf(';') >= 0)
                     errors.Add(new ValidationError("IK183", $"{label}: the {variable.Name} entry '{variable.Value}' contains ';'. Add one folder per entry."));
             }
@@ -319,7 +319,7 @@ namespace InstallKit
                 }
 
                 if (string.Equals(Path.GetExtension(edit.File), ".json", StringComparison.OrdinalIgnoreCase))
-                    errors.Add(new ValidationError("IK222", $"{label}: {what}: WithXmlValue edits XML files only. JSON files are not supported yet."));
+                    errors.Add(new ValidationError("IK222", $"{label}: {what}: XmlValue edits XML files only. JSON files are not supported yet."));
                 else
                     CheckInstalledFile(errors, msi, context, label, edit.File, $"file of the {what}");
 
@@ -398,7 +398,7 @@ namespace InstallKit
                 else if (prompt.IsReserved)
                     errors.Add(new ValidationError("IK284", $"{label}: '{prompt.Name}' is a property that Windows Installer or InstallKit uses itself. Pick another name."));
                 else if (!names.Add(prompt.Name) || msi.Properties.Keys.Contains(prompt.Name))
-                    errors.Add(new ValidationError("IK281", $"{label}: the property '{prompt.Name}' is defined more than once (as a prompt or with WithProperty)."));
+                    errors.Add(new ValidationError("IK281", $"{label}: the property '{prompt.Name}' is defined more than once (as a prompt or with Settings(s => s.Property(...)))."));
 
                 if (string.IsNullOrWhiteSpace(prompt.Label))
                     errors.Add(new ValidationError("IK282", $"{label}: the prompt for '{prompt.Name}' has no label."));

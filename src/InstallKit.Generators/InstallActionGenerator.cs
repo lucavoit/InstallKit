@@ -20,7 +20,7 @@ namespace InstallKit.Generators
     {
         internal const string SessionType = "WixToolset.Dtf.WindowsInstaller.Session";
         static readonly string[] Stages = { "OnLoad", "OnBeforeInstall", "OnAfterInstall" };
-        static readonly string[] Owners = { "InstallKit.MsiBuilder", "InstallKit.MsiDefinition" };
+        static readonly string[] Owners = { "InstallKit.LifecycleBuilder", "InstallKit.MsiDefinition" };
 
         static readonly DiagnosticDescriptor NotAMethod = new DiagnosticDescriptor(
             "IK160", "Install event handler must be a method",
