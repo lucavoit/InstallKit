@@ -15,6 +15,8 @@ return InstallerHost.Run(args, plan =>
             .Directory(@"..\content\config", "config"))
         .Feature("Docs", "Documentation", f => f.Directory(@"..\content\docs", "docs"))
         .Feature("Samples", "Sample files, not installed unless asked for", f => f.Directory(@"..\content\samples", "samples"), installedByDefault: false)
+        // A service that only exists when its feature is installed (the Service entry below).
+        .Feature("Worker", "A second service, installed on request", f => f.Payload("QaDemo", "worker"), installedByDefault: false)
         .Appearance(a => a
             .Modern(chooseInstallDir: true)
             .AccentColor("#6A1B9A"))
@@ -43,7 +45,8 @@ return InstallerHost.Run(args, plan =>
             .FolderPermission(@"NT AUTHORITY\LocalService", FolderRights.Read, "config")
             .Service("QaDemo.exe", "InstallKitQaDemo", s => s
                 .WithDisplayName("InstallKit QA Demo")
-                .WithDescription("Service installed by the InstallKit QA pipeline.")))
+                .WithDescription("Service installed by the InstallKit QA pipeline."))
+            .Service(@"worker\QaDemo.exe", "InstallKitQaWorker", s => s.WithDisplayName("InstallKit QA Worker")))
         .Lifecycle(l => l
             .OnAfterInstall(QaSetup.WriteMode, "MODE")
             .CloseApplication("InstallKitQaClose.exe", terminate: true, timeoutSeconds: 3)

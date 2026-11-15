@@ -68,7 +68,7 @@ namespace InstallKit
 
                 CheckInstalledFile(errors, msi, context, label, msi.MainExecutable, "main executable");
                 foreach (var service in msi.Services)
-                    CheckInstalledFile(errors, msi, context, label, service.Executable, $"service '{service.Name}'");
+                    CheckInstalledFile(errors, msi, context, label, service.Executable, $"service '{service.Name}'", allowFeature: true);
 
                 if (msi.Shortcuts.Desktop && string.IsNullOrWhiteSpace(msi.MainExecutable))
                     errors.Add(new ValidationError("IK120", $"{label} asks for a desktop shortcut but has no MainExecutable."));
@@ -321,7 +321,7 @@ namespace InstallKit
                 if (string.Equals(Path.GetExtension(edit.File), ".json", StringComparison.OrdinalIgnoreCase))
                     errors.Add(new ValidationError("IK222", $"{label}: {what}: XmlValue edits XML files only. JSON files are not supported yet."));
                 else
-                    CheckInstalledFile(errors, msi, context, label, edit.File, $"file of the {what}");
+                    CheckInstalledFile(errors, msi, context, label, edit.File, $"file of the {what}", allowFeature: true);
 
                 if (!edit.HasValidXPath)
                     errors.Add(new ValidationError("IK221", $"{label}: the XPath '{edit.XPath}' for '{edit.File}' is not valid, for example /configuration/appSettings/add[@key='Server']/@value."));
@@ -413,7 +413,10 @@ namespace InstallKit
                 CheckInstalledFile(errors, msi, context, label, executable, what);
         }
 
-        static void CheckInstalledFile(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label, string? path, string what)
+        // allowFeature: a service or an XML edit belongs to the feature of its file and is only there when that feature is installed.
+        // Everything else that points at a file (the main executable and its shortcuts, file associations, firewall rules) is
+        // installed whatever the user chooses, so its file must be too.
+        static void CheckInstalledFile(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label, string? path, string what, bool allowFeature = false)
         {
             if (string.IsNullOrWhiteSpace(path))
                 return;
@@ -422,9 +425,10 @@ namespace InstallKit
             if (found == null)
                 errors.Add(new ValidationError("IK121",
                     $"{label}: the {what} '{path}' is not in any payload. It must be at the top level of a payload's target folder."));
-            else if (found.Value.Payload.Feature != null)
+            else if (found.Value.Payload.Feature != null && !allowFeature)
                 errors.Add(new ValidationError("IK244",
-                    $"{label}: the {what} '{path}' is in the optional feature '{found.Value.Payload.Feature}', but it must always be installed. Move it to a payload without a feature."));
+                    $"{label}: the {what} '{path}' is in the optional feature '{found.Value.Payload.Feature}', but it is set up whether or not that feature is installed. " +
+                    "Move the file to a payload without a feature. Only services and XML values may live in a feature."));
         }
 
         static void CheckUpgradeCode(List<ValidationError> errors, Dictionary<Guid, string> seen, string label, string? upgradeCode)

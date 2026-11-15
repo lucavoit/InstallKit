@@ -399,7 +399,8 @@ MsiBuilder.Create("My App")
 - **Always-installed files:** everything added with `Content(...)`.
 - **Command line:** `msiexec /i MyApp.msi ADDLOCAL=Samples` adds a feature and `REMOVE=Documentation` removes one. Spaces in a feature name become underscores (`Sample_files`).
 - **Dialogs:** the modern UIs (`Modern`, `ModernInstallDir`) show a feature page after the welcome page and a "ready to install" page after that; running the MSI again on an installed product offers Repair, Remove and Change, and Change opens the same feature page. `InstallerUi.FeatureTree` shows the classic tree. With another UI (`Minimal`, `InstallDir`, `ProgressOnly`, `ModernWpf`) the build prints warning `IK246` and the defaults apply.
-- **Must always be installed:** the main executable, services, XML-edited files and the programs used by file associations and firewall rules cannot be in a feature (`IK244`).
+- **Services and XML values can live in a feature:** the feature's files come with their service or XML edit, and nothing of it exists when the feature is left out. Add a service for an optional part with `.Feature("Worker", f => f.Payload("Worker", "worker")).Machine(m => m.Service(@"worker\Worker.exe", "MyWorker"))`.
+- **Must always be installed:** the main executable (shortcuts point at it) and the programs used by file associations and firewall rules cannot be in a feature (`IK244`), because they are set up whether or not the feature is.
 - **Checked before WiX runs:** an unusable name (`IK240`), duplicates (`IK241`), files for a feature that was never declared (`IK242`) and a feature with no files (`IK243`).
 
 ### Folder permissions
