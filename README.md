@@ -256,6 +256,22 @@ MsiBuilder.Create("My App")
 - **Not forced on users:** Windows 10 and 11 keep the user's own "Open with" choice for an extension; the association only registers your program as a candidate and the default for extensions nobody else claimed.
 - **Checked before WiX runs:** an invalid extension (`IK190`), scheme (`IK191`) or ProgId (`IK194`), and duplicates (`IK193`, `IK195`).
 
+### Firewall rules
+
+```csharp
+MsiBuilder.Create("My App")
+    .WithService("MyService.exe", "MyService")
+    .WithFirewallRule("My App web", "8080")                                  // TCP port, any program
+    .WithFirewallRule("My App ports", "8000-8100", FirewallProtocol.Udp)     // a range, or a list such as "80,443"
+    .WithFirewallRule("My App", executable: "MyService.exe",                 // any port of one installed program,
+        scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private); // only from the local subnet, on private networks
+```
+
+- **Inbound:** the rule allows inbound connections and is removed on uninstall. Outbound rules are not supported yet.
+- **Needs elevation:** a per-user install cannot create firewall rules (`IK214`).
+- **Checked before WiX runs:** a rule needs a name (`IK210`) and a port or a program (`IK211`); ports must be 1 to 65535, a range or a list (`IK212`); a port needs TCP or UDP (`IK213`); the program must be in a payload (`IK121`).
+- **WiX extension:** the build adds the WiX firewall extension automatically when a rule is used; it is pinned to the same version as the `wix` tool like the other extensions.
+
 ## UI and branding
 
 | `Ui` | Dialogs |

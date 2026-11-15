@@ -87,6 +87,7 @@ namespace InstallKit
                 CheckRegistry(errors, msi, label);
                 CheckEnvironment(errors, label, msi);
                 CheckAssociations(errors, msi, context, label);
+                CheckFirewall(errors, msi, context, label);
 
                 foreach (var command in msi.Commands)
                 {
@@ -220,6 +221,29 @@ namespace InstallKit
                     errors.Add(new ValidationError("IK195", $"{label} registers the URL scheme '{protocol.Scheme}' more than once."));
 
                 CheckHandler(errors, msi, context, label, protocol.ResolveExecutable(msi), $"URL protocol '{protocol.Scheme}'");
+            }
+        }
+
+        static void CheckFirewall(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label)
+        {
+            foreach (var rule in msi.FirewallRules)
+            {
+                var what = $"firewall rule '{rule.Name}'";
+                if (string.IsNullOrWhiteSpace(rule.Name))
+                    errors.Add(new ValidationError("IK210", $"{label}: a firewall rule has no name."));
+                else if (rule.Port == null && rule.Executable == null)
+                    errors.Add(new ValidationError("IK211", $"{label}: the {what} names neither a port nor a program. Give it at least one."));
+
+                if (!rule.HasValidPort)
+                    errors.Add(new ValidationError("IK212", $"{label}: the {what} has the port '{rule.Port}'. Use a number from 1 to 65535, a range such as 8000-8100, or a comma separated list."));
+                else if (rule.Port != null && rule.Protocol == FirewallProtocol.Any)
+                    errors.Add(new ValidationError("IK213", $"{label}: the {what} has a port, so its protocol must be Tcp or Udp."));
+
+                if (rule.Executable != null)
+                    CheckInstalledFile(errors, msi, context, label, rule.Executable, what);
+
+                if (msi.Scope == InstallScope.PerUser)
+                    errors.Add(new ValidationError("IK214", $"{label}: the {what} cannot be created by a per-user install, which does not run elevated. Install per machine."));
             }
         }
 

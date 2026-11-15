@@ -74,6 +74,7 @@ BeforeAll {
         $DesktopLink | Should -Not -Exist
         $RegKey | Should -Not -Exist
         Get-MachinePathEntries | Should -Not -Contain $BinDir
+        Get-NetFirewallRule -DisplayName 'InstallKit QA Demo*' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         "$Classes\.ikqa" | Should -Not -Exist
         "$Classes\QaDemo.ikqa" | Should -Not -Exist
         "$Classes\installkitqa" | Should -Not -Exist
@@ -153,6 +154,25 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
         $key.GetValue('') | Should -Be 'URL:InstallKit QA link'
         $key.GetValueNames() | Should -Contain 'URL Protocol'
         (Get-Item "$Classes\installkitqa\shell\open\command").GetValue('') | Should -Be ('"' + (Join-Path $InstallDir 'QaDemo.exe') + '" "%1"')
+    }
+
+    It 'creates an enabled inbound firewall rule for the port' {
+        $rule = Get-NetFirewallRule -DisplayName 'InstallKit QA Demo port'
+        $rule | Should -HaveCount 1
+        $rule.Enabled | Should -Be 'True'
+        $rule.Direction | Should -Be 'Inbound'
+        $rule.Action | Should -Be 'Allow'
+        $filter = $rule | Get-NetFirewallPortFilter
+        $filter.Protocol | Should -Be 'TCP'
+        $filter.LocalPort | Should -Be '48765'
+    }
+
+    It 'creates a firewall rule for the installed program, limited to the local subnet and private profile' {
+        $rule = Get-NetFirewallRule -DisplayName 'InstallKit QA Demo program'
+        $rule.Enabled | Should -Be 'True'
+        $rule.Profile | Should -Be 'Private'
+        ($rule | Get-NetFirewallApplicationFilter).Program | Should -Be (Join-Path $InstallDir 'QaDemo.exe')
+        ($rule | Get-NetFirewallAddressFilter).RemoteAddress | Should -Be 'LocalSubnet'
     }
 
     It 'adds the install folder\bin to the machine PATH and sets the machine variable' {

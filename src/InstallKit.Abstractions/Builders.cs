@@ -83,6 +83,14 @@ namespace InstallKit
             return this;
         }
 
+        /// <inheritdoc cref="MsiDefinition.AddFirewallRule"/>
+        public MsiBuilder WithFirewallRule(string name, string? port = null, FirewallProtocol protocol = FirewallProtocol.Tcp, string? executable = null,
+            FirewallScope scope = FirewallScope.Any, FirewallProfile profile = FirewallProfile.All)
+        {
+            ListOf(FirewallRules, WithFirewallRules).Add(new FirewallRule(name, port, protocol, executable, scope, profile));
+            return this;
+        }
+
         /// <summary>Sets a public MSI property.</summary>
         public MsiBuilder WithProperty(string name, string value)
         {

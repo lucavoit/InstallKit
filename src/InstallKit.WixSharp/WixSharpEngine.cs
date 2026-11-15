@@ -46,6 +46,7 @@ namespace InstallKit.WixSharp
             // top level of the project, where it creates a component for each one.
             var installContents = BuildPayloadEntities(msi, context).ToList();
             installContents.AddRange(msi.EnvironmentVariables.Select((v, i) => ToEnvironmentVariable(v, i, msi.Scope)));
+            installContents.AddRange(msi.FirewallRules.Select(ToFirewallException));
 
             var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, installContents.ToArray());
             var entities = new List<WixEntity> { installDir };
@@ -113,6 +114,9 @@ namespace InstallKit.WixSharp
                         project.DefaultRefAssemblies.Add(reference);
                 }
             }
+
+            if (msi.FirewallRules.Count > 0)
+                project.Include(WixExtension.Fire);
 
             KeepSource(project, msi.ResolvedOutputFileName, context);
 
@@ -408,6 +412,29 @@ namespace InstallKit.WixSharp
                 Permanent = false,
             };
 
+        static WixEntity ToFirewallException(FirewallRule rule, int index) =>
+            new FirewallException(new Id($"InstallKitFirewall{index + 1}"), rule.Name)
+            {
+                // WixSharp leaves a rule disabled unless it is asked to enable it.
+                Enabled = true,
+                Port = rule.Port,
+                Protocol = rule.Protocol switch
+                {
+                    FirewallProtocol.Tcp => FirewallExceptionProtocol.tcp,
+                    FirewallProtocol.Udp => FirewallExceptionProtocol.udp,
+                    _ => (FirewallExceptionProtocol?)null,
+                },
+                Program = rule.Executable == null ? null : $"[{InstallDirId}]{Normalize(rule.Executable)}",
+                Scope = rule.Scope == FirewallScope.LocalSubnet ? FirewallExceptionScope.localSubnet : FirewallExceptionScope.any,
+                Profile = rule.Profile switch
+                {
+                    FirewallProfile.Domain => FirewallExceptionProfile.domain,
+                    FirewallProfile.Private => FirewallExceptionProfile.@private,
+                    FirewallProfile.Public => FirewallExceptionProfile.@public,
+                    _ => FirewallExceptionProfile.all,
+                },
+            };
+
         static ServiceInstaller ToServiceInstaller(ServiceDefinition service) => new ServiceInstaller
         {
             Name = service.Name,
@@ -484,7 +511,7 @@ namespace InstallKit.WixSharp
             // from .config/dotnet-tools.json so builds don't pick up whatever is newest on NuGet.
             if (!string.IsNullOrWhiteSpace(context.WixVersion))
             {
-                foreach (var extension in new[] { WixExtension.UI, WixExtension.Util, WixExtension.Bal, WixExtension.NetFx })
+                foreach (var extension in new[] { WixExtension.UI, WixExtension.Util, WixExtension.Bal, WixExtension.NetFx, WixExtension.Fire })
                     extension.PreferredVersion = context.WixVersion;
             }
 

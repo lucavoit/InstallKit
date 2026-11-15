@@ -79,6 +79,9 @@ namespace InstallKit
         /// <summary>URL schemes handled by this product. See <see cref="AddUrlProtocol"/>.</summary>
         public IList<UrlProtocol> UrlProtocols { get; set; } = new List<UrlProtocol>();
 
+        /// <summary>Inbound Windows Firewall exceptions. See <see cref="AddFirewallRule"/>.</summary>
+        public IList<FirewallRule> FirewallRules { get; set; } = new List<FirewallRule>();
+
         /// <summary>Registry values written at install time and removed on uninstall. See <see cref="AddRegistryValue(RegistryHive, string, string?, string, RegistryValueKind)"/>.</summary>
         public IList<RegistryEntry> RegistryEntries { get; set; } = new List<RegistryEntry>();
 
@@ -234,6 +237,20 @@ namespace InstallKit
                     all.AddRange(protocol.ToRegistryEntries(this));
                 return all;
             }
+        }
+
+        /// <summary>Opens a port, a program or both in Windows Firewall (inbound) and removes the rule on uninstall.</summary>
+        /// <param name="name">The rule name shown in Windows Defender Firewall.</param>
+        /// <param name="port">A port (<c>8080</c>), a range (<c>8000-8100</c>) or a list (<c>80,443</c>), or <c>null</c> for every port of the program.</param>
+        /// <param name="protocol">The protocol. Use <see cref="FirewallProtocol.Any"/> for a program without a port.</param>
+        /// <param name="executable">A program of the product relative to the install directory, or <c>null</c> to allow the port for every program.</param>
+        /// <param name="scope">Which remote addresses are allowed.</param>
+        /// <param name="profile">The firewall profiles the rule is active in.</param>
+        public MsiDefinition AddFirewallRule(string name, string? port = null, FirewallProtocol protocol = FirewallProtocol.Tcp, string? executable = null,
+            FirewallScope scope = FirewallScope.Any, FirewallProfile profile = FirewallProfile.All)
+        {
+            FirewallRules.Add(new FirewallRule(name, port, protocol, executable, scope, profile));
+            return this;
         }
 
         /// <summary>Output file name with defaults applied.</summary>
