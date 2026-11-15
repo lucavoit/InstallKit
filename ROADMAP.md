@@ -2,12 +2,16 @@
 
 What InstallKit may offer next, grouped by when. This is a plan, not a promise: the order can change with feedback. Open an issue to argue for moving something up.
 
+## Done
+
+Not released yet:
+- Registry values, with removal on uninstall
+
 ## Now
 
 In progress or next up.
 
 **Installer model** (fluent builders, engine-neutral, validated before WiX runs):
-- Registry entries, with removal on uninstall
 - `PATH` entries and environment variables
 - File associations and URL protocol handlers
 - Firewall rules
