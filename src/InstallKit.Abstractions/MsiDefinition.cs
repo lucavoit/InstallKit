@@ -70,6 +70,9 @@ namespace InstallKit
 
         public IList<ServiceDefinition> Services { get; set; } = new List<ServiceDefinition>();
 
+        /// <summary>Environment variable and <c>PATH</c> changes made at install time and undone on uninstall.</summary>
+        public IList<EnvironmentVariableEntry> EnvironmentVariables { get; set; } = new List<EnvironmentVariableEntry>();
+
         /// <summary>Registry values written at install time and removed on uninstall. See <see cref="AddRegistryValue(RegistryHive, string, string?, string, RegistryValueKind)"/>.</summary>
         public IList<RegistryEntry> RegistryEntries { get; set; } = new List<RegistryEntry>();
 
@@ -175,6 +178,19 @@ namespace InstallKit
         /// <summary>Writes a <c>REG_DWORD</c> registry value on install and removes it on uninstall.</summary>
         public MsiDefinition AddRegistryValue(RegistryHive hive, string key, string? name, int value) =>
             AddRegistryValue(hive, key, name, value.ToString(System.Globalization.CultureInfo.InvariantCulture), RegistryValueKind.DWord);
+
+        /// <summary>Sets, appends to or prepends to an environment variable. The change is undone on uninstall.</summary>
+        public MsiDefinition AddEnvironmentVariable(string name, string value, EnvironmentVariableAction action = EnvironmentVariableAction.Set)
+        {
+            EnvironmentVariables.Add(new EnvironmentVariableEntry(name, value, action));
+            return this;
+        }
+
+        /// <summary>Adds a folder to <c>PATH</c> and removes it again on uninstall.</summary>
+        /// <param name="path">The folder, for example <c>[INSTALLDIR]bin</c>.</param>
+        /// <param name="prepend">Put the folder at the start of <c>PATH</c> instead of the end.</param>
+        public MsiDefinition AddPathEntry(string path, bool prepend = false) =>
+            AddEnvironmentVariable("PATH", path, prepend ? EnvironmentVariableAction.Prepend : EnvironmentVariableAction.Append);
 
         /// <summary>Output file name with defaults applied.</summary>
         public string ResolvedOutputFileName => string.IsNullOrWhiteSpace(OutputFileName) ? Name.Replace(" ", string.Empty) : OutputFileName!;
