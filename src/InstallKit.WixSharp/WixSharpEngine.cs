@@ -51,6 +51,7 @@ namespace InstallKit.WixSharp
             var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, installContents.ToArray());
             var entities = new List<WixEntity> { installDir };
             entities.AddRange(msi.ResolvedRegistryEntries.Select(ToRegValue));
+            entities.AddRange(msi.CloseApplications.Select(ToCloseApplication));
             entities.AddRange(BuildShortcutDirs(msi));
             entities.AddRange(msi.Commands.Select(ToAction));
 
@@ -117,6 +118,8 @@ namespace InstallKit.WixSharp
 
             if (msi.FirewallRules.Count > 0)
                 project.Include(WixExtension.Fire);
+            if (msi.CloseApplications.Count > 0)
+                project.Include(WixExtension.Util);
 
             KeepSource(project, msi.ResolvedOutputFileName, context);
 
@@ -423,6 +426,16 @@ namespace InstallKit.WixSharp
                 },
                 System = scope == InstallKit.InstallScope.PerMachine,
                 Permanent = false,
+            };
+
+        static WixEntity ToCloseApplication(CloseApplicationRule rule, int index) =>
+            new global::WixSharp.CloseApplication(new Id($"InstallKitClose{index + 1}"), rule.ProcessName, closeMessage: true, rebootPrompt: false)
+            {
+                Timeout = rule.TimeoutSeconds,
+                // The exit code the process is ended with; null leaves a program that ignored the request running.
+                TerminateProcess = rule.Terminate ? 0 : (int?)null,
+                // Ask again in the elevated phase, so programs started by other users or services are asked too.
+                ElevatedCloseMessage = true,
             };
 
         static WixEntity ToFirewallException(FirewallRule rule, int index) =>

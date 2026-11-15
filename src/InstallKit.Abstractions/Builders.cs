@@ -98,6 +98,13 @@ namespace InstallKit
             return this;
         }
 
+        /// <inheritdoc cref="MsiDefinition.AddCloseApplication"/>
+        public MsiBuilder WithCloseApplication(string processName, bool terminate = false, int timeoutSeconds = 5)
+        {
+            ListOf(CloseApplications, WithCloseApplications).Add(new CloseApplicationRule(processName, terminate, timeoutSeconds));
+            return this;
+        }
+
         /// <summary>Sets a public MSI property.</summary>
         public MsiBuilder WithProperty(string name, string value)
         {
