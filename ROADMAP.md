@@ -16,6 +16,8 @@ Not released yet:
 - `installkit` command line tool with `new-guid`, `inspect` and `diff` (run from source)
 - Folder permissions on the install folder and its subfolders
 - Versions that install side by side (per major version, per minor version or every version)
+- Modern UI: a feature page and a Change option for products with optional features, and the repair and remove dialogs shown when the MSI is run again
+- ICE validation of the built MSIs in CI
 - Bundle prerequisite helpers for the VC++ redistributable, .NET runtimes and WebView2, from an embedded file or a pinned download
 
 ## Now

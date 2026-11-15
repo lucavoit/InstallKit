@@ -60,6 +60,9 @@ jobs:
       - name: Tool unit tests
         run: dotnet test tests/InstallKit.Tool.Tests -c Release
 
+      - name: Modern dialog tests
+        run: dotnet test tests/InstallKit.WixSharp.Tests -c Release
+
       - name: Pack
         run: dotnet pack InstallKit.slnx -c Release -p:InstallKitVersion=${{ steps.version.outputs.version }}
 
