@@ -135,6 +135,9 @@ namespace InstallKit.WixSharp
             if (msi.CloseApplications.Count > 0)
                 project.Include(WixExtension.Util);
 
+            // Before the source is kept, so the kept file is the one WiX compiles.
+            project.WixSourceGenerated += document => IdentifierLimits.Apply(document);
+
             KeepSource(project, msi.ResolvedOutputFileName, context);
 
             foreach (var customize in msi.EngineCustomizations.OfType<Action<Project>>())

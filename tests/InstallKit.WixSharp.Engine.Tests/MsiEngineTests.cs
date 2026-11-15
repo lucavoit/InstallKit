@@ -251,4 +251,27 @@ public class MsiEngineTests
 
         Assert.Equal("perUser", A(wxs.One("Package"), "Scope"));
     }
+
+    [Fact]
+    public void Files_with_long_names_get_identifiers_within_the_72_character_limit_and_every_reference_resolves()
+    {
+        var workspace = new Wxs.Workspace();
+        var longName = "Microsoft.Extensions.Configuration.EnvironmentVariables.Extra.Long.Name.dll";
+        System.IO.File.WriteAllText(System.IO.Path.Combine(workspace.Payload, longName), "x");
+        var longConfig = "A.Very.Long.Application.Configuration.File.Name.For.Testing.Limits.config";
+        System.IO.File.WriteAllText(System.IO.Path.Combine(workspace.Payload, longConfig), "<configuration/>");
+
+        var wxs = Wxs.Msi(workspace, workspace.App().WithXmlValue(longConfig, "/configuration/@x", "1"));
+
+        Assert.All(wxs.All("Component").Concat(wxs.All("File")), e => Assert.True(A(e, "Id")!.Length <= 72, A(e, "Id")));
+
+        var components = wxs.All("Component").Select(c => A(c, "Id")).ToHashSet();
+        Assert.All(wxs.All("ComponentRef"), r => Assert.Contains(A(r, "Id"), components));
+
+        // The XML edit still points at the file it edits, whose id was shortened too.
+        var edit = wxs.One("XmlFile");
+        var file = edit.Parent!.Elements().Single(e => e.Name.LocalName == "File");
+        Assert.EndsWith(longConfig, A(file, "Source"));
+        Assert.Equal($"[#{A(file, "Id")}]", A(edit, "File"));
+    }
 }

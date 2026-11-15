@@ -34,5 +34,6 @@
     <Compile Include="..\..\src\InstallKit.WixSharp\WixSharpCustomizations.cs" Link="Engine\WixSharpCustomizations.cs" />
     <Compile Include="..\..\src\InstallKit.WixSharp\ModernDialogs.cs" Link="Engine\ModernDialogs.cs" />
     <Compile Include="..\..\src\InstallKit.WixSharp\ModernDialogXml.cs" Link="Engine\ModernDialogXml.cs" />
+    <Compile Include="..\..\src\InstallKit.WixSharp\IdentifierLimits.cs" Link="Engine\IdentifierLimits.cs" />
   </ItemGroup>
 </Project>
