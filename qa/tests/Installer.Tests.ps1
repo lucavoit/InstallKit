@@ -9,6 +9,7 @@
 param(
     [Parameter(Mandatory)] [string] $V1,      # folder with QaDemo.msi built as 1.0.0
     [Parameter(Mandatory)] [string] $V2,      # folder with QaDemo.msi and QaDemoSetup.exe built as 1.1.0
+    [string] $V1Patch = '',                   # optional: folder with a 1.0.1 build, for the side-by-side patch test
     [Parameter(Mandatory)] [string] $LogDir
 )
 
@@ -63,6 +64,9 @@ BeforeAll {
         return $false
     }
 
+    function Get-SideEntries { @(Get-ChildItem $UninstallKeys -ErrorAction SilentlyContinue | Get-ItemProperty | Where-Object { $_.DisplayName -like 'InstallKit QA Side *' -and $_.WindowsInstaller -eq 1 }) }
+    function Get-SideDir([string] $Line) { Join-Path $env:ProgramFiles "InstallKit\InstallKit QA Side $Line" }
+
     function Get-MachinePathEntries { @([Environment]::GetEnvironmentVariable('Path', 'Machine') -split ';' | ForEach-Object { $_.TrimEnd('\') }) }
 
     # The allow rules of a folder for an identity such as '*\Users'.
@@ -93,6 +97,8 @@ BeforeAll {
         "$Classes\installkitqa" | Should -Not -Exist
         [Environment]::GetEnvironmentVariable('INSTALLKIT_QA_HOME', 'Machine') | Should -BeNullOrEmpty
     }
+
+    foreach ($entry in Get-SideEntries) { Invoke-Msi "/x $($entry.PSChildName)" 'cleanup-side' }
 
     # Start from a clean machine state (a previous failed attempt on the same agent, for example).
     foreach ($entry in Get-MsiEntries) { Invoke-Msi "/x $($entry.PSChildName)" 'cleanup' }
@@ -299,6 +305,69 @@ Describe 'Changing features of the installed product' {
         Join-Path $InstallDir 'docs' | Should -Not -Exist
         Join-Path $InstallDir 'samples\sample.txt' | Should -Exist
         Join-Path $InstallDir 'QaDemo.exe' | Should -Exist
+    }
+}
+
+Describe 'Versions of a side-by-side product' {
+    It 'installs 1.0.0 as the line 1.0 with its own folder and service' {
+        Invoke-Msi "/i `"$(Join-Path $V1 'QaSide.msi')`"" '5a-side-1.0.0'
+
+        $entries = Get-SideEntries
+        $entries | Should -HaveCount 1
+        $entries[0].DisplayName | Should -Be 'InstallKit QA Side 1.0'
+        $entries[0].DisplayVersion | Should -Be '1.0.0.0'
+        Join-Path (Get-SideDir '1.0') 'QaDemo.exe' | Should -Exist
+        Join-Path (Get-SideDir '1.0') 'config\qa.config' | Should -Exist
+        Get-Service 'InstallKitQaSide-1.0' | Should -Not -BeNullOrEmpty
+    }
+
+    It 'installs 1.1.0 next to it instead of replacing it' {
+        Invoke-Msi "/i `"$(Join-Path $V2 'QaSide.msi')`"" '5b-side-1.1.0'
+
+        $entries = Get-SideEntries | Sort-Object DisplayName
+        $entries | Should -HaveCount 2
+        $entries[0].DisplayName | Should -Be 'InstallKit QA Side 1.0'
+        $entries[0].DisplayVersion | Should -Be '1.0.0.0'
+        $entries[1].DisplayName | Should -Be 'InstallKit QA Side 1.1'
+        $entries[1].DisplayVersion | Should -Be '1.1.0.0'
+        Join-Path (Get-SideDir '1.0') 'QaDemo.exe' | Should -Exist
+        Join-Path (Get-SideDir '1.1') 'QaDemo.exe' | Should -Exist
+        Get-Service 'InstallKitQaSide-1.0' | Should -Not -BeNullOrEmpty
+        Get-Service 'InstallKitQaSide-1.1' | Should -Not -BeNullOrEmpty
+    }
+
+    It 'lets a patch release replace only its own line' -Skip:(-not $V1Patch) {
+        Invoke-Msi "/i `"$(Join-Path $V1Patch 'QaSide.msi')`"" '5c-side-1.0.1'
+
+        $entries = Get-SideEntries | Sort-Object DisplayName
+        $entries | Should -HaveCount 2
+        $entries[0].DisplayVersion | Should -Be '1.0.1.0'
+        $entries[1].DisplayVersion | Should -Be '1.1.0.0'
+        Join-Path (Get-SideDir '1.0') 'QaDemo.exe' | Should -Exist
+        Join-Path (Get-SideDir '1.1') 'QaDemo.exe' | Should -Exist
+    }
+
+    It 'removes one line without touching the other' {
+        $line10 = Get-SideEntries | Where-Object DisplayName -eq 'InstallKit QA Side 1.0'
+        Invoke-Msi "/x $($line10.PSChildName)" '5d-side-uninstall-1.0'
+
+        Get-SideEntries | Should -HaveCount 1
+        (Get-SideEntries)[0].DisplayName | Should -Be 'InstallKit QA Side 1.1'
+        # The service's heartbeat.txt is not part of the MSI, so the folder itself may stay; its files must not.
+        Join-Path (Get-SideDir '1.0') 'QaDemo.exe' | Should -Not -Exist
+        Join-Path (Get-SideDir '1.0') 'config' | Should -Not -Exist
+        Get-Service 'InstallKitQaSide-1.0' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Join-Path (Get-SideDir '1.1') 'QaDemo.exe' | Should -Exist
+        Get-Service 'InstallKitQaSide-1.1' | Should -Not -BeNullOrEmpty
+    }
+
+    It 'removes the last line completely' {
+        Invoke-Msi "/x $((Get-SideEntries)[0].PSChildName)" '5e-side-uninstall-1.1'
+
+        Get-SideEntries | Should -HaveCount 0
+        Join-Path (Get-SideDir '1.1') 'QaDemo.exe' | Should -Not -Exist
+        Join-Path (Get-SideDir '1.1') 'config' | Should -Not -Exist
+        Get-Service 'InstallKitQaSide-1.1' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
 }
 

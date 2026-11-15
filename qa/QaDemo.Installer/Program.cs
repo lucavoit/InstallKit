@@ -43,6 +43,17 @@ return InstallerHost.Run(args, plan =>
             .WithDisplayName("InstallKit QA Demo")
             .WithDescription("Service installed by the InstallKit QA pipeline.")));
 
+    // A second product whose versions install side by side: 1.0.x and 1.1.x are different lines, so 1.1.0 does not
+    // replace 1.0.0, while 1.0.1 replaces 1.0.0. The QA tests install them next to each other.
+    plan.Msi(MsiBuilder.Create("InstallKit QA Side")
+        .WithManufacturer("InstallKit")
+        .WithUpgradeCode("a8c2d417-6e3b-4f90-b5d1-7c4e0a92f685") // never change
+        .WithOutputFileName("QaSide")
+        .WithSideBySide(SideBySideMode.MajorMinor)
+        .WithPayload("QaDemo")
+        .WithDirectory(@"..\content\config", "config")
+        .WithService("QaDemo.exe", "InstallKitQaSide", s => s.WithDisplayName("InstallKit QA Side")));
+
     // A second bundle that is only built, not installed: it makes WiX compile the prerequisite helpers (embedded
     // installers, a .NET runtime, WebView2, a download). The "installers" are placeholder files; Burn never runs them here.
     var prerequisites = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "installkit-qa-prerequisites");

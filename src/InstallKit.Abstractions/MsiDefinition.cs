@@ -38,6 +38,15 @@ namespace InstallKit
 
         public InstallScope Scope { get; set; } = InstallScope.PerMachine;
 
+        /// <summary>
+        /// Whether versions install side by side instead of replacing each other. See <see cref="SideBySideMode"/>.
+        /// The name, upgrade code and service names get the version line (for example <c>3.1</c>) at build time.
+        /// </summary>
+        public SideBySideMode SideBySide { get; set; } = SideBySideMode.None;
+
+        // Set when the side-by-side naming was applied; a field so the generated builder does not expose it.
+        internal string? AppliedSideBySideLine;
+
         public InstallerUi Ui { get; set; } = InstallerUi.Minimal;
 
         /// <summary>Optional RTF license shown by the UI.</summary>

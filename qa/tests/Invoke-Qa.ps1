@@ -3,6 +3,7 @@
 param(
     [Parameter(Mandatory)] [string] $V1,
     [Parameter(Mandatory)] [string] $V2,
+    [string] $V1Patch = '',      # optional: a build of 1.0.1, to test that a patch release replaces its own line
     [string] $LogDir = (Join-Path ([IO.Path]::GetTempPath()) 'installkit-qa-logs'),
     [string] $ResultFile = (Join-Path ([IO.Path]::GetTempPath()) 'installkit-qa-results.xml')
 )
@@ -22,6 +23,7 @@ Import-Module Pester -MinimumVersion 5.5.0
 $container = New-PesterContainer -Path (Join-Path $PSScriptRoot 'Installer.Tests.ps1') -Data @{
     V1     = (Resolve-Path $V1).Path
     V2     = (Resolve-Path $V2).Path
+    V1Patch = $(if ($V1Patch) { (Resolve-Path $V1Patch).Path } else { '' })
     LogDir = $LogDir
 }
 

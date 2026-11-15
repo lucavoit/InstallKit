@@ -57,6 +57,7 @@ namespace InstallKit
         public static IReadOnlyList<string> Build(InstallerPlan plan, IInstallerEngine engine)
         {
             ApplyCapabilities(plan, engine);
+            SideBySide.Apply(plan);
 
             var errors = InstallerValidator.Validate(plan);
             if (errors.Count > 0)

@@ -22,6 +22,15 @@ namespace InstallKit
 
         public Version? Version { get; set; }
 
+        /// <summary>
+        /// Whether versions of the bundle install side by side instead of replacing each other. Use the same mode as the
+        /// MSIs it chains, otherwise a newer bundle replaces the older one together with its MSIs.
+        /// </summary>
+        public SideBySideMode SideBySide { get; set; } = SideBySideMode.None;
+
+        // Set when the side-by-side naming was applied; a field so the generated builder does not expose it.
+        internal string? AppliedSideBySideLine;
+
         /// <summary>Output file name without extension. Defaults to the name without spaces plus <c>Setup</c>.</summary>
         public string? OutputFileName { get; set; }
 
