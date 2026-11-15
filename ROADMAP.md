@@ -8,13 +8,13 @@ Not released yet:
 - Registry values, with removal on uninstall
 - `PATH` entries and environment variables
 - File associations and URL protocol handlers
+- Firewall rules (inbound)
 
 ## Now
 
 In progress or next up.
 
 **Installer model** (fluent builders, engine-neutral, validated before WiX runs):
-- Firewall rules
 - Config file transforms: write install-time values into `appsettings.json` or `.config` files without a custom action
 - Multi-instance (side-by-side) installs and `.mst` transforms for per-customer variants
 - Optional features: a builder API for feature groups
