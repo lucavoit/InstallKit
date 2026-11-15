@@ -425,7 +425,8 @@ namespace InstallKit.WixSharp
         /// </summary>
         static Dir BuildFolder(string path, WixEntity[] contents, DirPermission[] permissions, Id? id = null)
         {
-            Dir Leaf(string name) => id != null ? new Dir(id, name, contents) : new Dir(name, contents);
+            // Compare as object: WixSharp's Id overloads != and throws when the other side is null.
+            Dir Leaf(string name) => (object?)id != null ? new Dir(id!, name, contents) : new Dir(name, contents);
 
             if (permissions.Length == 0)
                 return Leaf(path);
