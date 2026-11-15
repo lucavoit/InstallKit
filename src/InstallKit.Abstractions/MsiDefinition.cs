@@ -70,6 +70,9 @@ namespace InstallKit
 
         public IList<ServiceDefinition> Services { get; set; } = new List<ServiceDefinition>();
 
+        /// <summary>Registry values written at install time and removed on uninstall. See <see cref="AddRegistryValue(RegistryHive, string, string?, string, RegistryValueKind)"/>.</summary>
+        public IList<RegistryEntry> RegistryEntries { get; set; } = new List<RegistryEntry>();
+
         /// <summary>Public MSI properties (for example values a bundle passes in).</summary>
         public IDictionary<string, string> Properties { get; set; } = new Dictionary<string, string>();
 
@@ -156,6 +159,22 @@ namespace InstallKit
             Services.Add(service);
             return this;
         }
+
+        /// <summary>Writes a registry value on install and removes it on uninstall.</summary>
+        /// <param name="hive">The registry root.</param>
+        /// <param name="key">The key below the root, for example <c>Software\Contoso\My App</c>.</param>
+        /// <param name="name">The value name, or <c>null</c> for the key's default value.</param>
+        /// <param name="value">The value. MSI formatted text such as <c>[INSTALLDIR]</c> is expanded.</param>
+        /// <param name="kind">The value type.</param>
+        public MsiDefinition AddRegistryValue(RegistryHive hive, string key, string? name, string value, RegistryValueKind kind = RegistryValueKind.String)
+        {
+            RegistryEntries.Add(new RegistryEntry(hive, key, name, value, kind));
+            return this;
+        }
+
+        /// <summary>Writes a <c>REG_DWORD</c> registry value on install and removes it on uninstall.</summary>
+        public MsiDefinition AddRegistryValue(RegistryHive hive, string key, string? name, int value) =>
+            AddRegistryValue(hive, key, name, value.ToString(System.Globalization.CultureInfo.InvariantCulture), RegistryValueKind.DWord);
 
         /// <summary>Output file name with defaults applied.</summary>
         public string ResolvedOutputFileName => string.IsNullOrWhiteSpace(OutputFileName) ? Name.Replace(" ", string.Empty) : OutputFileName!;

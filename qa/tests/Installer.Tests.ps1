@@ -21,6 +21,7 @@ BeforeAll {
     $script:StartMenu   = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'InstallKit\InstallKit QA Demo'
     $script:DesktopLink = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'InstallKit QA Demo.lnk'
     $script:Evidence    = Join-Path $env:ProgramData 'InstallKitQa'
+    $script:RegKey      = 'HKLM:\SOFTWARE\InstallKit\QA Demo'
     # The bundle's engine is 32-bit, so its entry lives in the WOW6432Node view; look in both.
     $script:UninstallKeys = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
                             'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
@@ -67,6 +68,7 @@ BeforeAll {
         Join-Path $InstallDir 'config' | Should -Not -Exist
         $StartMenu | Should -Not -Exist
         $DesktopLink | Should -Not -Exist
+        $RegKey | Should -Not -Exist
     }
 
     # Start from a clean machine state (a previous failed attempt on the same agent, for example).
@@ -117,6 +119,16 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
 
     It 'runs RunAfterInstall with the formatted MODE argument' {
         Get-Content (Join-Path $InstallDir 'init.txt') -Raw | Should -Be 'server'
+    }
+
+    It 'writes the registry values, expanding [INSTALLDIR]' {
+        $key = Get-Item $RegKey
+        $key.GetValue('InstallPath') | Should -Be ($InstallDir + '\')
+        $key.GetValue('') | Should -Be 'InstallKit QA Demo'
+        $key.GetValue('Telemetry') | Should -Be 0
+        $key.GetValueKind('Telemetry') | Should -Be 'DWord'
+        $key.GetValueKind('LogDir') | Should -Be 'ExpandString'
+        $key.GetValue('LogDir') | Should -Be (Join-Path $env:ProgramData 'InstallKitQa')
     }
 }
 
