@@ -12,6 +12,7 @@ Not released yet:
 - Values in XML config files, set at install time without a custom action (JSON is still to do)
 - Closing (and optionally ending) running programs before an install, upgrade or uninstall
 - Optional features that users can leave out, chosen in the feature tree or with `ADDLOCAL`
+- Roslyn analyzers for upgrade codes and builder creation (`IK300` to `IK303`)
 
 ## Now
 
@@ -22,7 +23,7 @@ In progress or next up.
 - Prerequisite helpers for bundles: .NET runtime, VC++ redistributable, WebView2, with built-in detect conditions
 
 **Tooling and runtime:**
-- Roslyn analyzers and code fixes for the `IKxxx` validation errors
+- Code fixes for the analyzers, and analyzers for more of the `IKxxx` checks
 - An `installkit` dotnet tool: `inspect`, `diff` and `verify` for MSI files, plus `new-guid`
 - Folder permissions (grant an account rights on the install folder or a subfolder)
 
