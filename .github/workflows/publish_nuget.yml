@@ -57,6 +57,9 @@ jobs:
       - name: Unit tests
         run: dotnet test tests/InstallKit.Abstractions.Tests -c Release
 
+      - name: Tool unit tests
+        run: dotnet test tests/InstallKit.Tool.Tests -c Release
+
       - name: Pack
         run: dotnet pack InstallKit.slnx -c Release -p:InstallKitVersion=${{ steps.version.outputs.version }}
 

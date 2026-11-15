@@ -5,6 +5,7 @@
     <Project Path="src/InstallKit.WixSharp/InstallKit.WixSharp.csproj" />
     <Project Path="src/InstallKit.WixSharp.Core/InstallKit.WixSharp.Core.csproj" />
     <Project Path="src/InstallKit.Sdk/InstallKit.Sdk.csproj" />
+    <Project Path="src/InstallKit.Tool/InstallKit.Tool.csproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/HelloService/HelloService.csproj" />
@@ -21,5 +22,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/InstallKit.Abstractions.Tests/InstallKit.Abstractions.Tests.csproj" />
+    <Project Path="tests/InstallKit.Tool.Tests/InstallKit.Tool.Tests.csproj" />
   </Folder>
 </Solution>
