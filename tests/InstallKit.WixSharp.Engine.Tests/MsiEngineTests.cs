@@ -293,4 +293,33 @@ public class MsiEngineTests
         // The other file of the folder is still installed, once.
         Assert.Single(folder.Descendants(), e => e.Name.LocalName == "File" && (A(e, "Source") ?? "").EndsWith("other.txt"));
     }
+
+    [Fact]
+    public void A_service_and_an_xml_edit_in_a_feature_belong_to_that_feature_and_not_to_the_core()
+    {
+        var workspace = new Wxs.Workspace();
+        var worker = System.IO.Path.Combine(workspace.Root, "worker");
+        System.IO.Directory.CreateDirectory(worker);
+        System.IO.File.WriteAllText(System.IO.Path.Combine(worker, "Worker.exe"), "x");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(worker, "worker.config"), "<configuration/>");
+
+        var wxs = Wxs.Msi(workspace, workspace.App()
+            .WithFeature("Worker", installedByDefault: false)
+            .WithDirectory(worker, "worker", "Worker")
+            .WithService(@"worker\Worker.exe", "WorkerSvc")
+            .WithXmlValue(@"worker\worker.config", "/configuration/@x", "1"));
+
+        var feature = wxs.All("Feature").Single(f => A(f, "Id") == "Worker");
+        var refs = feature.Elements().Where(e => e.Name.LocalName == "ComponentRef").Select(r => A(r, "Id")).ToHashSet();
+
+        // The service's and the XML edit's components are in the feature (which is off by default) ...
+        Assert.Contains(A(wxs.One("ServiceInstall").Parent!, "Id"), refs);
+        Assert.Contains(A(wxs.One("XmlFile").Parent!, "Id"), refs);
+
+        // ... and in no other feature, in particular not in the always-installed one.
+        var elsewhere = wxs.All("Feature").Where(f => A(f, "Id") != "Worker")
+            .SelectMany(f => f.Elements().Where(e => e.Name.LocalName == "ComponentRef")).Select(r => A(r, "Id")).ToHashSet();
+        Assert.DoesNotContain(A(wxs.One("ServiceInstall").Parent!, "Id"), elsewhere);
+        Assert.DoesNotContain(A(wxs.One("XmlFile").Parent!, "Id"), elsewhere);
+    }
 }

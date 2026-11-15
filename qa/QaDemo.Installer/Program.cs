@@ -15,6 +15,10 @@ return InstallerHost.Run(args, plan =>
         .WithFeature("Samples", "Sample files, not installed unless asked for", installedByDefault: false)
         .WithDirectory(@"..\content\docs", "docs", feature: "Docs")
         .WithDirectory(@"..\content\samples", "samples", feature: "Samples")
+        // A service that only exists when its feature is installed.
+        .WithFeature("Worker", "A second service, installed on request", installedByDefault: false)
+        .WithPayload("QaDemo", "worker", feature: "Worker")
+        .WithService(@"worker\QaDemo.exe", "InstallKitQaWorker", s => s.WithDisplayName("InstallKit QA Worker"))
         .WithMainExecutable("QaDemo.exe")
         .WithStartMenuShortcut()
         .WithDesktopShortcut()
