@@ -419,6 +419,10 @@ dotnet build qa/QaDemo.Installer -c Release -p:InstallKitVersion=1.1.0 -p:Instal
 ./qa/tests/Invoke-Qa.ps1 -V1 out/1.0.0 -V2 out/1.1.0
 ```
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for what is planned now, later and in the future, and what is not planned.
+
 ## License
 
 InstallKit is released under the [MIT License](LICENSE). WixSharp and the WiX Toolset have their own licences; see [WiX version and licence](#wix-version-and-licence).
