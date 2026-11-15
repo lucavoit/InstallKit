@@ -277,6 +277,38 @@ namespace InstallKit
             return this;
         }
 
+        /// <inheritdoc cref="BundleChain.VcRedist"/>
+        public BundleBuilder WithVcRedist(PrerequisiteInstaller installer, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64)
+        {
+            ChainOf().VcRedist(installer, architecture);
+            return this;
+        }
+
+        /// <summary>Installs the Visual C++ Redistributable from an installer file that is embedded into the setup.</summary>
+        public BundleBuilder WithVcRedist(string installerPath, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64) =>
+            WithVcRedist(PrerequisiteInstaller.FromFile(installerPath), architecture);
+
+        /// <inheritdoc cref="BundleChain.DotNetRuntime"/>
+        public BundleBuilder WithDotNetRuntime(DotNetRuntimeKind kind, int majorVersion, PrerequisiteInstaller installer, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64)
+        {
+            ChainOf().DotNetRuntime(kind, majorVersion, installer, architecture);
+            return this;
+        }
+
+        /// <summary>Installs a .NET runtime from an installer file that is embedded into the setup.</summary>
+        public BundleBuilder WithDotNetRuntime(DotNetRuntimeKind kind, int majorVersion, string installerPath, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64) =>
+            WithDotNetRuntime(kind, majorVersion, PrerequisiteInstaller.FromFile(installerPath), architecture);
+
+        /// <inheritdoc cref="BundleChain.WebView2"/>
+        public BundleBuilder WithWebView2(PrerequisiteInstaller installer)
+        {
+            ChainOf().WebView2(installer);
+            return this;
+        }
+
+        /// <summary>Installs the WebView2 Runtime from an installer file that is embedded into the setup.</summary>
+        public BundleBuilder WithWebView2(string installerPath) => WithWebView2(PrerequisiteInstaller.FromFile(installerPath));
+
         /// <summary>Adds an engine-specific customization. Prefer the engine package's extension methods.</summary>
         public BundleBuilder WithEngineCustomization(object customization)
         {

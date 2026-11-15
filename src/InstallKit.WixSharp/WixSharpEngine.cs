@@ -146,8 +146,10 @@ namespace InstallKit.WixSharp
                 OutFileName = bundle.ResolvedOutputFileName,
             };
 
-            if (bundle.Chain.Items.OfType<NetFrameworkChainItem>().Any())
+            if (bundle.Chain.Items.OfType<NetFrameworkChainItem>().Any() || bundle.Chain.Searches.OfType<DotNetBundleSearch>().Any())
                 wixBundle.Include(WixExtension.NetFx);
+
+            AddSearches(wixBundle, bundle.Chain.Searches);
 
             wixBundle.Application = new LicenseBootstrapperApplication
             {
@@ -173,6 +175,44 @@ namespace InstallKit.WixSharp
                 SignBundle(output, context);
 
             return output;
+        }
+
+        /// <summary>Adds the lookups that prerequisite helpers need: registry values and installed .NET runtimes.</summary>
+        static void AddSearches(Bundle bundle, IReadOnlyList<BundleSearch> searches)
+        {
+            var registry = searches.OfType<RegistryBundleSearch>().ToList();
+            if (registry.Count > 0)
+            {
+                bundle.Include(WixExtension.Util);
+                bundle.WixSourceGenerated += document =>
+                {
+                    System.Xml.Linq.XNamespace util = "http://wixtoolset.org/schemas/v4/wxs/util";
+                    var root = document.Descendants().First(e => e.Name.LocalName == "Bundle");
+                    for (var i = 0; i < registry.Count; i++)
+                    {
+                        var search = registry[i];
+                        root.Add(new System.Xml.Linq.XElement(util + "RegistrySearch",
+                            new System.Xml.Linq.XAttribute("Id", $"InstallKitSearch{i + 1}"),
+                            new System.Xml.Linq.XAttribute("Variable", search.Variable),
+                            new System.Xml.Linq.XAttribute("Root", search.Root == InstallKit.RegistryHive.CurrentUser ? "HKCU" : "HKLM"),
+                            new System.Xml.Linq.XAttribute("Key", search.Key),
+                            new System.Xml.Linq.XAttribute("Value", search.Value),
+                            new System.Xml.Linq.XAttribute("Result", "value"),
+                            new System.Xml.Linq.XAttribute("Bitness", search.Win64 ? "always64" : "always32")));
+                    }
+                };
+            }
+
+            foreach (var search in searches.OfType<DotNetBundleSearch>())
+            {
+                bundle.GenericItems.Add(new DotNetCoreSearch
+                {
+                    Variable = search.Variable,
+                    RuntimeType = search.Kind == DotNetRuntimeKind.AspNetCore ? "aspnet" : search.Kind == DotNetRuntimeKind.WindowsDesktop ? "desktop" : "core",
+                    MajorVersion = search.MajorVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    Platform = search.Architecture == PrerequisiteArchitecture.X86 ? "x86" : search.Architecture == PrerequisiteArchitecture.Arm64 ? "arm64" : "x64",
+                });
+            }
         }
 
         /// <summary>
@@ -578,6 +618,33 @@ namespace InstallKit.WixSharp
                     if (msi.Properties.Count > 0)
                         package.MsiProperties = string.Join(";", msi.Properties.Select(p => $"{p.Key}={p.Value}"));
                     result = package;
+                    break;
+
+                case ExeChainItem exe when exe.Download != null:
+                    // Nothing is embedded: Burn downloads the file and checks its hash and size before running it.
+                    var download = exe.Download;
+                    result = new ExePackage
+                    {
+                        Name = download.ResolvedFileName,
+                        DownloadUrl = download.Url,
+                        Compressed = false,
+                        InstallArguments = exe.InstallArguments,
+                        UninstallArguments = exe.UninstallArguments,
+                        DetectCondition = exe.DetectCondition,
+                        PerMachine = exe.PerMachine,
+                        Permanent = exe.Permanent,
+                        InstallCondition = exe.InstallCondition,
+                        Payloads = new Payload[]
+                        {
+                            new ExePackagePayload
+                            {
+                                Name = download.ResolvedFileName,
+                                DownloadUrl = download.Url,
+                                Hash = download.Sha512!.ToUpperInvariant(),
+                                Size = (int)download.Size,
+                            },
+                        },
+                    };
                     break;
 
                 case ExeChainItem exe:

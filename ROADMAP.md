@@ -15,6 +15,7 @@ Not released yet:
 - Roslyn analyzers for upgrade codes and builder creation (`IK300` to `IK303`)
 - `installkit` command line tool with `new-guid`, `inspect` and `diff` (run from source)
 - Folder permissions on the install folder and its subfolders
+- Bundle prerequisite helpers for the VC++ redistributable, .NET runtimes and WebView2, from an embedded file or a pinned download
 
 ## Now
 
@@ -22,7 +23,6 @@ In progress or next up.
 
 **Installer model** (fluent builders, engine-neutral, validated before WiX runs):
 - Multi-instance (side-by-side) installs and `.mst` transforms for per-customer variants
-- Prerequisite helpers for bundles: .NET runtime, VC++ redistributable, WebView2, with built-in detect conditions
 
 **Tooling and runtime:**
 - Code fixes for the analyzers, and analyzers for more of the `IKxxx` checks
