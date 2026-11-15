@@ -115,9 +115,9 @@ namespace InstallKit.WixSharp
 
                 E("InstallUISequence",
                     E("Show", A("Dialog", WelcomeId), A("Before", "ProgressDlg"), A("Condition", "NOT Installed")),
-                    // Running the MSI again on an installed product offers repair, remove and (with features) change.
-                    E("Show", A("Dialog", "ResumeDlg"), A("Before", "ProgressDlg"), A("Condition", "Installed AND (RESUME OR Preselected)")),
-                    E("Show", A("Dialog", "MaintenanceWelcomeDlg"), A("Before", "ProgressDlg"), A("Condition", "Installed AND NOT RESUME AND NOT Preselected AND NOT PATCH")),
+                    // Running the MSI again on an installed product offers repair, remove and (with features) change. The
+                    // DialogRefs above bring ResumeDlg and MaintenanceWelcomeDlg with their own Show entries, which WiX
+                    // defines as virtual: scheduling them here too is a conflict (WIX7009), so we leave them to the extension.
                     E("Show", A("Dialog", FinishId), A("OnExit", "success"))),
                 E("AdminUISequence",
                     E("Show", A("Dialog", FinishId), A("OnExit", "success"))));

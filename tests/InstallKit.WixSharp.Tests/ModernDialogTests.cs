@@ -143,17 +143,21 @@ public class ModernDialogTests
     }
 
     [Fact]
-    public void The_maintenance_dialogs_are_shown_when_the_installed_product_is_run_again()
+    public void The_maintenance_dialogs_come_with_their_own_schedule_from_the_wix_ui_extension()
     {
         var fragment = Build();
         var shows = Ui(fragment).Single(e => e.Name == Ns + "InstallUISequence").Elements(Ns + "Show")
             .ToDictionary(e => (string)e.Attribute("Dialog")!, e => (string?)e.Attribute("Condition"));
 
         Assert.Equal("NOT Installed", shows[ModernDialogXml.WelcomeId]);
-        Assert.Contains("Installed", shows["MaintenanceWelcomeDlg"]);
-        Assert.Contains("NOT RESUME", shows["MaintenanceWelcomeDlg"]);
-        Assert.Contains("RESUME", shows["ResumeDlg"]);
         Assert.Contains(ModernDialogXml.FinishId, shows.Keys);
+
+        // Running the MSI again on an installed product shows these. The extension schedules them itself (as virtual
+        // entries), so scheduling them here as well fails the build with WIX7009.
+        Assert.Contains("ResumeDlg", DialogRefs(fragment));
+        Assert.Contains("MaintenanceWelcomeDlg", DialogRefs(fragment));
+        Assert.DoesNotContain("ResumeDlg", shows.Keys);
+        Assert.DoesNotContain("MaintenanceWelcomeDlg", shows.Keys);
     }
 
     [Fact]
