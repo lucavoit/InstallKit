@@ -23,5 +23,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/InstallKit.Abstractions.Tests/InstallKit.Abstractions.Tests.csproj" />
     <Project Path="tests/InstallKit.Tool.Tests/InstallKit.Tool.Tests.csproj" />
+    <Project Path="tests/InstallKit.WixSharp.Tests/InstallKit.WixSharp.Tests.csproj" />
   </Folder>
 </Solution>

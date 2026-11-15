@@ -379,7 +379,7 @@ MsiBuilder.Create("My App")
 
 - **Always-installed files:** everything without a `feature` argument.
 - **Command line:** `msiexec /i MyApp.msi ADDLOCAL=Samples` adds a feature and `REMOVE=Documentation` removes one. Spaces in a feature name become underscores (`Sample_files`).
-- **Dialogs:** only `InstallerUi.FeatureTree` shows the feature tree. With another UI the build prints warning `IK246` and the defaults apply.
+- **Dialogs:** the modern UIs (`Modern`, `ModernInstallDir`) show a feature page after the welcome page and a "ready to install" page after that; running the MSI again on an installed product offers Repair, Remove and Change, and Change opens the same feature page. `InstallerUi.FeatureTree` shows the classic tree. With another UI (`Minimal`, `InstallDir`, `ProgressOnly`, `ModernWpf`) the build prints warning `IK246` and the defaults apply.
 - **Must always be installed:** the main executable, services, XML-edited files and the programs used by file associations and firewall rules cannot be in a feature (`IK244`).
 - **Checked before WiX runs:** an unusable name (`IK240`), duplicates (`IK241`), files for a feature that was never declared (`IK242`) and a feature with no files (`IK243`).
 
@@ -417,6 +417,7 @@ MsiBuilder.Create("My App")
 ```
 
 - **Branded images:** InstallKit generates the banner (493×58) and dialog (493×312) bitmaps in your accent colour with your logo, so even the classic dialogs look current. You can supply your own `.bmp` files through the `BannerImage` and `BackgroundImage` settings of `Branding`. Bundles use the logo too.
+- **Modern (native), with optional features:** the feature page is WiX's own feature tree dialog (with its Reset and Disk Usage buttons) in the classic banner style, between the branded welcome page and the "ready to install" page. Add or Remove Programs offers Change for such a product.
 - **Modern (native):** the dialogs are built from MSI's own dialog tables, in Segoe UI on the branded background. The target machine needs nothing extra, and it works the same on both engines. The progress, error and repair/remove pages reuse WiX's dialogs, which pick up the same fonts and banner. Its texts are English for now.
 - **ModernWpf:** needs .NET Framework 4.8 on the target machine and adds about 1 MB to the MSI. The `WixSharpCore` engine falls back to `Modern` with warning `IK200`.
 - Silent installs (`/qn`) show no UI at all.

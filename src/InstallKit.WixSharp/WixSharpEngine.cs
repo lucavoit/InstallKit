@@ -49,8 +49,8 @@ namespace InstallKit.WixSharp
             installContents.AddRange(msi.FirewallRules.Select(ToFirewallException));
 
             var installDir = BuildFolder(msi.ResolvedInstallDirectory, installContents.ToArray(), PermissionsFor(msi, null), new Id(InstallDirId));
-            if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree)
-                Console.WriteLine($"InstallKit : warning IK246: MSI '{msi.Name}' has optional features, which users can only choose in the FeatureTree UI or with ADDLOCAL and REMOVE on the command line. Set Ui = InstallerUi.FeatureTree to show them.");
+            if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir)
+                Console.WriteLine($"InstallKit : warning IK246: MSI '{msi.Name}' has optional features, which users can only choose in the FeatureTree and Modern UIs or with ADDLOCAL and REMOVE on the command line. Set Ui = InstallerUi.Modern or InstallerUi.FeatureTree to show them.");
             var entities = new List<WixEntity> { installDir };
             entities.AddRange(msi.ResolvedRegistryEntries.Select(ToRegValue));
             entities.AddRange(msi.CloseApplications.Select(ToCloseApplication));
