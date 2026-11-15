@@ -18,6 +18,10 @@ return InstallerHost.Run(args, plan =>
         .WithAccentColor("#6A1B9A")
         .WithProperty("MODE", "client")                          // overridden on the msiexec command line
         .OnAfterInstall(QaSetup.WriteMode, "MODE")
+        .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "InstallPath", "[INSTALLDIR]")
+        .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", null, "InstallKit QA Demo")
+        .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "Telemetry", 0)
+        .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "LogDir", @"%ProgramData%\InstallKitQa", RegistryValueKind.ExpandString)
         .RunAfterInstall("QaDemo.exe", "--init [MODE]")
         .RunBeforeUninstall("QaDemo.exe", "--unregister")
         .WithService("QaDemo.exe", "InstallKitQaDemo", s => s

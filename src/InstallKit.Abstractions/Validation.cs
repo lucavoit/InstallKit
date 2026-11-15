@@ -84,6 +84,8 @@ namespace InstallKit
                         errors.Add(new ValidationError("IK150", $"{label}: the {handler.Stage} handler '{handler.Handler.Method.Name}' cannot run at install time: {problem}."));
                 }
 
+                CheckRegistry(errors, msi, label);
+
                 foreach (var command in msi.Commands)
                 {
                     if (string.IsNullOrWhiteSpace(command.Path))
@@ -160,6 +162,20 @@ namespace InstallKit
             }
 
             return null;
+        }
+
+        static void CheckRegistry(List<ValidationError> errors, MsiDefinition msi, string label)
+        {
+            foreach (var entry in msi.RegistryEntries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Key) || entry.Key.StartsWith("\\", StringComparison.Ordinal))
+                    errors.Add(new ValidationError("IK170", $"{label}: a registry value under {entry.Hive} has the key '{entry.Key}'. Use a path below the hive without a leading backslash, for example Software\\Contoso\\App."));
+                else if (entry.Kind == RegistryValueKind.DWord && entry.DWordValue == null)
+                    errors.Add(new ValidationError("IK171", $"{label}: {entry} is a DWord but its value '{entry.Value}' is not a whole number."));
+
+                if (entry.Hive == RegistryHive.LocalMachine && msi.Scope == InstallScope.PerUser)
+                    errors.Add(new ValidationError("IK172", $"{label}: {entry} is under HKLM, which a per-user install cannot write. Use RegistryHive.CurrentUser, or install per machine."));
+            }
         }
 
         static void CheckInstalledFile(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label, string? path, string what)

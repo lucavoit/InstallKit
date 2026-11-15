@@ -40,6 +40,22 @@ namespace InstallKit
             return this;
         }
 
+        /// <summary>Writes a registry value on install and removes it on uninstall.</summary>
+        /// <param name="hive">The registry root.</param>
+        /// <param name="key">The key below the root, for example <c>Software\Contoso\My App</c>.</param>
+        /// <param name="name">The value name, or <c>null</c> for the key's default value.</param>
+        /// <param name="value">The value. MSI formatted text such as <c>[INSTALLDIR]</c> is expanded.</param>
+        /// <param name="kind">The value type.</param>
+        public MsiBuilder WithRegistryValue(RegistryHive hive, string key, string? name, string value, RegistryValueKind kind = RegistryValueKind.String)
+        {
+            ListOf(RegistryEntries, WithRegistryEntries).Add(new RegistryEntry(hive, key, name, value, kind));
+            return this;
+        }
+
+        /// <summary>Writes a <c>REG_DWORD</c> registry value on install and removes it on uninstall.</summary>
+        public MsiBuilder WithRegistryValue(RegistryHive hive, string key, string? name, int value) =>
+            WithRegistryValue(hive, key, name, value.ToString(System.Globalization.CultureInfo.InvariantCulture), RegistryValueKind.DWord);
+
         /// <summary>Sets a public MSI property.</summary>
         public MsiBuilder WithProperty(string name, string value)
         {

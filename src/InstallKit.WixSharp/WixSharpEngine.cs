@@ -43,7 +43,9 @@ namespace InstallKit.WixSharp
             ConfigureToolset(context);
 
             var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, BuildPayloadEntities(msi, context).ToArray());
+            // WixSharp only accepts registry values at the top level of the project, where it creates a component for each.
             var entities = new List<WixEntity> { installDir };
+            entities.AddRange(msi.RegistryEntries.Select(ToRegValue));
             entities.AddRange(BuildShortcutDirs(msi));
             entities.AddRange(msi.Commands.Select(ToAction));
 
@@ -365,6 +367,26 @@ namespace InstallKit.WixSharp
                 yield return new Dir("%Desktop%",
                     new ExeFileShortcut(msi.Name, target, arguments: string.Empty) { WorkingDirectory = InstallDirId });
             }
+        }
+
+        static WixEntity ToRegValue(RegistryEntry entry, int index)
+        {
+            var hive = entry.Hive switch
+            {
+                InstallKit.RegistryHive.CurrentUser => global::WixSharp.RegistryHive.CurrentUser,
+                InstallKit.RegistryHive.ClassesRoot => global::WixSharp.RegistryHive.ClassesRoot,
+                InstallKit.RegistryHive.Users => global::WixSharp.RegistryHive.Users,
+                _ => global::WixSharp.RegistryHive.LocalMachine,
+            };
+
+            // A null name is the key's default value, which WixSharp spells as an empty name.
+            // Every value needs its own id: two default values would otherwise both be called "RegValue".
+            var value = new RegValue(new Id($"InstallKitReg{index + 1}"), hive, entry.Key, entry.Name ?? string.Empty,
+                entry.Kind == RegistryValueKind.DWord ? (object)entry.DWordValue!.Value : entry.Value);
+            // WixSharp turns any value that contains '%' into REG_EXPAND_SZ on its own, so say what is meant.
+            if (entry.Kind != RegistryValueKind.DWord)
+                value.Type = entry.Kind == RegistryValueKind.ExpandString ? "expandable" : "string";
+            return value;
         }
 
         static ServiceInstaller ToServiceInstaller(ServiceDefinition service) => new ServiceInstaller
