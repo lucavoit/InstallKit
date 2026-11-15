@@ -56,6 +56,19 @@ namespace InstallKit
         public MsiBuilder WithRegistryValue(RegistryHive hive, string key, string? name, int value) =>
             WithRegistryValue(hive, key, name, value.ToString(System.Globalization.CultureInfo.InvariantCulture), RegistryValueKind.DWord);
 
+        /// <summary>Sets, appends to or prepends to an environment variable. The change is undone on uninstall.</summary>
+        public MsiBuilder WithEnvironmentVariable(string name, string value, EnvironmentVariableAction action = EnvironmentVariableAction.Set)
+        {
+            ListOf(EnvironmentVariables, WithEnvironmentVariables).Add(new EnvironmentVariableEntry(name, value, action));
+            return this;
+        }
+
+        /// <summary>Adds a folder to <c>PATH</c> and removes it again on uninstall.</summary>
+        /// <param name="path">The folder, for example <c>[INSTALLDIR]bin</c>.</param>
+        /// <param name="prepend">Put the folder at the start of <c>PATH</c> instead of the end.</param>
+        public MsiBuilder WithPathEntry(string path, bool prepend = false) =>
+            WithEnvironmentVariable("PATH", path, prepend ? EnvironmentVariableAction.Prepend : EnvironmentVariableAction.Append);
+
         /// <summary>Sets a public MSI property.</summary>
         public MsiBuilder WithProperty(string name, string value)
         {

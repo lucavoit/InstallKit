@@ -22,6 +22,8 @@ return InstallerHost.Run(args, plan =>
         .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", null, "InstallKit QA Demo")
         .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "Telemetry", 0)
         .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "LogDir", @"%ProgramData%\InstallKitQa", RegistryValueKind.ExpandString)
+        .WithPathEntry("[INSTALLDIR]bin")
+        .WithEnvironmentVariable("INSTALLKIT_QA_HOME", "[INSTALLDIR]")
         .RunAfterInstall("QaDemo.exe", "--init [MODE]")
         .RunBeforeUninstall("QaDemo.exe", "--unregister")
         .WithService("QaDemo.exe", "InstallKitQaDemo", s => s

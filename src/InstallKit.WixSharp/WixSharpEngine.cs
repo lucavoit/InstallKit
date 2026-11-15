@@ -45,6 +45,7 @@ namespace InstallKit.WixSharp
             // Registry values (and later the other system settings) live in the install directory's components.
             var installContents = BuildPayloadEntities(msi, context).ToList();
             installContents.AddRange(msi.RegistryEntries.Select(ToRegValue));
+            installContents.AddRange(msi.EnvironmentVariables.Select((v, i) => ToEnvironmentVariable(v, i, msi.Scope)));
 
             var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, installContents.ToArray());
             var entities = new List<WixEntity> { installDir };
@@ -389,6 +390,20 @@ namespace InstallKit.WixSharp
                 value.Type = "expandable";
             return value;
         }
+
+        static WixEntity ToEnvironmentVariable(EnvironmentVariableEntry variable, int index, InstallKit.InstallScope scope) =>
+            new global::WixSharp.EnvironmentVariable(new Id($"InstallKitEnv{index + 1}"), variable.Name, variable.Value)
+            {
+                Action = EnvVarAction.set,
+                Part = variable.Action switch
+                {
+                    EnvironmentVariableAction.Append => EnvVarPart.last,
+                    EnvironmentVariableAction.Prepend => EnvVarPart.first,
+                    _ => EnvVarPart.all,
+                },
+                System = scope == InstallKit.InstallScope.PerMachine,
+                Permanent = false,
+            };
 
         static ServiceInstaller ToServiceInstaller(ServiceDefinition service) => new ServiceInstaller
         {

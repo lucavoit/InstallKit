@@ -85,6 +85,7 @@ namespace InstallKit
                 }
 
                 CheckRegistry(errors, msi, label);
+                CheckEnvironment(errors, label, msi);
 
                 foreach (var command in msi.Commands)
                 {
@@ -175,6 +176,21 @@ namespace InstallKit
 
                 if (entry.Hive == RegistryHive.LocalMachine && msi.Scope == InstallScope.PerUser)
                     errors.Add(new ValidationError("IK172", $"{label}: {entry} is under HKLM, which a per-user install cannot write. Use RegistryHive.CurrentUser, or install per machine."));
+            }
+        }
+
+        static void CheckEnvironment(List<ValidationError> errors, string label, MsiDefinition msi)
+        {
+            foreach (var variable in msi.EnvironmentVariables)
+            {
+                if (string.IsNullOrWhiteSpace(variable.Name) || variable.Name.IndexOf('=') >= 0)
+                    errors.Add(new ValidationError("IK180", $"{label}: '{variable.Name}' is not a valid environment variable name (it must not be empty or contain '=')."));
+                else if (string.IsNullOrWhiteSpace(variable.Value))
+                    errors.Add(new ValidationError("IK181", $"{label}: the environment variable '{variable.Name}' has no value."));
+                else if (variable.IsPath && variable.Action == EnvironmentVariableAction.Set)
+                    errors.Add(new ValidationError("IK182", $"{label}: setting PATH would replace the whole variable. Use WithPathEntry(...) to add a folder, or WithEnvironmentVariable(\"PATH\", ..., EnvironmentVariableAction.Append)."));
+                else if (variable.Action != EnvironmentVariableAction.Set && variable.Value.IndexOf(';') >= 0)
+                    errors.Add(new ValidationError("IK183", $"{label}: the {variable.Name} entry '{variable.Value}' contains ';'. Add one folder per entry."));
             }
         }
 

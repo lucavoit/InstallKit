@@ -226,6 +226,20 @@ MsiBuilder.Create("My App")
 - **Checked before WiX runs:** a key with a leading backslash fails with `IK170`, a DWord that is not a whole number with `IK171`, and an HKLM value in a per-user install with `IK172`.
 - **Machine-wide or per user:** use `RegistryHive.LocalMachine` for per-machine installs and `RegistryHive.CurrentUser` for per-user installs.
 
+### Environment variables and PATH
+
+```csharp
+MsiBuilder.Create("My App")
+    .WithPathEntry("[INSTALLDIR]bin")                      // adds the folder to PATH, removes only it on uninstall
+    .WithPathEntry("[INSTALLDIR]tools", prepend: true)     // at the start of PATH instead
+    .WithEnvironmentVariable("MYAPP_HOME", "[INSTALLDIR]");
+```
+
+- **Per machine or per user:** a per-machine install changes the machine-wide variable, a per-user install the user's own.
+- **Only your part is touched:** appended and prepended values are added to the existing value, and only that part is removed again.
+- **Already running programs:** they keep the old environment. A new terminal or program sees the change.
+- **Checked before WiX runs:** setting `PATH` as a whole fails with `IK182` (use `WithPathEntry`), a `;` inside one entry with `IK183`.
+
 ## UI and branding
 
 | `Ui` | Dialogs |
