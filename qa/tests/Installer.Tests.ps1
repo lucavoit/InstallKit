@@ -21,6 +21,7 @@ BeforeAll {
     $script:StartMenu   = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'InstallKit\InstallKit QA Demo'
     $script:DesktopLink = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'InstallKit QA Demo.lnk'
     $script:Evidence    = Join-Path $env:ProgramData 'InstallKitQa'
+    $script:BinDir      = Join-Path $script:InstallDir 'bin'
     $script:RegKey      = 'HKLM:\SOFTWARE\InstallKit\QA Demo'
     # The bundle's engine is 32-bit, so its entry lives in the WOW6432Node view; look in both.
     $script:UninstallKeys = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
@@ -61,6 +62,8 @@ BeforeAll {
         return $false
     }
 
+    function Get-MachinePathEntries { @([Environment]::GetEnvironmentVariable('Path', 'Machine') -split ';' | ForEach-Object { $_.TrimEnd('\') }) }
+
     function Assert-Removed {
         Get-Service $ServiceName -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-MsiEntries | Should -HaveCount 0
@@ -69,6 +72,8 @@ BeforeAll {
         $StartMenu | Should -Not -Exist
         $DesktopLink | Should -Not -Exist
         $RegKey | Should -Not -Exist
+        Get-MachinePathEntries | Should -Not -Contain $BinDir
+        [Environment]::GetEnvironmentVariable('INSTALLKIT_QA_HOME', 'Machine') | Should -BeNullOrEmpty
     }
 
     # Start from a clean machine state (a previous failed attempt on the same agent, for example).
@@ -129,6 +134,11 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
         $key.GetValueKind('Telemetry') | Should -Be 'DWord'
         $key.GetValueKind('LogDir') | Should -Be 'ExpandString'
         $key.GetValue('LogDir') | Should -Be (Join-Path $env:ProgramData 'InstallKitQa')
+    }
+
+    It 'adds the install folder\bin to the machine PATH and sets the machine variable' {
+        Get-MachinePathEntries | Should -Contain $BinDir
+        [Environment]::GetEnvironmentVariable('INSTALLKIT_QA_HOME', 'Machine') | Should -Be ($InstallDir + '\')
     }
 }
 

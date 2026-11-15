@@ -42,8 +42,12 @@ namespace InstallKit.WixSharp
         {
             ConfigureToolset(context);
 
-            var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, BuildPayloadEntities(msi, context).ToArray());
-            // WixSharp only accepts registry values at the top level of the project, where it creates a component for each.
+            // Environment variables live in the install directory. WixSharp only accepts registry values at the
+            // top level of the project, where it creates a component for each one.
+            var installContents = BuildPayloadEntities(msi, context).ToList();
+            installContents.AddRange(msi.EnvironmentVariables.Select((v, i) => ToEnvironmentVariable(v, i, msi.Scope)));
+
+            var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, installContents.ToArray());
             var entities = new List<WixEntity> { installDir };
             entities.AddRange(msi.RegistryEntries.Select(ToRegValue));
             entities.AddRange(BuildShortcutDirs(msi));
@@ -388,6 +392,20 @@ namespace InstallKit.WixSharp
                 value.Type = entry.Kind == RegistryValueKind.ExpandString ? "expandable" : "string";
             return value;
         }
+
+        static WixEntity ToEnvironmentVariable(EnvironmentVariableEntry variable, int index, InstallKit.InstallScope scope) =>
+            new global::WixSharp.EnvironmentVariable(new Id($"InstallKitEnv{index + 1}"), variable.Name, variable.Value)
+            {
+                Action = EnvVarAction.set,
+                Part = variable.Action switch
+                {
+                    EnvironmentVariableAction.Append => EnvVarPart.last,
+                    EnvironmentVariableAction.Prepend => EnvVarPart.first,
+                    _ => EnvVarPart.all,
+                },
+                System = scope == InstallKit.InstallScope.PerMachine,
+                Permanent = false,
+            };
 
         static ServiceInstaller ToServiceInstaller(ServiceDefinition service) => new ServiceInstaller
         {
