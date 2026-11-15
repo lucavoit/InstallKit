@@ -112,6 +112,13 @@ namespace InstallKit
             return this;
         }
 
+        /// <inheritdoc cref="MsiDefinition.AddFolderPermission"/>
+        public MsiBuilder WithFolderPermission(string account, FolderRights rights, string? folder = null)
+        {
+            ListOf(FolderPermissions, WithFolderPermissions).Add(new FolderPermission(account, rights, folder));
+            return this;
+        }
+
         /// <summary>Sets a public MSI property.</summary>
         public MsiBuilder WithProperty(string name, string value)
         {

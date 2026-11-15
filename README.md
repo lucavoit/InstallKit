@@ -350,6 +350,22 @@ MsiBuilder.Create("My App")
 - **Must always be installed:** the main executable, services, XML-edited files and the programs used by file associations and firewall rules cannot be in a feature (`IK244`).
 - **Checked before WiX runs:** an unusable name (`IK240`), duplicates (`IK241`), files for a feature that was never declared (`IK242`) and a feature with no files (`IK243`).
 
+### Folder permissions
+
+```csharp
+MsiBuilder.Create("My App")
+    .WithService("MyService.exe", "MyService", s => s.WithAccount(@"NT AUTHORITY\LocalService"))
+    .WithFolderPermission(@"NT AUTHORITY\LocalService", FolderRights.Modify, "data")   // creates data\ if no payload has it
+    .WithFolderPermission("Users", FolderRights.Read, "config")                         // a payload folder
+    .WithFolderPermission("Authenticated Users", FolderRights.Modify);                  // the install folder itself
+```
+
+- **Accounts:** a name such as `Users`, `Everyone`, `Administrators` or `Authenticated Users`, or `DOMAIN\name` such as `NT AUTHORITY\LocalService` or `NT SERVICE\MyService`.
+- **Rights:** `Read` (list, read, run), `Modify` (Windows' "Modify": also create, change and delete) and `FullControl`.
+- **Folders:** the install directory (no folder given), a folder of a payload (`WithDirectory(dir, "config")`), or any other relative path, which is created as an empty folder. Only that one folder is changed: never Program Files or the manufacturer folder above the install directory.
+- **Not supported yet:** a folder inside a payload folder (`IK252`), such as `config\secrets` when `config` holds files.
+- **Checked before WiX runs:** a missing account (`IK250`), a folder that is not below the install directory (`IK251`), and the same account twice for one folder (`IK253`).
+
 ## UI and branding
 
 | `Ui` | Dialogs |

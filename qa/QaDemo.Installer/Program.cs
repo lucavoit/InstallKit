@@ -34,6 +34,9 @@ return InstallerHost.Run(args, plan =>
         .WithFirewallRule("InstallKit QA Demo program", executable: "QaDemo.exe", scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private)
         .WithXmlValue(@"config\qa.config", "/configuration/appSettings/add[@key='Server']/@value", "[MODE]")
         .WithCloseApplication("InstallKitQaClose.exe", terminate: true, timeoutSeconds: 3)
+        .WithFolderPermission("Authenticated Users", FolderRights.Modify)
+        .WithFolderPermission("Users", FolderRights.Modify, "logs")
+        .WithFolderPermission(@"NT AUTHORITY\LocalService", FolderRights.Read, "config")
         .RunAfterInstall("QaDemo.exe", "--init [MODE]")
         .RunBeforeUninstall("QaDemo.exe", "--unregister")
         .WithService("QaDemo.exe", "InstallKitQaDemo", s => s

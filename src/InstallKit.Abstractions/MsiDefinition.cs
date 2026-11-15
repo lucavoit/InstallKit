@@ -91,6 +91,9 @@ namespace InstallKit
         /// <summary>Optional parts of the product. See <see cref="AddFeature"/>.</summary>
         public IList<OptionalFeature> Features { get; set; } = new List<OptionalFeature>();
 
+        /// <summary>Access granted to accounts on folders of the product. See <see cref="AddFolderPermission"/>.</summary>
+        public IList<FolderPermission> FolderPermissions { get; set; } = new List<FolderPermission>();
+
         /// <summary>Registry values written at install time and removed on uninstall. See <see cref="AddRegistryValue(RegistryHive, string, string?, string, RegistryValueKind)"/>.</summary>
         public IList<RegistryEntry> RegistryEntries { get; set; } = new List<RegistryEntry>();
 
@@ -297,6 +300,19 @@ namespace InstallKit
         public MsiDefinition AddFeature(string name, string? description = null, bool installedByDefault = true)
         {
             Features.Add(new OptionalFeature(name, description, installedByDefault));
+            return this;
+        }
+
+        /// <summary>
+        /// Gives an account access to the install directory or one of its subfolders, for example so a service that runs
+        /// as a limited account can write to its data folder. A folder that holds no files of the product is created.
+        /// </summary>
+        /// <param name="account">For example <c>Users</c>, <c>Authenticated Users</c>, <c>NT AUTHORITY\LocalService</c> or <c>NT SERVICE\MyService</c>.</param>
+        /// <param name="rights">How much access the account gets.</param>
+        /// <param name="folder">A folder below the install directory such as <c>data</c> or <c>data\logs</c>, or <c>null</c> for the install directory itself.</param>
+        public MsiDefinition AddFolderPermission(string account, FolderRights rights, string? folder = null)
+        {
+            FolderPermissions.Add(new FolderPermission(account, rights, folder));
             return this;
         }
 
