@@ -274,4 +274,23 @@ public class MsiEngineTests
         Assert.EndsWith(longConfig, A(file, "Source"));
         Assert.Equal($"[#{A(file, "Id")}]", A(edit, "File"));
     }
+
+    [Fact]
+    public void A_service_in_a_subfolder_of_the_install_directory_is_installed_there()
+    {
+        var workspace = new Wxs.Workspace();
+        var tools = System.IO.Path.Combine(workspace.Root, "tools");
+        System.IO.Directory.CreateDirectory(tools);
+        System.IO.File.WriteAllText(System.IO.Path.Combine(tools, "Tool.exe"), "x");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(tools, "other.txt"), "x");
+
+        var wxs = Wxs.Msi(workspace, workspace.App().WithDirectory(tools, "tools").WithService(@"tools\Tool.exe", "ToolSvc"));
+
+        var folder = wxs.One("Directory", "INSTALLDIR").Elements().Single(e => e.Name.LocalName == "Directory" && A(e, "Name") == "tools");
+        var component = wxs.One("ServiceInstall").Parent!;
+        Assert.Same(folder, component.Parent);
+        Assert.EndsWith("Tool.exe", A(component.Elements().Single(e => e.Name.LocalName == "File"), "Source"));
+        // The other file of the folder is still installed, once.
+        Assert.Single(folder.Descendants(), e => e.Name.LocalName == "File" && (A(e, "Source") ?? "").EndsWith("other.txt"));
+    }
 }
