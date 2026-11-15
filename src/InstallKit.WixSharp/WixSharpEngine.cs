@@ -49,7 +49,7 @@ namespace InstallKit.WixSharp
 
             var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, installContents.ToArray());
             var entities = new List<WixEntity> { installDir };
-            entities.AddRange(msi.RegistryEntries.Select(ToRegValue));
+            entities.AddRange(msi.ResolvedRegistryEntries.Select(ToRegValue));
             entities.AddRange(BuildShortcutDirs(msi));
             entities.AddRange(msi.Commands.Select(ToAction));
 
@@ -387,7 +387,8 @@ namespace InstallKit.WixSharp
             // Every value needs its own id: two default values would otherwise both be called "RegValue".
             var value = new RegValue(new Id($"InstallKitReg{index + 1}"), hive, entry.Key, entry.Name ?? string.Empty,
                 entry.Kind == RegistryValueKind.DWord ? (object)entry.DWordValue!.Value : entry.Value);
-            // WixSharp turns any value that contains '%' into REG_EXPAND_SZ on its own, so say what is meant.
+            // WixSharp turns any value that contains '%' (such as "%1" in an open command) into REG_EXPAND_SZ
+            // on its own, so say what is meant.
             if (entry.Kind != RegistryValueKind.DWord)
                 value.Type = entry.Kind == RegistryValueKind.ExpandString ? "expandable" : "string";
             return value;

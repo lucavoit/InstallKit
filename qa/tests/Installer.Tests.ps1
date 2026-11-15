@@ -22,6 +22,7 @@ BeforeAll {
     $script:DesktopLink = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'InstallKit QA Demo.lnk'
     $script:Evidence    = Join-Path $env:ProgramData 'InstallKitQa'
     $script:BinDir      = Join-Path $script:InstallDir 'bin'
+    $script:Classes     = 'HKLM:\SOFTWARE\Classes'
     $script:RegKey      = 'HKLM:\SOFTWARE\InstallKit\QA Demo'
     # The bundle's engine is 32-bit, so its entry lives in the WOW6432Node view; look in both.
     $script:UninstallKeys = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
@@ -73,6 +74,9 @@ BeforeAll {
         $DesktopLink | Should -Not -Exist
         $RegKey | Should -Not -Exist
         Get-MachinePathEntries | Should -Not -Contain $BinDir
+        "$Classes\.ikqa" | Should -Not -Exist
+        "$Classes\QaDemo.ikqa" | Should -Not -Exist
+        "$Classes\installkitqa" | Should -Not -Exist
         [Environment]::GetEnvironmentVariable('INSTALLKIT_QA_HOME', 'Machine') | Should -BeNullOrEmpty
     }
 
@@ -134,6 +138,21 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
         $key.GetValueKind('Telemetry') | Should -Be 'DWord'
         $key.GetValueKind('LogDir') | Should -Be 'ExpandString'
         $key.GetValue('LogDir') | Should -Be (Join-Path $env:ProgramData 'InstallKitQa')
+    }
+
+    It 'registers the .ikqa file association with an open command' {
+        (Get-Item "$Classes\.ikqa").GetValue('') | Should -Be 'QaDemo.ikqa'
+        (Get-Item "$Classes\QaDemo.ikqa").GetValue('') | Should -Be 'InstallKit QA file'
+        $command = Get-Item "$Classes\QaDemo.ikqa\shell\open\command"
+        $command.GetValue('') | Should -Be ('"' + (Join-Path $InstallDir 'QaDemo.exe') + '" "%1"')
+        $command.GetValueKind('') | Should -Be 'String'
+    }
+
+    It 'registers the installkitqa:// URL protocol' {
+        $key = Get-Item "$Classes\installkitqa"
+        $key.GetValue('') | Should -Be 'URL:InstallKit QA link'
+        $key.GetValueNames() | Should -Contain 'URL Protocol'
+        (Get-Item "$Classes\installkitqa\shell\open\command").GetValue('') | Should -Be ('"' + (Join-Path $InstallDir 'QaDemo.exe') + '" "%1"')
     }
 
     It 'adds the install folder\bin to the machine PATH and sets the machine variable' {
