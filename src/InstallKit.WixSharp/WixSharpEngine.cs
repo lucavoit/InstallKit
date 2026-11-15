@@ -313,12 +313,26 @@ namespace InstallKit.WixSharp
             };
         }
 
+        static void AddChild(Dictionary<string, List<WixEntity>> children, string file, WixEntity child)
+        {
+            var key = Normalize(file);
+            if (!children.TryGetValue(key, out var list))
+                children[key] = list = new List<WixEntity>();
+            list.Add(child);
+        }
+
+        static WixEntity ToXmlFile(XmlValue edit, int index) =>
+            // The file is the one the element is nested in; the XPath's brackets must be escaped for MSI.
+            new XmlFile(new Id($"InstallKitXml{index + 1}"), XmlFileAction.setValue, edit.EscapedXPath, edit.Value);
+
         static IEnumerable<WixEntity> BuildPayloadEntities(MsiDefinition msi, InstallerContext context)
         {
-            // Files that carry a service get their own <File> element; everything else is a wildcard.
-            var special = msi.Services
-                             .GroupBy(s => Normalize(s.Executable), StringComparer.OrdinalIgnoreCase)
-                             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+            // Files that carry a service or an XML edit get their own <File> element; everything else is a wildcard.
+            var special = new Dictionary<string, List<WixEntity>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var service in msi.Services)
+                AddChild(special, service.Executable, ToServiceInstaller(service));
+            for (var i = 0; i < msi.XmlValues.Count; i++)
+                AddChild(special, msi.XmlValues[i].File, ToXmlFile(msi.XmlValues[i], i));
 
             foreach (var group in msi.Payloads.GroupBy(p => p.TargetSubdirectory ?? string.Empty, StringComparer.OrdinalIgnoreCase))
             {
@@ -334,8 +348,7 @@ namespace InstallKit.WixSharp
 
                     foreach (var entry in specialHere)
                     {
-                        var services = entry.Value.Select(ToServiceInstaller).Cast<WixEntity>().ToArray();
-                        items.Add(new WixFile(Path.Combine(source, Path.GetFileName(entry.Key)), services));
+                        items.Add(new WixFile(Path.Combine(source, Path.GetFileName(entry.Key)), entry.Value.ToArray()));
                         special.Remove(entry.Key);
                     }
 

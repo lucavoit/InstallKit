@@ -91,6 +91,13 @@ namespace InstallKit
             return this;
         }
 
+        /// <inheritdoc cref="MsiDefinition.AddXmlValue"/>
+        public MsiBuilder WithXmlValue(string file, string xpath, string value)
+        {
+            ListOf(XmlValues, WithXmlValues).Add(new XmlValue(file, xpath, value));
+            return this;
+        }
+
         /// <summary>Sets a public MSI property.</summary>
         public MsiBuilder WithProperty(string name, string value)
         {
