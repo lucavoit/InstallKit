@@ -114,4 +114,57 @@ public class FeatureTests
         Assert.Equal("IK244", error.Code);
         Assert.Contains("Extras", error.Message);
     }
+
+    static (InstallerPlan Plan, MsiBuilder Builder, string Folder) PlanWithFeatureFiles()
+    {
+        var (plan, builder, _) = NewPlan();
+        var dir = Directory.CreateTempSubdirectory().FullName;
+        File.WriteAllText(Path.Combine(dir, "Worker.exe"), "");
+        File.WriteAllText(Path.Combine(dir, "worker.config"), "<configuration/>");
+        return (plan, builder.WithFeature("Worker").WithDirectory(dir, "worker", "Worker"), dir);
+    }
+
+    [Fact]
+    public void A_service_can_live_in_a_feature()
+    {
+        var (plan, builder, _) = PlanWithFeatureFiles();
+        plan.Msi(builder.WithService(@"worker\Worker.exe", "WorkerSvc"));
+
+        Assert.Empty(Codes(plan));
+    }
+
+    [Fact]
+    public void An_xml_value_can_live_in_a_feature()
+    {
+        var (plan, builder, _) = PlanWithFeatureFiles();
+        plan.Msi(builder.WithXmlValue(@"worker\worker.config", "/configuration/@x", "1"));
+
+        Assert.Empty(Codes(plan));
+    }
+
+    [Fact]
+    public void A_file_association_a_firewall_rule_and_the_main_executable_still_need_an_always_installed_file()
+    {
+        var (planA, builderA, _) = PlanWithFeatureFiles();
+        planA.Msi(builderA.WithFileAssociation(".wrk", "Worker file", @"worker\Worker.exe"));
+        Assert.Contains("IK244", Codes(planA));
+
+        var (planB, builderB, _) = PlanWithFeatureFiles();
+        planB.Msi(builderB.WithFirewallRule("Worker", executable: @"worker\Worker.exe", protocol: FirewallProtocol.Any));
+        Assert.Contains("IK244", Codes(planB));
+
+        var (planC, builderC, _) = PlanWithFeatureFiles();
+        planC.Msi(builderC.WithMainExecutable(@"worker\Worker.exe"));
+        Assert.Contains("IK244", Codes(planC));
+    }
+
+    [Fact]
+    public void The_message_says_what_is_allowed()
+    {
+        var (plan, builder, _) = PlanWithFeatureFiles();
+        plan.Msi(builder.WithMainExecutable(@"worker\Worker.exe"));
+
+        var message = InstallerValidator.Validate(plan).Single(e => e.Code == "IK244").Message;
+        Assert.Contains("Only services and XML values may live in a feature", message);
+    }
 }
