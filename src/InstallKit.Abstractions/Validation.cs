@@ -91,6 +91,7 @@ namespace InstallKit
                 CheckFirewall(errors, msi, context, label);
                 CheckXmlValues(errors, msi, context, label);
                 CheckCloseApplications(errors, msi, label);
+                CheckFolderPermissions(errors, msi, label);
 
                 foreach (var command in msi.Commands)
                 {
@@ -311,6 +312,33 @@ namespace InstallKit
 
                 if (rule.TimeoutSeconds < 1 || rule.TimeoutSeconds > 600)
                     errors.Add(new ValidationError("IK232", $"{label}: the timeout for closing '{rule.ProcessName}' is {rule.TimeoutSeconds} seconds. Use 1 to 600."));
+            }
+        }
+
+        static void CheckFolderPermissions(List<ValidationError> errors, MsiDefinition msi, string label)
+        {
+            var payloadFolders = msi.Payloads.Where(p => p.TargetSubdirectory != null).Select(p => p.TargetSubdirectory!.Replace('/', '\\')).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var permission in msi.FolderPermissions)
+            {
+                var where = permission.Folder == null ? "the install directory" : $"the folder '{permission.Folder}'";
+
+                if (string.IsNullOrWhiteSpace(permission.Account) || permission.UserName.Length == 0)
+                    errors.Add(new ValidationError("IK250", $"{label}: a folder permission for {where} has no account. Use a name such as Users or a DOMAIN\\name such as NT AUTHORITY\\LocalService."));
+
+                if (!permission.HasValidFolder)
+                {
+                    errors.Add(new ValidationError("IK251", $"{label}: '{permission.Folder}' is not a folder below the install directory. Use a relative path such as data or data\\logs, without '..', a drive or wildcards."));
+                    continue;
+                }
+
+                // A folder inside a payload folder would be created twice: once by the payload, once by the permission.
+                if (permission.Folder != null && payloadFolders.Any(f => permission.Folder.StartsWith(f + "\\", StringComparison.OrdinalIgnoreCase)))
+                    errors.Add(new ValidationError("IK252", $"{label}: {where} is inside a payload folder, which is not supported yet. Give the permission to the payload folder itself, or use a folder outside the payload folders."));
+
+                if (!seen.Add((permission.Folder ?? "") + "|" + permission.Account))
+                    errors.Add(new ValidationError("IK253", $"{label} gives '{permission.Account}' rights on {where} more than once."));
             }
         }
 

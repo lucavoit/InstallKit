@@ -65,6 +65,16 @@ BeforeAll {
 
     function Get-MachinePathEntries { @([Environment]::GetEnvironmentVariable('Path', 'Machine') -split ';' | ForEach-Object { $_.TrimEnd('\') }) }
 
+    # The allow rules of a folder for an identity such as '*\Users'.
+    function Get-FolderRules([string] $Path, [string] $Identity) {
+        @((Get-Acl $Path).Access | Where-Object { $_.AccessControlType -eq 'Allow' -and $_.IdentityReference.Value -like $Identity })
+    }
+
+    function Test-Right($Rule, [string] $Right) {
+        $flag = [Security.AccessControl.FileSystemRights]$Right
+        ($Rule.FileSystemRights -band $flag) -eq $flag
+    }
+
     function Assert-Removed {
         Get-Service $ServiceName -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-MsiEntries | Should -HaveCount 0
@@ -75,6 +85,7 @@ BeforeAll {
         $RegKey | Should -Not -Exist
         Join-Path $InstallDir 'docs' | Should -Not -Exist
         Join-Path $InstallDir 'samples' | Should -Not -Exist
+        Join-Path $InstallDir 'logs' | Should -Not -Exist
         Get-MachinePathEntries | Should -Not -Contain $BinDir
         Get-NetFirewallRule -DisplayName 'InstallKit QA Demo*' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         "$Classes\.ikqa" | Should -Not -Exist
@@ -152,6 +163,35 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
     It 'installs the default-on feature and leaves the default-off feature out' {
         Join-Path $InstallDir 'docs\readme.txt' | Should -Exist
         Join-Path $InstallDir 'samples' | Should -Not -Exist
+    }
+
+    It 'gives Authenticated Users Modify on the install folder and keeps the administrators' {
+        $rules = Get-FolderRules $InstallDir '*Authenticated Users'
+        $rules | Should -Not -BeNullOrEmpty
+        Test-Right $rules[0] 'Modify' | Should -BeTrue
+        $admins = Get-FolderRules $InstallDir '*\Administrators'
+        $admins | Should -Not -BeNullOrEmpty
+        Test-Right $admins[0] 'FullControl' | Should -BeTrue
+    }
+
+    It 'does not change the permissions of Program Files or the manufacturer folder' {
+        Get-FolderRules $env:ProgramFiles '*Authenticated Users' | Should -BeNullOrEmpty
+        Get-FolderRules (Split-Path $InstallDir) '*Authenticated Users' | Should -BeNullOrEmpty
+    }
+
+    It 'creates the logs folder with Modify for Users' {
+        $logs = Join-Path $InstallDir 'logs'
+        $logs | Should -Exist
+        $rules = Get-FolderRules $logs '*\Users'
+        $rules | Should -Not -BeNullOrEmpty
+        Test-Right $rules[0] 'Modify' | Should -BeTrue
+    }
+
+    It 'gives LocalService Read on the payload folder config' {
+        $rules = Get-FolderRules (Join-Path $InstallDir 'config') '*\LOCAL SERVICE'
+        $rules | Should -Not -BeNullOrEmpty
+        Test-Right $rules[0] 'ReadAndExecute' | Should -BeTrue
+        Test-Right $rules[0] 'Write' | Should -BeFalse
     }
 
     It 'registers the .ikqa file association with an open command' {

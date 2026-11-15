@@ -48,7 +48,7 @@ namespace InstallKit.WixSharp
             installContents.AddRange(msi.EnvironmentVariables.Select((v, i) => ToEnvironmentVariable(v, i, msi.Scope)));
             installContents.AddRange(msi.FirewallRules.Select(ToFirewallException));
 
-            var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, installContents.ToArray());
+            var installDir = BuildFolder(msi.ResolvedInstallDirectory, installContents.ToArray(), PermissionsFor(msi, null), new Id(InstallDirId));
             if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree)
                 Console.WriteLine($"InstallKit : warning IK246: MSI '{msi.Name}' has optional features, which users can only choose in the FeatureTree UI or with ADDLOCAL and REMOVE on the command line. Set Ui = InstallerUi.FeatureTree to show them.");
             var entities = new List<WixEntity> { installDir };
@@ -376,9 +376,71 @@ namespace InstallKit.WixSharp
                 }
                 else
                 {
-                    yield return new Dir(group.Key, items.ToArray());
+                    yield return BuildFolder(group.Key, items.ToArray(), PermissionsFor(msi, group.Key));
                 }
             }
+
+            // A folder that only has permissions (a logs folder, for example) is created for them.
+            var payloadFolders = new HashSet<string>(msi.Payloads.Select(p => p.TargetSubdirectory ?? string.Empty), StringComparer.OrdinalIgnoreCase);
+            foreach (var folder in msi.FolderPermissions.Where(p => p.Folder != null).Select(p => p.Folder!).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (!payloadFolders.Contains(folder))
+                    yield return BuildFolder(folder, new WixEntity[0], PermissionsFor(msi, folder));
+            }
+        }
+
+        static DirPermission[] PermissionsFor(MsiDefinition msi, string? folder) =>
+            msi.FolderPermissions
+                .Where(p => string.Equals(p.Folder, folder, StringComparison.OrdinalIgnoreCase))
+                .Select(ToDirPermission)
+                .ToArray();
+
+        static DirPermission ToDirPermission(FolderPermission permission)
+        {
+            var result = new DirPermission(permission.UserName) { Domain = permission.Domain };
+            switch (permission.Rights)
+            {
+                case FolderRights.Read:
+                    result.GenericRead = true;
+                    result.GenericExecute = true;
+                    break;
+                case FolderRights.Modify:
+                    result.GenericRead = true;
+                    result.GenericExecute = true;
+                    result.GenericWrite = true;
+                    result.Delete = true;
+                    break;
+                default:
+                    result.GenericAll = true;
+                    break;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// A folder with its contents. WixSharp puts the permissions of a multi-segment path on the first segment
+        /// (for the install directory that would be Program Files itself), so a folder with permissions is built as
+        /// nested single-segment folders and the permissions go on the last one.
+        /// </summary>
+        static Dir BuildFolder(string path, WixEntity[] contents, DirPermission[] permissions, Id? id = null)
+        {
+            Dir Leaf(string name) => id != null ? new Dir(id, name, contents) : new Dir(name, contents);
+
+            if (permissions.Length == 0)
+                return Leaf(path);
+
+            var split = path.LastIndexOfAny(new[] { '\\', '/' });
+            if (split < 0)
+            {
+                var single = Leaf(path);
+                single.Permissions = permissions;
+                return single;
+            }
+
+            var leaf = Leaf(path.Substring(split + 1));
+            leaf.Permissions = permissions;
+            return new Dir(path.Substring(0, split), leaf);
         }
 
         static IEnumerable<WixEntity> BuildShortcutDirs(MsiDefinition msi)
