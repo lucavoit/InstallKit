@@ -84,6 +84,7 @@ namespace InstallKit
                         errors.Add(new ValidationError("IK150", $"{label}: the {handler.Stage} handler '{handler.Handler.Method.Name}' cannot run at install time: {problem}."));
                 }
 
+                CheckFeatures(errors, msi, context, label);
                 CheckRegistry(errors, msi, label);
                 CheckEnvironment(errors, label, msi);
                 CheckAssociations(errors, msi, context, label);
@@ -167,6 +168,32 @@ namespace InstallKit
             }
 
             return null;
+        }
+
+        static void CheckFeatures(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label)
+        {
+            var declared = new Dictionary<string, OptionalFeature>(StringComparer.OrdinalIgnoreCase);
+            foreach (var feature in msi.Features)
+            {
+                if (string.IsNullOrWhiteSpace(feature.Name) || string.Equals(feature.Id, "Complete", StringComparison.OrdinalIgnoreCase))
+                    errors.Add(new ValidationError("IK240", $"{label}: '{feature.Name}' is not a usable feature name. It must not be empty or 'Complete', which InstallKit uses for the files that are always installed."));
+                else if (declared.ContainsKey(feature.Id))
+                    errors.Add(new ValidationError("IK241", $"{label} declares the feature '{feature.Name}' more than once (names that differ only in spaces or punctuation are the same feature)."));
+                else
+                    declared[feature.Id] = feature;
+            }
+
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var payload in msi.Payloads.Where(p => p.Feature != null))
+            {
+                var id = new OptionalFeature(payload.Feature!).Id;
+                if (!declared.ContainsKey(id))
+                    errors.Add(new ValidationError("IK242", $"{label}: files are assigned to the feature '{payload.Feature}', which is not declared. Add .WithFeature(\"{payload.Feature}\")."));
+                used.Add(id);
+            }
+
+            foreach (var feature in declared.Values.Where(f => !used.Contains(f.Id)))
+                errors.Add(new ValidationError("IK243", $"{label}: the feature '{feature.Name}' has no files. Pass feature: \"{feature.Name}\" to WithPayload or WithDirectory."));
         }
 
         static void CheckRegistry(List<ValidationError> errors, MsiDefinition msi, string label)
@@ -300,9 +327,13 @@ namespace InstallKit
             if (string.IsNullOrWhiteSpace(path))
                 return;
 
-            if (FindInstalledFile(msi, context, path!) == null)
+            var found = FindInstalledFile(msi, context, path!);
+            if (found == null)
                 errors.Add(new ValidationError("IK121",
                     $"{label}: the {what} '{path}' is not in any payload. It must be at the top level of a payload's target folder."));
+            else if (found.Value.Payload.Feature != null)
+                errors.Add(new ValidationError("IK244",
+                    $"{label}: the {what} '{path}' is in the optional feature '{found.Value.Payload.Feature}', but it must always be installed. Move it to a payload without a feature."));
         }
 
         static void CheckUpgradeCode(List<ValidationError> errors, Dictionary<Guid, string> seen, string label, string? upgradeCode)

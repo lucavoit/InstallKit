@@ -303,6 +303,24 @@ A running program locks its files, so an upgrade or uninstall would otherwise as
 - **Silent installs:** it works with `/qn` as well, which is the main use.
 - **Checked before WiX runs:** a name that is not a file name (`IK230`), duplicates (`IK231`) and a timeout outside 1 to 600 seconds (`IK232`).
 
+### Optional features
+
+```csharp
+MsiBuilder.Create("My App")
+    .WithPayload("MyApp")                                                      // always installed
+    .WithFeature("Documentation", "Help files and the user guide")
+    .WithFeature("Samples", "Example projects", installedByDefault: false)
+    .WithDirectory(@"..\docs", "docs", feature: "Documentation")
+    .WithDirectory(@"..\samples", "samples", feature: "Samples")
+    .WithUi(InstallerUi.FeatureTree);                                          // lets users tick them
+```
+
+- **Always-installed files:** everything without a `feature` argument.
+- **Command line:** `msiexec /i MyApp.msi ADDLOCAL=Samples` adds a feature and `REMOVE=Documentation` removes one. Spaces in a feature name become underscores (`Sample_files`).
+- **Dialogs:** only `InstallerUi.FeatureTree` shows the feature tree. With another UI the build prints warning `IK246` and the defaults apply.
+- **Must always be installed:** the main executable, services, XML-edited files and the programs used by file associations and firewall rules cannot be in a feature (`IK244`).
+- **Checked before WiX runs:** an unusable name (`IK240`), duplicates (`IK241`), files for a feature that was never declared (`IK242`) and a feature with no files (`IK243`).
+
 ## UI and branding
 
 | `Ui` | Dialogs |

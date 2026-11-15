@@ -11,6 +11,7 @@ Not released yet:
 - Firewall rules (inbound)
 - Values in XML config files, set at install time without a custom action (JSON is still to do)
 - Closing (and optionally ending) running programs before an install, upgrade or uninstall
+- Optional features that users can leave out, chosen in the feature tree or with `ADDLOCAL`
 
 ## Now
 
@@ -18,7 +19,6 @@ In progress or next up.
 
 **Installer model** (fluent builders, engine-neutral, validated before WiX runs):
 - Multi-instance (side-by-side) installs and `.mst` transforms for per-customer variants
-- Optional features: a builder API for feature groups
 - Prerequisite helpers for bundles: .NET runtime, VC++ redistributable, WebView2, with built-in detect conditions
 
 **Tooling and runtime:**

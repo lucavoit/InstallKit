@@ -18,17 +18,17 @@ namespace InstallKit
         /// <summary>Starts an MSI with every default applied.</summary>
         public static MsiBuilder Create(string name) => new MsiBuilder().WithValuesFrom(new MsiDefinition(name));
 
-        /// <summary>Includes the published output of an <c>&lt;InstallerPayload&gt;</c> project.</summary>
-        public MsiBuilder WithPayload(string payloadName, string? targetSubdirectory = null)
+        /// <summary>Includes the published output of an <c>&lt;InstallerPayload&gt;</c> project. Pass <paramref name="feature"/> to make these files optional.</summary>
+        public MsiBuilder WithPayload(string payloadName, string? targetSubdirectory = null, string? feature = null)
         {
-            ListOf(Payloads, WithPayloads).Add(PayloadSource.FromPayload(payloadName, targetSubdirectory));
+            ListOf(Payloads, WithPayloads).Add(PayloadSource.FromPayload(payloadName, targetSubdirectory, feature));
             return this;
         }
 
         /// <summary>Includes every file of a directory (recursively).</summary>
-        public MsiBuilder WithDirectory(string sourceDirectory, string? targetSubdirectory = null)
+        public MsiBuilder WithDirectory(string sourceDirectory, string? targetSubdirectory = null, string? feature = null)
         {
-            ListOf(Payloads, WithPayloads).Add(PayloadSource.FromDirectory(sourceDirectory, targetSubdirectory));
+            ListOf(Payloads, WithPayloads).Add(PayloadSource.FromDirectory(sourceDirectory, targetSubdirectory, feature));
             return this;
         }
 
@@ -102,6 +102,13 @@ namespace InstallKit
         public MsiBuilder WithCloseApplication(string processName, bool terminate = false, int timeoutSeconds = 5)
         {
             ListOf(CloseApplications, WithCloseApplications).Add(new CloseApplicationRule(processName, terminate, timeoutSeconds));
+            return this;
+        }
+
+        /// <inheritdoc cref="MsiDefinition.AddFeature"/>
+        public MsiBuilder WithFeature(string name, string? description = null, bool installedByDefault = true)
+        {
+            ListOf(Features, WithFeatures).Add(new OptionalFeature(name, description, installedByDefault));
             return this;
         }
 

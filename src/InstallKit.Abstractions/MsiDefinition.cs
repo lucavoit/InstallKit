@@ -88,6 +88,9 @@ namespace InstallKit
         /// <summary>Programs that are closed (and optionally ended) while installing. See <see cref="AddCloseApplication"/>.</summary>
         public IList<CloseApplicationRule> CloseApplications { get; set; } = new List<CloseApplicationRule>();
 
+        /// <summary>Optional parts of the product. See <see cref="AddFeature"/>.</summary>
+        public IList<OptionalFeature> Features { get; set; } = new List<OptionalFeature>();
+
         /// <summary>Registry values written at install time and removed on uninstall. See <see cref="AddRegistryValue(RegistryHive, string, string?, string, RegistryValueKind)"/>.</summary>
         public IList<RegistryEntry> RegistryEntries { get; set; } = new List<RegistryEntry>();
 
@@ -105,16 +108,17 @@ namespace InstallKit
         /// </summary>
         /// <param name="payloadName">The payload name: the project file name without extension, or its <c>Name</c> metadata.</param>
         /// <param name="targetSubdirectory">Optional folder under the install directory.</param>
-        public MsiDefinition AddPayload(string payloadName, string? targetSubdirectory = null)
+        /// <param name="feature">Optional <see cref="OptionalFeature"/> these files belong to.</param>
+        public MsiDefinition AddPayload(string payloadName, string? targetSubdirectory = null, string? feature = null)
         {
-            Payloads.Add(PayloadSource.FromPayload(payloadName, targetSubdirectory));
+            Payloads.Add(PayloadSource.FromPayload(payloadName, targetSubdirectory, feature));
             return this;
         }
 
         /// <summary>Includes every file of a directory (recursively).</summary>
-        public MsiDefinition AddDirectory(string sourceDirectory, string? targetSubdirectory = null)
+        public MsiDefinition AddDirectory(string sourceDirectory, string? targetSubdirectory = null, string? feature = null)
         {
-            Payloads.Add(PayloadSource.FromDirectory(sourceDirectory, targetSubdirectory));
+            Payloads.Add(PayloadSource.FromDirectory(sourceDirectory, targetSubdirectory, feature));
             return this;
         }
 
@@ -282,6 +286,20 @@ namespace InstallKit
             return this;
         }
 
+        /// <summary>
+        /// Declares an optional part of the product. Assign files to it with the <c>feature</c> argument of
+        /// <see cref="AddPayload"/> and <see cref="AddDirectory"/>. Users choose features in the
+        /// <see cref="InstallerUi.FeatureTree"/> dialogs or with <c>ADDLOCAL</c> and <c>REMOVE</c> on the command line.
+        /// </summary>
+        /// <param name="name">The name users see. Also used on the command line, with spaces replaced by underscores.</param>
+        /// <param name="description">Shown next to the feature in the feature tree.</param>
+        /// <param name="installedByDefault">Whether the feature is installed when the user does not choose.</param>
+        public MsiDefinition AddFeature(string name, string? description = null, bool installedByDefault = true)
+        {
+            Features.Add(new OptionalFeature(name, description, installedByDefault));
+            return this;
+        }
+
         /// <summary>Output file name with defaults applied.</summary>
         public string ResolvedOutputFileName => string.IsNullOrWhiteSpace(OutputFileName) ? Name.Replace(" ", string.Empty) : OutputFileName!;
 
@@ -303,8 +321,9 @@ namespace InstallKit
     /// <summary>Where a set of installed files comes from.</summary>
     public sealed class PayloadSource
     {
-        PayloadSource(string? payloadName, string? directory, string? targetSubdirectory)
+        PayloadSource(string? payloadName, string? directory, string? targetSubdirectory, string? feature)
         {
+            Feature = string.IsNullOrWhiteSpace(feature) ? null : feature;
             PayloadName = payloadName;
             Directory = directory;
             TargetSubdirectory = string.IsNullOrWhiteSpace(targetSubdirectory) ? null : targetSubdirectory!.Trim('\\', '/');
@@ -319,11 +338,14 @@ namespace InstallKit
         /// <summary>Folder under the install directory, or <c>null</c> for the root.</summary>
         public string? TargetSubdirectory { get; }
 
-        public static PayloadSource FromPayload(string payloadName, string? targetSubdirectory = null) =>
-            new PayloadSource(payloadName, null, targetSubdirectory);
+        /// <summary>The <see cref="OptionalFeature"/> these files belong to, or <c>null</c> for files that are always installed.</summary>
+        public string? Feature { get; }
 
-        public static PayloadSource FromDirectory(string directory, string? targetSubdirectory = null) =>
-            new PayloadSource(null, directory, targetSubdirectory);
+        public static PayloadSource FromPayload(string payloadName, string? targetSubdirectory = null, string? feature = null) =>
+            new PayloadSource(payloadName, null, targetSubdirectory, feature);
+
+        public static PayloadSource FromDirectory(string directory, string? targetSubdirectory = null, string? feature = null) =>
+            new PayloadSource(null, directory, targetSubdirectory, feature);
     }
 
     /// <summary>A Windows service installed with the MSI.</summary>
