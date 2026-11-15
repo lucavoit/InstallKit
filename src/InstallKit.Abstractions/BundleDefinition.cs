@@ -48,8 +48,12 @@ namespace InstallKit
     public sealed class BundleChain
     {
         readonly List<ChainItem> items = new List<ChainItem>();
+        readonly List<BundleSearch> searches = new List<BundleSearch>();
 
         public IReadOnlyList<ChainItem> Items => items;
+
+        /// <summary>Lookups the setup makes before installing; added by the prerequisite helpers.</summary>
+        public IReadOnlyList<BundleSearch> Searches => searches;
 
         /// <summary>Installs a .NET Framework redistributable when it is missing (downloaded on demand).</summary>
         public BundleChain NetFramework(NetFrameworkVersion version)
@@ -83,6 +87,49 @@ namespace InstallKit
         {
             var item = new ExeChainItem(exePath);
             configure?.Invoke(item);
+            items.Add(item);
+            return this;
+        }
+
+        /// <summary>
+        /// Installs the Visual C++ Redistributable (2015 to 2022) unless it is already present. The installer is the one
+        /// you download from Microsoft (<c>vc_redist.x64.exe</c>), embedded or downloaded when the setup runs.
+        /// </summary>
+        public BundleChain VcRedist(PrerequisiteInstaller installer, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64)
+        {
+            var variable = "InstallKitVcRedist" + architecture;
+            var folder = architecture == PrerequisiteArchitecture.X86 ? "x86" : architecture == PrerequisiteArchitecture.Arm64 ? "arm64" : "x64";
+            // The x86 runtime registers itself in the 32-bit view of the registry, the others in the 64-bit view.
+            searches.Add(new RegistryBundleSearch(variable, RegistryHive.LocalMachine, $@"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\{folder}", "Installed", architecture != PrerequisiteArchitecture.X86));
+            return AddPrerequisite(installer, "/install /quiet /norestart", $"{variable} = 1");
+        }
+
+        /// <summary>Installs a .NET runtime of the given major version unless a runtime with that major version (or a newer patch) is present.</summary>
+        public BundleChain DotNetRuntime(DotNetRuntimeKind kind, int majorVersion, PrerequisiteInstaller installer, PrerequisiteArchitecture architecture = PrerequisiteArchitecture.X64)
+        {
+            var variable = $"InstallKitDotNet{kind}{majorVersion}{architecture}";
+            searches.Add(new DotNetBundleSearch(variable, kind, majorVersion, architecture));
+            return AddPrerequisite(installer, "/install /quiet /norestart", $"{variable} >= v{majorVersion}.0.0.0");
+        }
+
+        /// <summary>
+        /// Installs the Microsoft Edge WebView2 Runtime unless it is already present for this machine or this user.
+        /// The installer is Microsoft's Evergreen Bootstrapper or Standalone Installer.
+        /// </summary>
+        public BundleChain WebView2(PrerequisiteInstaller installer)
+        {
+            const string key = @"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
+            searches.Add(new RegistryBundleSearch("InstallKitWebView2", RegistryHive.LocalMachine, key, "pv", win64: false));
+            searches.Add(new RegistryBundleSearch("InstallKitWebView2User", RegistryHive.CurrentUser, key, "pv", win64: false));
+            return AddPrerequisite(installer, "/silent /install",
+                "(InstallKitWebView2 <> \"\" AND InstallKitWebView2 <> \"0.0.0.0\") OR (InstallKitWebView2User <> \"\" AND InstallKitWebView2User <> \"0.0.0.0\")");
+        }
+
+        BundleChain AddPrerequisite(PrerequisiteInstaller installer, string arguments, string detectCondition)
+        {
+            var item = installer.IsDownload ? new ExeChainItem(installer.ResolvedFileName, installer) : new ExeChainItem(installer.FilePath!, null);
+            item.InstallArguments = arguments;
+            item.DetectCondition = detectCondition;
             items.Add(item);
             return this;
         }
@@ -126,9 +173,17 @@ namespace InstallKit
 
     public sealed class ExeChainItem : ChainItem
     {
-        internal ExeChainItem(string path) => Path = path;
+        internal ExeChainItem(string path, PrerequisiteInstaller? download = null)
+        {
+            Path = path;
+            Download = download;
+        }
 
+        /// <summary>The installer file, or for a download the name it is saved as.</summary>
         public string Path { get; }
+
+        /// <summary>Set when the installer is downloaded when the setup runs instead of being embedded.</summary>
+        public PrerequisiteInstaller? Download { get; }
 
         public string? InstallArguments { get; set; } = "/quiet /norestart";
 

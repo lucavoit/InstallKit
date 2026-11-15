@@ -50,3 +50,6 @@ Assert-That ($diff -notmatch 'upgrade code') 'diff does not report the unchanged
 
 $same = Invoke-Tool diff $msi1 $msi1
 Assert-That ($same.Trim() -eq 'No differences.') 'diff of a file with itself reports no differences'
+
+# The prerequisite bundle is only built, never installed; it must exist next to the MSI the QA job built.
+Assert-That (Test-Path (Join-Path (Resolve-Path $V1).Path 'QaPrerequisitesSetup.exe')) 'the bundle with prerequisite helpers was built'

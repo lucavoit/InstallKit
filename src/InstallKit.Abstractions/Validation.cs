@@ -118,6 +118,11 @@ namespace InstallKit
                         case MsiChainItem m when m.Path != null && !File.Exists(m.Path):
                             errors.Add(new ValidationError("IK132", $"{label} chains '{m.Path}', which does not exist."));
                             break;
+                        case ExeChainItem e when e.Download != null:
+                            CheckDownload(errors, label, e.Download);
+                            if (string.IsNullOrWhiteSpace(e.DetectCondition))
+                                errors.Add(new ValidationError("IK134", $"{label}: '{e.Download.ResolvedFileName}' has no DetectCondition, so it would run on every install."));
+                            break;
                         case ExeChainItem e when !File.Exists(e.Path):
                             errors.Add(new ValidationError("IK133", $"{label} chains '{e.Path}', which does not exist."));
                             break;
@@ -127,6 +132,15 @@ namespace InstallKit
                                 "Set one, for example a registry or file search result."));
                             break;
                     }
+                }
+
+                var variables = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var search in bundle.Chain.Searches)
+                {
+                    if (!variables.Add(search.Variable))
+                        errors.Add(new ValidationError("IK264", $"{label} looks up the variable '{search.Variable}' twice. A prerequisite helper can be used once per runtime, version and architecture."));
+                    if (search is DotNetBundleSearch dotNet && (dotNet.MajorVersion < 3 || dotNet.MajorVersion > 99))
+                        errors.Add(new ValidationError("IK265", $"{label}: .NET {dotNet.MajorVersion} is not a valid major version. Use the major version of the runtime, for example 8."));
                 }
 
                 if (bundle.License != null && !IsUrl(bundle.License))
@@ -340,6 +354,19 @@ namespace InstallKit
                 if (!seen.Add((permission.Folder ?? "") + "|" + permission.Account))
                     errors.Add(new ValidationError("IK253", $"{label} gives '{permission.Account}' rights on {where} more than once."));
             }
+        }
+
+        static void CheckDownload(List<ValidationError> errors, string label, PrerequisiteInstaller download)
+        {
+            var name = download.ResolvedFileName;
+            if (!Uri.TryCreate(download.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+                errors.Add(new ValidationError("IK260", $"{label}: the download address '{download.Url}' must be a full https URL."));
+            if (!download.HasValidHash)
+                errors.Add(new ValidationError("IK261", $"{label}: the SHA-512 hash of '{name}' must be 128 hex digits. Get it with: Get-FileHash -Algorithm SHA512 <file>."));
+            if (download.Size <= 0 || download.Size > int.MaxValue)
+                errors.Add(new ValidationError("IK262", $"{label}: the size of '{name}' must be given in bytes (1 to 2147483647), for example from (Get-Item <file>).Length."));
+            if (name.IndexOfAny(new[] { '\\', '/', ':' }) >= 0 || !name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                errors.Add(new ValidationError("IK263", $"{label}: '{name}' is not a usable installer file name. Use a name ending in .exe without a path."));
         }
 
         static void CheckHandler(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label, string executable, string what)

@@ -43,6 +43,27 @@ return InstallerHost.Run(args, plan =>
             .WithDisplayName("InstallKit QA Demo")
             .WithDescription("Service installed by the InstallKit QA pipeline.")));
 
+    // A second bundle that is only built, not installed: it makes WiX compile the prerequisite helpers (embedded
+    // installers, a .NET runtime, WebView2, a download). The "installers" are placeholder files; Burn never runs them here.
+    var prerequisites = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "installkit-qa-prerequisites");
+    System.IO.Directory.CreateDirectory(prerequisites);
+    string Placeholder(string name)
+    {
+        var path = System.IO.Path.Combine(prerequisites, name);
+        System.IO.File.WriteAllText(path, "placeholder for " + name);
+        return path;
+    }
+
+    plan.Bundle(BundleBuilder.Create("InstallKit QA Prerequisites")
+        .WithManufacturer("InstallKit")
+        .WithUpgradeCode("3d9b2f68-0c47-4a15-8e72-b5a4c19d6f03")
+        .WithOutputFileName("QaPrerequisitesSetup")
+        .WithVcRedist(Placeholder("vc_redist.x64.exe"))
+        .WithVcRedist(PrerequisiteInstaller.FromDownload("https://aka.ms/vs/17/release/vc_redist.x86.exe", new string('A', 128), 13_000_000), PrerequisiteArchitecture.X86)
+        .WithDotNetRuntime(DotNetRuntimeKind.WindowsDesktop, 8, Placeholder("windowsdesktop-runtime-8-win-x64.exe"))
+        .WithWebView2(PrerequisiteInstaller.FromDownload("https://go.microsoft.com/fwlink/p/?LinkId=2124703", new string('B', 128), 1_800_000, "MicrosoftEdgeWebview2Setup.exe"))
+        .WithMsi(msi));
+
     plan.Bundle(BundleBuilder.Create("InstallKit QA Demo")
         .WithManufacturer("InstallKit")
         .WithUpgradeCode("e1a64b07-53c9-4f2d-9e8a-6b0d17c4f2a3")
