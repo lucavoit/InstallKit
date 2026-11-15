@@ -119,6 +119,13 @@ namespace InstallKit
             return this;
         }
 
+        /// <inheritdoc cref="MsiDefinition.AddPromptedProperty"/>
+        public MsiBuilder WithPromptedProperty(string name, string label, string? defaultValue = null, bool required = false)
+        {
+            ListOf(PromptedProperties, WithPromptedProperties).Add(new PromptedProperty(name, label, defaultValue, required));
+            return this;
+        }
+
         /// <summary>Sets a public MSI property.</summary>
         public MsiBuilder WithProperty(string name, string value)
         {

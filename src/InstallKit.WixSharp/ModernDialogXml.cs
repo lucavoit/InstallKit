@@ -18,6 +18,26 @@ namespace InstallKit.WixSharp
         /// Change button that leads there too.
         /// </summary>
         public bool HasFeatures { get; set; }
+
+        /// <summary>Values to ask for on a page of their own after the welcome page (at most three fit).</summary>
+        public IReadOnlyList<ModernPrompt> Prompts { get; set; } = new ModernPrompt[0];
+    }
+
+    /// <summary>One input box on the settings page.</summary>
+    internal sealed class ModernPrompt
+    {
+        public ModernPrompt(string property, string label, bool required)
+        {
+            Property = property;
+            Label = label;
+            Required = required;
+        }
+
+        public string Property { get; }
+
+        public string Label { get; }
+
+        public bool Required { get; }
     }
 
     /// <summary>
@@ -29,6 +49,7 @@ namespace InstallKit.WixSharp
         public const string UiId = "InstallKit_Modern";
         public const string WelcomeId = "InstallKit_WelcomeDlg";
         public const string FinishId = "InstallKit_FinishDlg";
+        public const string OptionsId = "InstallKit_OptionsDlg";
 
         // Dialog units. 370x270 is the standard WiX dialog size; the background bitmap covers 370x234.
         const int Width = 370;
@@ -42,6 +63,9 @@ namespace InstallKit.WixSharp
             XAttribute A(string name, object value) => new XAttribute(name, value);
 
             var features = options.HasFeatures;
+            var prompts = options.Prompts.Count > 0;
+            // The page before the feature page when installing: the settings page, or the welcome page.
+            var beforeFeatures = prompts ? OptionsId : WelcomeId;
 
             var dialogRefs = new List<string>
             {
@@ -78,7 +102,7 @@ namespace InstallKit.WixSharp
                     {
                         Publish(ns, "MaintenanceTypeDlg", "ChangeButton", "NewDialog", "CustomizeDlg"),
                         Publish(ns, "CustomizeDlg", "Back", "NewDialog", "MaintenanceTypeDlg", 1, "WixUI_InstallMode = \"Change\""),
-                        Publish(ns, "CustomizeDlg", "Back", "NewDialog", WelcomeId, 2, "WixUI_InstallMode <> \"Change\""),
+                        Publish(ns, "CustomizeDlg", "Back", "NewDialog", beforeFeatures, 2, "WixUI_InstallMode <> \"Change\""),
                         Publish(ns, "CustomizeDlg", "Next", "NewDialog", "VerifyReadyDlg"),
                         Publish(ns, "VerifyReadyDlg", "Back", "NewDialog", "CustomizeDlg", 1, "NOT Installed OR WixUI_InstallMode = \"Change\""),
                         Publish(ns, "VerifyReadyDlg", "Back", "NewDialog", "MaintenanceTypeDlg", 2, "Installed AND WixUI_InstallMode <> \"Change\""),
@@ -86,6 +110,7 @@ namespace InstallKit.WixSharp
                     : new[] { Publish(ns, "VerifyReadyDlg", "Back", "NewDialog", "MaintenanceTypeDlg") },
 
                 Welcome(ns, options),
+                prompts ? Options(ns, options) : null,
                 Finish(ns),
 
                 E("InstallUISequence",
@@ -108,6 +133,8 @@ namespace InstallKit.WixSharp
             var license = options.LicenseFile;
             var chooseFolder = options.ChooseInstallDir;
             var features = options.HasFeatures;
+            // The page this one leads to, or null when its button starts the install.
+            var next = options.Prompts.Count > 0 ? OptionsId : features ? "CustomizeDlg" : null;
 
             var dialog = E("Dialog", A("Id", WelcomeId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
                 Bitmap(ns),
@@ -131,8 +158,8 @@ namespace InstallKit.WixSharp
             }
             else
             {
-                dialog.Add(Text(ns, "Intro", y, 40, features
-                    ? "Setup will install [ProductName] on this computer. Click Next to choose what to install."
+                dialog.Add(Text(ns, "Intro", y, 40, next != null
+                    ? "Setup will install [ProductName] on this computer. Click Next to continue."
                     : "Setup will install [ProductName] on this computer. Click Install to continue."));
                 y += 46;
             }
@@ -152,10 +179,10 @@ namespace InstallKit.WixSharp
             // Without features this button starts the install. With features it leads to the feature page, and the
             // "Ready to install" page after it (which has the elevation shield and the disk space check) starts it.
             var install = E("Control", A("Id", "Install"), A("Type", "PushButton"), A("X", 236), A("Y", 243), A("Width", 56), A("Height", 17),
-                A("Default", "yes"), features ? null : A("ElevationShield", "yes"), A("Text", features ? "Next" : "Install"),
+                A("Default", "yes"), next != null ? null : A("ElevationShield", "yes"), A("Text", next != null ? "Next" : "Install"),
                 chooseFolder ? E("Publish", A("Event", "SetTargetPath"), A("Value", "INSTALLDIR"), A("Order", 1)) : null,
-                features
-                    ? new[] { E("Publish", A("Event", "NewDialog"), A("Value", "CustomizeDlg"), A("Order", 2)) }
+                next != null
+                    ? new[] { E("Publish", A("Event", "NewDialog"), A("Value", next), A("Order", 2)) }
                     : new[]
                     {
                         E("Publish", A("Event", "SpawnDialog"), A("Value", "OutOfDiskDlg"), A("Order", 2), A("Condition", "OutOfDiskSpace = 1")),
@@ -170,6 +197,55 @@ namespace InstallKit.WixSharp
             dialog.Add(
                 E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)),
                 install,
+                E("Control", A("Id", "Cancel"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
+                  A("Cancel", "yes"), A("Text", "Cancel"),
+                  E("Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+
+            return dialog;
+        }
+
+        /// <summary>The page with the prompted values: one label and input box each, then Back and Next (or Install).</summary>
+        static XElement Options(XNamespace ns, ModernDialogOptions options)
+        {
+            XElement E(string name, params object?[] content) => new XElement(ns + name, content);
+            XAttribute A(string name, object value) => new XAttribute(name, value);
+
+            var features = options.HasFeatures;
+
+            var dialog = E("Dialog", A("Id", OptionsId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
+                Bitmap(ns),
+                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}Settings"),
+                Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}Tell setup a little about this installation."));
+
+            var y = 82;
+            for (var i = 0; i < options.Prompts.Count; i++)
+            {
+                var prompt = options.Prompts[i];
+                dialog.Add(
+                    Text(ns, $"PromptLabel{i + 1}", y, 12, prompt.Label),
+                    E("Control", A("Id", $"Prompt{i + 1}"), A("Type", "Edit"), A("X", ContentX), A("Y", y + 14), A("Width", ContentWidth), A("Height", 17),
+                      A("Property", prompt.Property), A("Sunken", "yes")));
+                y += 40;
+            }
+
+            var required = options.Prompts.Where(p => p.Required).Select(p => $"{p.Property} = \"\"").ToList();
+            var forward = E("Control", A("Id", "Next"), A("Type", "PushButton"), A("X", 236), A("Y", 243), A("Width", 56), A("Height", 17),
+                A("Default", "yes"), features ? null : A("ElevationShield", "yes"), A("Text", features ? "Next" : "Install"),
+                features
+                    ? new[] { E("Publish", A("Event", "NewDialog"), A("Value", "CustomizeDlg"), A("Order", 1)) }
+                    : new[]
+                    {
+                        E("Publish", A("Event", "SpawnDialog"), A("Value", "OutOfDiskDlg"), A("Order", 1), A("Condition", "OutOfDiskSpace = 1")),
+                        E("Publish", A("Event", "EndDialog"), A("Value", "Return"), A("Order", 2), A("Condition", "OutOfDiskSpace <> 1")),
+                    });
+            if (required.Count > 0)
+                forward.Add(A("DisableCondition", string.Join(" OR ", required)));
+
+            dialog.Add(
+                E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)),
+                E("Control", A("Id", "Back"), A("Type", "PushButton"), A("X", 180), A("Y", 243), A("Width", 56), A("Height", 17), A("Text", "Back"),
+                  E("Publish", A("Event", "NewDialog"), A("Value", WelcomeId))),
+                forward,
                 E("Control", A("Id", "Cancel"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
                   A("Cancel", "yes"), A("Text", "Cancel"),
                   E("Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));

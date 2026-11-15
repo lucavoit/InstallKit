@@ -13,6 +13,7 @@ namespace InstallKit.WixSharp
     /// accept box, optional install folder with Browse, and an Install button.</item>
     /// <item>With optional features the welcome page leads to the feature page and a "ready to install" page; the repair
     /// dialog then also offers Change.</item>
+    /// <item>Prompted properties get a settings page of their own (a label and an input box each) after the welcome page.</item>
     /// <item>A finish page on the same background.</item>
     /// <item>Progress, errors, files-in-use and repair/remove reuse the WiX UI extension's dialogs, which pick
     /// up the generated banner and the Segoe UI text styles defined here.</item>
@@ -28,6 +29,7 @@ namespace InstallKit.WixSharp
                 LicenseFile = string.IsNullOrWhiteSpace(msi.LicenseFile) ? null : Path.GetFullPath(msi.LicenseFile),
                 ChooseInstallDir = msi.Ui == InstallerUi.ModernInstallDir,
                 HasFeatures = msi.Features.Count > 0,
+                Prompts = msi.PromptedProperties.Select(p => new ModernPrompt(p.Name, p.Label, p.Required)).ToList(),
             };
 
             project.WixSourceGenerated += document =>

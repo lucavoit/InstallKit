@@ -33,6 +33,9 @@ return InstallerHost.Run(args, plan =>
         .WithFirewallRule("InstallKit QA Demo port", "48765")
         .WithFirewallRule("InstallKit QA Demo program", executable: "QaDemo.exe", scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private)
         .WithXmlValue(@"config\qa.config", "/configuration/appSettings/add[@key='Server']/@value", "[MODE]")
+        // Asked for on the settings page of the modern UI; here it is the default or the command line that provides it.
+        .WithPromptedProperty("QA_REGION", "Region", "eu-west", required: true)
+        .WithXmlValue(@"config\qa.config", "/configuration/appSettings/add[@key='Region']/@value", "[QA_REGION]")
         .WithCloseApplication("InstallKitQaClose.exe", terminate: true, timeoutSeconds: 3)
         .WithFolderPermission("Authenticated Users", FolderRights.Modify)
         .WithFolderPermission("Users", FolderRights.Modify, "logs")

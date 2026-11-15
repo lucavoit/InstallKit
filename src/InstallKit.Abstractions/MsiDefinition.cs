@@ -103,6 +103,9 @@ namespace InstallKit
         /// <summary>Access granted to accounts on folders of the product. See <see cref="AddFolderPermission"/>.</summary>
         public IList<FolderPermission> FolderPermissions { get; set; } = new List<FolderPermission>();
 
+        /// <summary>Values the modern setup dialogs ask the user for. See <see cref="AddPromptedProperty"/>.</summary>
+        public IList<PromptedProperty> PromptedProperties { get; set; } = new List<PromptedProperty>();
+
         /// <summary>Registry values written at install time and removed on uninstall. See <see cref="AddRegistryValue(RegistryHive, string, string?, string, RegistryValueKind)"/>.</summary>
         public IList<RegistryEntry> RegistryEntries { get; set; } = new List<RegistryEntry>();
 
@@ -322,6 +325,20 @@ namespace InstallKit
         public MsiDefinition AddFolderPermission(string account, FolderRights rights, string? folder = null)
         {
             FolderPermissions.Add(new FolderPermission(account, rights, folder));
+            return this;
+        }
+
+        /// <summary>
+        /// Asks the user for a value in the modern setup dialogs and keeps it in an MSI property, with a default.
+        /// Silent installs and the command line use the default or the value given with <c>NAME=value</c>.
+        /// </summary>
+        /// <param name="name">The property name in capital letters, for example <c>SERVER</c>.</param>
+        /// <param name="label">The text above the input box.</param>
+        /// <param name="defaultValue">The value the box starts with.</param>
+        /// <param name="required">Keep the Next or Install button disabled while the box is empty.</param>
+        public MsiDefinition AddPromptedProperty(string name, string label, string? defaultValue = null, bool required = false)
+        {
+            PromptedProperties.Add(new PromptedProperty(name, label, defaultValue, required));
             return this;
         }
 
