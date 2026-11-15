@@ -26,6 +26,8 @@ return InstallerHost.Run(args, plan =>
         .WithEnvironmentVariable("INSTALLKIT_QA_HOME", "[INSTALLDIR]")
         .WithFileAssociation(".ikqa", "InstallKit QA file")
         .WithUrlProtocol("installkitqa", "InstallKit QA link")
+        .WithFirewallRule("InstallKit QA Demo port", "48765")
+        .WithFirewallRule("InstallKit QA Demo program", executable: "QaDemo.exe", scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private)
         .RunAfterInstall("QaDemo.exe", "--init [MODE]")
         .RunBeforeUninstall("QaDemo.exe", "--unregister")
         .WithService("QaDemo.exe", "InstallKitQaDemo", s => s
