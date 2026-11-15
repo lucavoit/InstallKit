@@ -308,6 +308,8 @@ public class MsiEngineTests
         var uiRefs = wxs.All("UIRef").Select(r => A(r, "Id")).ToList();
         Assert.Contains("InstallKit_Modern", uiRefs);
         Assert.DoesNotContain("WixUI_Minimal", uiRefs);
+        // WixSharp writes the stock set as a WixUI element (WiX 4 and later); left in place it would be linked and ours dropped.
+        Assert.DoesNotContain(wxs.All("WixUI"), e => A(e, "Id") == "WixUI_Minimal");
         Assert.Contains(wxs.All("Feature"), f => A(f, "Id") == "Tray");
 
         var welcome = wxs.One("Dialog", "InstallKit_WelcomeDlg");

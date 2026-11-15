@@ -37,9 +37,14 @@ namespace InstallKit.WixSharp
                 var root = document.Root!;
                 XNamespace ns = root.Name.Namespace;
 
-                // WixSharp references WixUI_Minimal (which also pulls in the UI extension); swap in ours.
-                foreach (var uiRef in root.Descendants(ns + "UIRef").Where(e => (string?)e.Attribute("Id") == "WixUI_Minimal").ToList())
-                    uiRef.SetAttributeValue("Id", ModernDialogXml.UiId);
+                // WixSharp selects WixUI_Minimal, and swapping it for ours is what makes our fragment part of the MSI: WiX
+                // leaves out a fragment nothing references. Depending on the WiX version WixSharp writes it as a UIRef
+                // or as a WixUI element of the UI extension's namespace (WiX 4 and later), so look for both by name.
+                var stock = root.Descendants()
+                    .Where(e => (e.Name.LocalName == "UIRef" || e.Name.LocalName == "WixUI") && (string?)e.Attribute("Id") == "WixUI_Minimal")
+                    .ToList();
+                foreach (var element in stock)
+                    element.ReplaceWith(new XElement(ns + "UIRef", new XAttribute("Id", ModernDialogXml.UiId)));
 
                 root.Add(ModernDialogXml.BuildFragment(ns, options));
             };
