@@ -624,11 +624,10 @@ namespace InstallKit.WixSharp
                 case ExeChainItem exe when exe.Download != null:
                     // Nothing is embedded: Burn downloads the file and checks its hash and size before running it.
                     var download = exe.Download;
+                    // WiX rejects a payload element on a package that also has SourceFile, Name, DownloadUrl or Compressed,
+                    // so the file name, address, hash and size all live on the payload.
                     result = new ExePackage
                     {
-                        Name = download.ResolvedFileName,
-                        DownloadUrl = download.Url,
-                        Compressed = false,
                         InstallArguments = exe.InstallArguments,
                         UninstallArguments = exe.UninstallArguments,
                         DetectCondition = exe.DetectCondition,
