@@ -24,6 +24,8 @@ return InstallerHost.Run(args, plan =>
         .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "LogDir", @"%ProgramData%\InstallKitQa", RegistryValueKind.ExpandString)
         .WithPathEntry("[INSTALLDIR]bin")
         .WithEnvironmentVariable("INSTALLKIT_QA_HOME", "[INSTALLDIR]")
+        .WithFileAssociation(".ikqa", "InstallKit QA file")
+        .WithUrlProtocol("installkitqa", "InstallKit QA link")
         .RunAfterInstall("QaDemo.exe", "--init [MODE]")
         .RunBeforeUninstall("QaDemo.exe", "--unregister")
         .WithService("QaDemo.exe", "InstallKitQaDemo", s => s

@@ -73,6 +73,12 @@ namespace InstallKit
         /// <summary>Environment variable and <c>PATH</c> changes made at install time and undone on uninstall.</summary>
         public IList<EnvironmentVariableEntry> EnvironmentVariables { get; set; } = new List<EnvironmentVariableEntry>();
 
+        /// <summary>File extensions that open with this product. See <see cref="AddFileAssociation"/>.</summary>
+        public IList<FileAssociation> FileAssociations { get; set; } = new List<FileAssociation>();
+
+        /// <summary>URL schemes handled by this product. See <see cref="AddUrlProtocol"/>.</summary>
+        public IList<UrlProtocol> UrlProtocols { get; set; } = new List<UrlProtocol>();
+
         /// <summary>Registry values written at install time and removed on uninstall. See <see cref="AddRegistryValue(RegistryHive, string, string?, string, RegistryValueKind)"/>.</summary>
         public IList<RegistryEntry> RegistryEntries { get; set; } = new List<RegistryEntry>();
 
@@ -191,6 +197,44 @@ namespace InstallKit
         /// <param name="prepend">Put the folder at the start of <c>PATH</c> instead of the end.</param>
         public MsiDefinition AddPathEntry(string path, bool prepend = false) =>
             AddEnvironmentVariable("PATH", path, prepend ? EnvironmentVariableAction.Prepend : EnvironmentVariableAction.Append);
+
+        /// <summary>Makes a file extension open with one of the product's programs.</summary>
+        /// <param name="extension">The extension with its dot, for example <c>.foo</c>.</param>
+        /// <param name="description">The file type name Explorer shows.</param>
+        /// <param name="executable">The program, relative to the install directory. Defaults to <see cref="MainExecutable"/>.</param>
+        /// <param name="progId">The ProgId. Defaults to the output file name plus the extension.</param>
+        public MsiDefinition AddFileAssociation(string extension, string description, string? executable = null, string? progId = null)
+        {
+            FileAssociations.Add(new FileAssociation(extension, description, executable, progId));
+            return this;
+        }
+
+        /// <summary>Registers a URL scheme such as <c>myapp://</c> that starts one of the product's programs.</summary>
+        /// <param name="scheme">The scheme without <c>://</c>.</param>
+        /// <param name="description">Shown to the user when the browser asks which program should open the link.</param>
+        /// <param name="executable">The program, relative to the install directory. Defaults to <see cref="MainExecutable"/>.</param>
+        public MsiDefinition AddUrlProtocol(string scheme, string description, string? executable = null)
+        {
+            UrlProtocols.Add(new UrlProtocol(scheme, description, executable));
+            return this;
+        }
+
+        /// <summary>
+        /// Everything written to the registry: the values added directly plus those that file associations and
+        /// URL protocols are made of. Engines write this list.
+        /// </summary>
+        public IReadOnlyList<RegistryEntry> ResolvedRegistryEntries
+        {
+            get
+            {
+                var all = new List<RegistryEntry>(RegistryEntries);
+                foreach (var association in FileAssociations)
+                    all.AddRange(association.ToRegistryEntries(this));
+                foreach (var protocol in UrlProtocols)
+                    all.AddRange(protocol.ToRegistryEntries(this));
+                return all;
+            }
+        }
 
         /// <summary>Output file name with defaults applied.</summary>
         public string ResolvedOutputFileName => string.IsNullOrWhiteSpace(OutputFileName) ? Name.Replace(" ", string.Empty) : OutputFileName!;
