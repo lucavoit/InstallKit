@@ -82,6 +82,9 @@ namespace InstallKit
         /// <summary>Inbound Windows Firewall exceptions. See <see cref="AddFirewallRule"/>.</summary>
         public IList<FirewallRule> FirewallRules { get; set; } = new List<FirewallRule>();
 
+        /// <summary>Values set in installed XML files. See <see cref="AddXmlValue"/>.</summary>
+        public IList<XmlValue> XmlValues { get; set; } = new List<XmlValue>();
+
         /// <summary>Registry values written at install time and removed on uninstall. See <see cref="AddRegistryValue(RegistryHive, string, string?, string, RegistryValueKind)"/>.</summary>
         public IList<RegistryEntry> RegistryEntries { get; set; } = new List<RegistryEntry>();
 
@@ -250,6 +253,16 @@ namespace InstallKit
             FirewallScope scope = FirewallScope.Any, FirewallProfile profile = FirewallProfile.All)
         {
             FirewallRules.Add(new FirewallRule(name, port, protocol, executable, scope, profile));
+            return this;
+        }
+
+        /// <summary>Sets an attribute or element value in an installed XML file during the install.</summary>
+        /// <param name="file">The file relative to the install directory, for example <c>MyApp.exe.config</c>.</param>
+        /// <param name="xpath">An XPath to one element or attribute, for example <c>/configuration/appSettings/add[@key='Server']/@value</c>.</param>
+        /// <param name="value">The new value. MSI formatted text such as <c>[SERVER]</c> is expanded.</param>
+        public MsiDefinition AddXmlValue(string file, string xpath, string value)
+        {
+            XmlValues.Add(new XmlValue(file, xpath, value));
             return this;
         }
 

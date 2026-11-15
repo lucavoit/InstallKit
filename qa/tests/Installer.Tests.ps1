@@ -141,6 +141,12 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
         $key.GetValue('LogDir') | Should -Be (Join-Path $env:ProgramData 'InstallKitQa')
     }
 
+    It 'writes the MODE property into config\qa.config and leaves other settings alone' {
+        $config = [xml](Get-Content (Join-Path $InstallDir 'config\qa.config') -Raw)
+        ($config.configuration.appSettings.add | Where-Object key -eq 'Server').value | Should -Be 'server'
+        ($config.configuration.appSettings.add | Where-Object key -eq 'Other').value | Should -Be 'untouched'
+    }
+
     It 'registers the .ikqa file association with an open command' {
         (Get-Item "$Classes\.ikqa").GetValue('') | Should -Be 'QaDemo.ikqa'
         (Get-Item "$Classes\QaDemo.ikqa").GetValue('') | Should -Be 'InstallKit QA file'

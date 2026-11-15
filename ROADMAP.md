@@ -9,13 +9,13 @@ Not released yet:
 - `PATH` entries and environment variables
 - File associations and URL protocol handlers
 - Firewall rules (inbound)
+- Values in XML config files, set at install time without a custom action (JSON is still to do)
 
 ## Now
 
 In progress or next up.
 
 **Installer model** (fluent builders, engine-neutral, validated before WiX runs):
-- Config file transforms: write install-time values into `appsettings.json` or `.config` files without a custom action
 - Multi-instance (side-by-side) installs and `.mst` transforms for per-customer variants
 - Optional features: a builder API for feature groups
 - Prerequisite helpers for bundles: .NET runtime, VC++ redistributable, WebView2, with built-in detect conditions

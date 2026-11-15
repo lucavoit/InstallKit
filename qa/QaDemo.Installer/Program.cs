@@ -28,6 +28,7 @@ return InstallerHost.Run(args, plan =>
         .WithUrlProtocol("installkitqa", "InstallKit QA link")
         .WithFirewallRule("InstallKit QA Demo port", "48765")
         .WithFirewallRule("InstallKit QA Demo program", executable: "QaDemo.exe", scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private)
+        .WithXmlValue(@"config\qa.config", "/configuration/appSettings/add[@key='Server']/@value", "[MODE]")
         .RunAfterInstall("QaDemo.exe", "--init [MODE]")
         .RunBeforeUninstall("QaDemo.exe", "--unregister")
         .WithService("QaDemo.exe", "InstallKitQaDemo", s => s

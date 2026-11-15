@@ -272,6 +272,21 @@ MsiBuilder.Create("My App")
 - **Checked before WiX runs:** a rule needs a name (`IK210`) and a port or a program (`IK211`); ports must be 1 to 65535, a range or a list (`IK212`); a port needs TCP or UDP (`IK213`); the program must be in a payload (`IK121`).
 - **WiX extension:** the build adds the WiX firewall extension automatically when a rule is used; it is pinned to the same version as the `wix` tool like the other extensions.
 
+### Values in XML config files
+
+```csharp
+MsiBuilder.Create("My App")
+    .WithProperty("SERVER", "localhost")
+    .WithXmlValue("MyApp.exe.config", "/configuration/appSettings/add[@key='Server']/@value", "[SERVER]");
+```
+
+Run `msiexec /i MyApp.msi SERVER=prod.contoso.com` and the installed file contains `prod.contoso.com`. This also works with the value a custom dialog stores in a property, and needs no custom action.
+
+- **File:** relative to the install directory and part of a payload (`IK121`). The edit happens after the files are copied.
+- **XPath:** points at one element or attribute and is checked before WiX runs (`IK221`). InstallKit escapes the `[` and `]` of XPath predicates for you, because Windows Installer would otherwise read them as property references.
+- **Value:** MSI formatted text such as `[SERVER]` or `[INSTALLDIR]logs`.
+- **XML only:** a JSON file fails with `IK222`. JSON support is planned.
+
 ## UI and branding
 
 | `Ui` | Dialogs |

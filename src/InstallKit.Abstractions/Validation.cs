@@ -88,6 +88,7 @@ namespace InstallKit
                 CheckEnvironment(errors, label, msi);
                 CheckAssociations(errors, msi, context, label);
                 CheckFirewall(errors, msi, context, label);
+                CheckXmlValues(errors, msi, context, label);
 
                 foreach (var command in msi.Commands)
                 {
@@ -244,6 +245,29 @@ namespace InstallKit
 
                 if (msi.Scope == InstallScope.PerUser)
                     errors.Add(new ValidationError("IK214", $"{label}: the {what} cannot be created by a per-user install, which does not run elevated. Install per machine."));
+            }
+        }
+
+        static void CheckXmlValues(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label)
+        {
+            foreach (var edit in msi.XmlValues)
+            {
+                var what = $"XML value '{edit.XPath}' in '{edit.File}'";
+                if (string.IsNullOrWhiteSpace(edit.File))
+                {
+                    errors.Add(new ValidationError("IK220", $"{label}: an XML value has no file."));
+                    continue;
+                }
+
+                if (string.Equals(Path.GetExtension(edit.File), ".json", StringComparison.OrdinalIgnoreCase))
+                    errors.Add(new ValidationError("IK222", $"{label}: {what}: WithXmlValue edits XML files only. JSON files are not supported yet."));
+                else
+                    CheckInstalledFile(errors, msi, context, label, edit.File, $"file of the {what}");
+
+                if (!edit.HasValidXPath)
+                    errors.Add(new ValidationError("IK221", $"{label}: the XPath '{edit.XPath}' for '{edit.File}' is not valid, for example /configuration/appSettings/add[@key='Server']/@value."));
+                else if (edit.Value == null)
+                    errors.Add(new ValidationError("IK223", $"{label}: the {what} has no value."));
             }
         }
 
