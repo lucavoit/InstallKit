@@ -49,6 +49,8 @@ namespace InstallKit.WixSharp
             installContents.AddRange(msi.FirewallRules.Select(ToFirewallException));
 
             var installDir = new Dir(new Id(InstallDirId), msi.ResolvedInstallDirectory, installContents.ToArray());
+            if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree)
+                Console.WriteLine($"InstallKit : warning IK246: MSI '{msi.Name}' has optional features, which users can only choose in the FeatureTree UI or with ADDLOCAL and REMOVE on the command line. Set Ui = InstallerUi.FeatureTree to show them.");
             var entities = new List<WixEntity> { installDir };
             entities.AddRange(msi.ResolvedRegistryEntries.Select(ToRegValue));
             entities.AddRange(msi.CloseApplications.Select(ToCloseApplication));
@@ -316,6 +318,9 @@ namespace InstallKit.WixSharp
             };
         }
 
+        static Feature ToFeature(OptionalFeature feature) =>
+            new Feature(feature.Name, feature.Description ?? string.Empty, feature.InstalledByDefault, true) { Id = feature.Id };
+
         static void AddChild(Dictionary<string, List<WixEntity>> children, string file, WixEntity child)
         {
             var key = Normalize(file);
@@ -330,6 +335,8 @@ namespace InstallKit.WixSharp
 
         static IEnumerable<WixEntity> BuildPayloadEntities(MsiDefinition msi, InstallerContext context)
         {
+            var features = msi.Features.ToDictionary(f => f.Id, ToFeature, StringComparer.OrdinalIgnoreCase);
+
             // Files that carry a service or an XML edit get their own <File> element; everything else is a wildcard.
             var special = new Dictionary<string, List<WixEntity>>(StringComparer.OrdinalIgnoreCase);
             foreach (var service in msi.Services)
@@ -356,7 +363,10 @@ namespace InstallKit.WixSharp
                     }
 
                     var excluded = new HashSet<string>(specialHere.Select(s => Path.Combine(source, Path.GetFileName(s.Key))), StringComparer.OrdinalIgnoreCase);
-                    items.Add(new Files(Path.Combine(source, "*.*"), path => !excluded.Contains(Path.GetFullPath(path))));
+                    var files = new Files(Path.Combine(source, "*.*"), path => !excluded.Contains(Path.GetFullPath(path)));
+                    if (payload.Feature != null)
+                        files.Feature = features[new OptionalFeature(payload.Feature).Id];
+                    items.Add(files);
                 }
 
                 if (group.Key.Length == 0)

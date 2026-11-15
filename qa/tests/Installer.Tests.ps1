@@ -73,6 +73,8 @@ BeforeAll {
         $StartMenu | Should -Not -Exist
         $DesktopLink | Should -Not -Exist
         $RegKey | Should -Not -Exist
+        Join-Path $InstallDir 'docs' | Should -Not -Exist
+        Join-Path $InstallDir 'samples' | Should -Not -Exist
         Get-MachinePathEntries | Should -Not -Contain $BinDir
         Get-NetFirewallRule -DisplayName 'InstallKit QA Demo*' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         "$Classes\.ikqa" | Should -Not -Exist
@@ -145,6 +147,11 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
         $config = [xml](Get-Content (Join-Path $InstallDir 'config\qa.config') -Raw)
         ($config.configuration.appSettings.add | Where-Object key -eq 'Server').value | Should -Be 'server'
         ($config.configuration.appSettings.add | Where-Object key -eq 'Other').value | Should -Be 'untouched'
+    }
+
+    It 'installs the default-on feature and leaves the default-off feature out' {
+        Join-Path $InstallDir 'docs\readme.txt' | Should -Exist
+        Join-Path $InstallDir 'samples' | Should -Not -Exist
     }
 
     It 'registers the .ikqa file association with an open command' {
@@ -237,6 +244,21 @@ Describe 'Repair' {
 
     It 'restores a deleted file' {
         Join-Path $InstallDir 'config\appsettings.qa.json' | Should -Exist
+    }
+}
+
+Describe 'Changing features of the installed product' {
+    It 'adds an optional feature with ADDLOCAL' {
+        Invoke-Msi "/i $((Get-MsiEntries)[0].PSChildName) ADDLOCAL=Samples" '3b-add-feature'
+        Join-Path $InstallDir 'samples\sample.txt' | Should -Exist
+        Join-Path $InstallDir 'docs\readme.txt' | Should -Exist
+    }
+
+    It 'removes a feature with REMOVE and keeps the rest' {
+        Invoke-Msi "/i $((Get-MsiEntries)[0].PSChildName) REMOVE=Docs" '3c-remove-feature'
+        Join-Path $InstallDir 'docs' | Should -Not -Exist
+        Join-Path $InstallDir 'samples\sample.txt' | Should -Exist
+        Join-Path $InstallDir 'QaDemo.exe' | Should -Exist
     }
 }
 
