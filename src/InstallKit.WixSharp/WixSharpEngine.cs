@@ -384,6 +384,15 @@ namespace InstallKit.WixSharp
         static Feature ToFeature(OptionalFeature feature) =>
             new Feature(feature.Name, feature.Description ?? string.Empty, feature.InstalledByDefault, true) { Id = feature.Id };
 
+        // Installed paths use backslashes whatever the build machine is, which Path.GetFileName and GetDirectoryName do not split on Linux.
+        static string InstalledFileName(string path) => path.Substring(path.LastIndexOf('\\') + 1);
+
+        static string InstalledFolder(string path)
+        {
+            var cut = path.LastIndexOf('\\');
+            return cut <= 0 ? string.Empty : path.Substring(0, cut);
+        }
+
         static void AddChild(Dictionary<string, List<WixEntity>> children, string file, WixEntity child)
         {
             var key = Normalize(file);
@@ -415,17 +424,17 @@ namespace InstallKit.WixSharp
                 {
                     var source = InstallerValidator.ResolvePayload(payload, context)!;
                     var specialHere = special
-                        .Where(s => IOFile.Exists(Path.Combine(source, Path.GetFileName(s.Key))) &&
-                                    string.Equals(Path.GetDirectoryName(s.Key) ?? string.Empty, group.Key, StringComparison.OrdinalIgnoreCase))
+                        .Where(s => IOFile.Exists(Path.Combine(source, InstalledFileName(s.Key))) &&
+                                    string.Equals(InstalledFolder(s.Key), group.Key, StringComparison.OrdinalIgnoreCase))
                         .ToList();
 
                     foreach (var entry in specialHere)
                     {
-                        items.Add(new WixFile(Path.Combine(source, Path.GetFileName(entry.Key)), entry.Value.ToArray()));
+                        items.Add(new WixFile(Path.Combine(source, InstalledFileName(entry.Key)), entry.Value.ToArray()));
                         special.Remove(entry.Key);
                     }
 
-                    var excluded = new HashSet<string>(specialHere.Select(s => Path.Combine(source, Path.GetFileName(s.Key))), StringComparer.OrdinalIgnoreCase);
+                    var excluded = new HashSet<string>(specialHere.Select(s => Path.Combine(source, InstalledFileName(s.Key))), StringComparer.OrdinalIgnoreCase);
                     var files = new Files(Path.Combine(source, "*.*"), path => !excluded.Contains(Path.GetFullPath(path)));
                     if (payload.Feature != null)
                         files.Feature = features[new OptionalFeature(payload.Feature).Id];

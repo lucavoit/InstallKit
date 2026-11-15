@@ -179,8 +179,10 @@ namespace InstallKit
         public static (PayloadSource Payload, string SourcePath)? FindInstalledFile(MsiDefinition msi, InstallerContext context, string installedPath)
         {
             var normalized = installedPath.Replace('/', '\\').TrimStart('\\');
-            var folder = Path.GetDirectoryName(normalized)?.Replace('/', '\\');
-            folder = string.IsNullOrEmpty(folder) ? null : folder;
+            // Installed paths use backslashes whatever the build machine is: Path.GetDirectoryName would not split them on Linux.
+            var lastSeparator = normalized.LastIndexOf('\\');
+            var folder = lastSeparator <= 0 ? null : normalized.Substring(0, lastSeparator);
+            var fileName = lastSeparator < 0 ? normalized : normalized.Substring(lastSeparator + 1);
 
             foreach (var payload in msi.Payloads)
             {
@@ -191,7 +193,7 @@ namespace InstallKit
                 if (directory == null)
                     continue;
 
-                var source = Path.Combine(directory, Path.GetFileName(normalized));
+                var source = Path.Combine(directory, fileName);
                 if (File.Exists(source))
                     return (payload, source);
             }
