@@ -85,6 +85,9 @@ namespace InstallKit
         /// <summary>Values set in installed XML files. See <see cref="AddXmlValue"/>.</summary>
         public IList<XmlValue> XmlValues { get; set; } = new List<XmlValue>();
 
+        /// <summary>Programs that are closed (and optionally ended) while installing. See <see cref="AddCloseApplication"/>.</summary>
+        public IList<CloseApplicationRule> CloseApplications { get; set; } = new List<CloseApplicationRule>();
+
         /// <summary>Registry values written at install time and removed on uninstall. See <see cref="AddRegistryValue(RegistryHive, string, string?, string, RegistryValueKind)"/>.</summary>
         public IList<RegistryEntry> RegistryEntries { get; set; } = new List<RegistryEntry>();
 
@@ -263,6 +266,19 @@ namespace InstallKit
         public MsiDefinition AddXmlValue(string file, string xpath, string value)
         {
             XmlValues.Add(new XmlValue(file, xpath, value));
+            return this;
+        }
+
+        /// <summary>
+        /// Closes a running program before files are replaced or removed, so they are not locked and no restart is needed.
+        /// It is asked to close first; with <paramref name="terminate"/> it is ended when it does not.
+        /// </summary>
+        /// <param name="processName">The process file name, for example <c>MyApp.exe</c>.</param>
+        /// <param name="terminate">End the process if it is still running after <paramref name="timeoutSeconds"/>.</param>
+        /// <param name="timeoutSeconds">How long to wait for the program to close.</param>
+        public MsiDefinition AddCloseApplication(string processName, bool terminate = false, int timeoutSeconds = 5)
+        {
+            CloseApplications.Add(new CloseApplicationRule(processName, terminate, timeoutSeconds));
             return this;
         }
 

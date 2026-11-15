@@ -10,6 +10,7 @@ Not released yet:
 - File associations and URL protocol handlers
 - Firewall rules (inbound)
 - Values in XML config files, set at install time without a custom action (JSON is still to do)
+- Closing (and optionally ending) running programs before an install, upgrade or uninstall
 
 ## Now
 
@@ -23,7 +24,7 @@ In progress or next up.
 **Tooling and runtime:**
 - Roslyn analyzers and code fixes for the `IKxxx` validation errors
 - An `installkit` dotnet tool: `inspect`, `diff` and `verify` for MSI files, plus `new-guid`
-- Built-in install handlers: `AddToPath`, `GrantFolderPermissions`, `StopRunningProcesses`, `CloseApplications`
+- Folder permissions (grant an account rights on the install folder or a subfolder)
 
 ## Later
 

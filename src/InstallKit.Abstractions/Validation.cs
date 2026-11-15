@@ -89,6 +89,7 @@ namespace InstallKit
                 CheckAssociations(errors, msi, context, label);
                 CheckFirewall(errors, msi, context, label);
                 CheckXmlValues(errors, msi, context, label);
+                CheckCloseApplications(errors, msi, label);
 
                 foreach (var command in msi.Commands)
                 {
@@ -268,6 +269,21 @@ namespace InstallKit
                     errors.Add(new ValidationError("IK221", $"{label}: the XPath '{edit.XPath}' for '{edit.File}' is not valid, for example /configuration/appSettings/add[@key='Server']/@value."));
                 else if (edit.Value == null)
                     errors.Add(new ValidationError("IK223", $"{label}: the {what} has no value."));
+            }
+        }
+
+        static void CheckCloseApplications(List<ValidationError> errors, MsiDefinition msi, string label)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var rule in msi.CloseApplications)
+            {
+                if (!rule.IsProcessFileName)
+                    errors.Add(new ValidationError("IK230", $"{label}: '{rule.ProcessName}' is not a process file name. Use the name of the program's executable, for example MyApp.exe, without a path."));
+                else if (!seen.Add(rule.ProcessName))
+                    errors.Add(new ValidationError("IK231", $"{label} closes '{rule.ProcessName}' more than once."));
+
+                if (rule.TimeoutSeconds < 1 || rule.TimeoutSeconds > 600)
+                    errors.Add(new ValidationError("IK232", $"{label}: the timeout for closing '{rule.ProcessName}' is {rule.TimeoutSeconds} seconds. Use 1 to 600."));
             }
         }
 

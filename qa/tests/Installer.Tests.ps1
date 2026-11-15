@@ -188,7 +188,26 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
 }
 
 Describe 'Major upgrade to 1.1.0 without MODE' {
-    BeforeAll { Invoke-Msi "/i `"$(Join-Path $V2 'QaDemo.msi')`"" '2-upgrade-1.1.0' }
+    BeforeAll {
+        # A running program the installer is told to close: a console program under the name the MSI looks for.
+        $script:CloseTarget = Join-Path $env:TEMP 'InstallKitQaClose.exe'
+        Copy-Item (Join-Path $env:SystemRoot 'System32\ping.exe') $CloseTarget -Force
+        $script:CloseProcess = Start-Process $CloseTarget -ArgumentList '-t', '127.0.0.1' -WindowStyle Hidden -PassThru
+        Start-Sleep -Seconds 1
+        $script:CloseWasRunning = -not $CloseProcess.HasExited
+
+        Invoke-Msi "/i `"$(Join-Path $V2 'QaDemo.msi')`"" '2-upgrade-1.1.0'
+    }
+
+    AfterAll {
+        Get-Process -Name 'InstallKitQaClose' -ErrorAction SilentlyContinue | Stop-Process -Force
+        Remove-Item $CloseTarget -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'closes the program named in WithCloseApplication' {
+        $CloseWasRunning | Should -BeTrue
+        $CloseProcess.WaitForExit(15000) | Should -BeTrue
+    }
 
     It 'replaces 1.0.0 instead of installing side by side' {
         $entries = Get-MsiEntries
