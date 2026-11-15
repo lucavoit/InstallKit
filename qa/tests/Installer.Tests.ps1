@@ -106,7 +106,7 @@ BeforeAll {
 }
 
 Describe 'Fresh install of 1.0.0 with MODE=server' {
-    BeforeAll { Invoke-Msi "/i `"$(Join-Path $V1 'QaDemo.msi')`" MODE=server" '1-install-1.0.0' }
+    BeforeAll { Invoke-Msi "/i `"$(Join-Path $V1 'QaDemo.msi')`" MODE=server QA_REGION=us-east" '1-install-1.0.0' }
 
     It 'registers exactly one product in Add/Remove Programs' {
         $entries = Get-MsiEntries
@@ -164,6 +164,11 @@ Describe 'Fresh install of 1.0.0 with MODE=server' {
         $config = [xml](Get-Content (Join-Path $InstallDir 'config\qa.config') -Raw)
         ($config.configuration.appSettings.add | Where-Object key -eq 'Server').value | Should -Be 'server'
         ($config.configuration.appSettings.add | Where-Object key -eq 'Other').value | Should -Be 'untouched'
+    }
+
+    It 'passes a prompted property given on the command line into config\qa.config' {
+        $config = [xml](Get-Content (Join-Path $InstallDir 'config\qa.config') -Raw)
+        ($config.configuration.appSettings.add | Where-Object key -eq 'Region').value | Should -Be 'us-east'
     }
 
     It 'installs the default-on feature and leaves the default-off feature out' {
@@ -274,6 +279,11 @@ Describe 'Major upgrade to 1.1.0 without MODE' {
 
     It 'uses the default MODE when none is given' {
         Get-Content (Join-Path $InstallDir 'mode.txt') -Raw | Should -Be 'client'
+    }
+
+    It 'uses the default of a prompted property when none is given' {
+        $config = [xml](Get-Content (Join-Path $InstallDir 'config\qa.config') -Raw)
+        ($config.configuration.appSettings.add | Where-Object key -eq 'Region').value | Should -Be 'eu-west'
     }
 
     It 'keeps the service running' {

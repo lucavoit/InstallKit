@@ -82,7 +82,11 @@ namespace InstallKit.WixSharp
             project.UI = isModern ? WUI.WixUI_Minimal : ToUi(msi.Ui);
             project.OutDir = context.OutputDirectory;
             project.OutFileName = msi.ResolvedOutputFileName;
-            project.Properties = msi.Properties.Select(p => new Property(p.Key, p.Value)).ToArray();
+            // A property that the user can set in a dialog has to be secure, or the elevated install would ignore the value.
+            project.Properties = msi.Properties.Select(p => new Property(p.Key, p.Value))
+                .Concat(msi.PromptedProperties.Select(ToPromptedProperty)).ToArray();
+            if (msi.PromptedProperties.Count > 0 && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir)
+                Console.WriteLine($"InstallKit : warning IK285: MSI '{msi.Name}' has prompted properties, which only the modern UIs ask for. With {msi.Ui} they keep their defaults unless given on the command line.");
 
             // WixSharp needs a ProductId per build; a random one is right for major upgrades.
             project.ProductId = Guid.NewGuid();
@@ -540,6 +544,15 @@ namespace InstallKit.WixSharp
                 System = scope == InstallKit.InstallScope.PerMachine,
                 Permanent = false,
             };
+
+        static Property ToPromptedProperty(PromptedProperty prompt)
+        {
+            // WiX rejects an empty Value, so a prompt without a default declares the property without one.
+            var property = new Property(prompt.Name, prompt.DefaultValue ?? "x") { Secure = true };
+            if (prompt.DefaultValue == null)
+                property.Value = null;
+            return property;
+        }
 
         static WixEntity ToCloseApplication(CloseApplicationRule rule, int index) =>
             new global::WixSharp.CloseApplication(new Id($"InstallKitClose{index + 1}"), rule.ProcessName, closeMessage: true, rebootPrompt: false)

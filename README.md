@@ -342,7 +342,7 @@ MsiBuilder.Create("My App")
     .WithXmlValue("MyApp.exe.config", "/configuration/appSettings/add[@key='Server']/@value", "[SERVER]");
 ```
 
-Run `msiexec /i MyApp.msi SERVER=prod.contoso.com` and the installed file contains `prod.contoso.com`. This also works with the value a custom dialog stores in a property, and needs no custom action.
+Run `msiexec /i MyApp.msi SERVER=prod.contoso.com` and the installed file contains `prod.contoso.com`. This needs no custom action. To ask the user instead, see [Asking for values](#asking-for-values).
 
 - **File:** relative to the install directory and part of a payload (`IK121`). The edit happens after the files are copied.
 - **XPath:** points at one element or attribute and is checked before WiX runs (`IK221`). InstallKit escapes the `[` and `]` of XPath predicates for you, because Windows Installer would otherwise read them as property references.
@@ -398,6 +398,24 @@ MsiBuilder.Create("My App")
 - **Folders:** the install directory (no folder given), a folder of a payload (`WithDirectory(dir, "config")`), or any other relative path, which is created as an empty folder. Only that one folder is changed: never Program Files or the manufacturer folder above the install directory.
 - **Not supported yet:** a folder inside a payload folder (`IK252`), such as `config\secrets` when `config` holds files.
 - **Checked before WiX runs:** a missing account (`IK250`), a folder that is not below the install directory (`IK251`), and the same account twice for one folder (`IK253`).
+
+### Asking for values
+
+```csharp
+MsiBuilder.Create("My App")
+    .WithModernUi()
+    .WithPromptedProperty("SERVER", "Server address", defaultValue: "localhost", required: true)
+    .WithPromptedProperty("DB_NAME", "Database name", "myapp")
+    .WithXmlValue("MyApp.exe.config", "/configuration/appSettings/add[@key='Server']/@value", "[SERVER]");
+```
+
+The modern UI shows a settings page after the welcome page with a labelled input box for each value (at most three). The default fills the box, a **required** value keeps Next or Install disabled while the box is empty, and the page is followed by the feature page when the product has optional features.
+
+- **Silent installs and the command line:** nothing is asked; `SERVER=prod` on the command line wins over the default, otherwise the default is used.
+- **Where the value goes:** it is an ordinary MSI property, so `[SERVER]` works in XML values and run commands, and an install event reads it with `e["SERVER"]` (list it in `OnAfterInstall(handler, "SERVER")`).
+- **Property names:** capital letters, digits and underscores (`IK280`); not one Windows Installer or InstallKit uses (`IK284`); not the same as a `WithProperty` (`IK281`). The label is required (`IK282`) and only three prompts fit on the page (`IK283`).
+- **Other UIs:** `Minimal`, `InstallDir`, `FeatureTree` and `ModernWpf` do not ask; the build prints warning `IK285` and the defaults apply. Use the WPF custom dialogs there.
+- **Not for secrets:** the box shows what is typed and the value ends up in the install log. Use it for server names, regions, ports and the like.
 
 ## UI and branding
 

@@ -92,6 +92,7 @@ namespace InstallKit
                 CheckXmlValues(errors, msi, context, label);
                 CheckCloseApplications(errors, msi, label);
                 CheckFolderPermissions(errors, msi, label);
+                CheckPrompts(errors, msi, label);
 
                 if (msi.AppliedSideBySideLine != null && !string.IsNullOrWhiteSpace(msi.InstallDirectory) &&
                     msi.InstallDirectory!.IndexOf(msi.AppliedSideBySideLine, StringComparison.Ordinal) < 0)
@@ -380,6 +381,26 @@ namespace InstallKit
                 errors.Add(new ValidationError("IK262", $"{label}: the size of '{name}' must be given in bytes (1 to 2147483647), for example from (Get-Item <file>).Length."));
             if (name.IndexOfAny(new[] { '\\', '/', ':' }) >= 0 || !name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                 errors.Add(new ValidationError("IK263", $"{label}: '{name}' is not a usable installer file name. Use a name ending in .exe without a path."));
+        }
+
+        static void CheckPrompts(List<ValidationError> errors, MsiDefinition msi, string label)
+        {
+            if (msi.PromptedProperties.Count > PromptedProperty.MaxPerInstaller)
+                errors.Add(new ValidationError("IK283", $"{label} asks for {msi.PromptedProperties.Count} values, but the setup page has room for {PromptedProperty.MaxPerInstaller}."));
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var prompt in msi.PromptedProperties)
+            {
+                if (!prompt.HasValidName)
+                    errors.Add(new ValidationError("IK280", $"{label}: '{prompt.Name}' is not a usable property name. Use capital letters, digits and underscores, starting with a letter, for example SERVER."));
+                else if (prompt.IsReserved)
+                    errors.Add(new ValidationError("IK284", $"{label}: '{prompt.Name}' is a property that Windows Installer or InstallKit uses itself. Pick another name."));
+                else if (!names.Add(prompt.Name) || msi.Properties.Keys.Contains(prompt.Name))
+                    errors.Add(new ValidationError("IK281", $"{label}: the property '{prompt.Name}' is defined more than once (as a prompt or with WithProperty)."));
+
+                if (string.IsNullOrWhiteSpace(prompt.Label))
+                    errors.Add(new ValidationError("IK282", $"{label}: the prompt for '{prompt.Name}' has no label."));
+            }
         }
 
         static void CheckHandler(List<ValidationError> errors, MsiDefinition msi, InstallerContext context, string label, string executable, string what)

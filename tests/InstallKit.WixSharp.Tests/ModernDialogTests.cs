@@ -10,8 +10,16 @@ public class ModernDialogTests
 {
     static readonly XNamespace Ns = "http://wixtoolset.org/schemas/v4/wxs";
 
-    static XElement Build(bool features = false, bool chooseDir = false, string? license = null) =>
-        ModernDialogXml.BuildFragment(Ns, new ModernDialogOptions { HasFeatures = features, ChooseInstallDir = chooseDir, LicenseFile = license });
+    static readonly ModernPrompt[] TwoPrompts = { new("SERVER", "Server address", required: true), new("PORT", "Port", required: false) };
+
+    static XElement Build(bool features = false, bool chooseDir = false, string? license = null, bool prompts = false) =>
+        ModernDialogXml.BuildFragment(Ns, new ModernDialogOptions
+        {
+            HasFeatures = features,
+            ChooseInstallDir = chooseDir,
+            LicenseFile = license,
+            Prompts = prompts ? TwoPrompts : new ModernPrompt[0],
+        });
 
     static IEnumerable<XElement> Ui(XElement fragment) => fragment.Element(Ns + "UI")!.Elements();
 
@@ -40,13 +48,14 @@ public class ModernDialogTests
         from features in new[] { false, true }
         from chooseDir in new[] { false, true }
         from license in new string?[] { null, "license.rtf" }
-        select new object[] { features, chooseDir, license! };
+        from prompts in new[] { false, true }
+        select new object[] { features, chooseDir, license!, prompts };
 
     [Theory]
     [MemberData(nameof(Variants))]
-    public void Every_dialog_we_navigate_to_exists_or_is_referenced(bool features, bool chooseDir, string? license)
+    public void Every_dialog_we_navigate_to_exists_or_is_referenced(bool features, bool chooseDir, string? license, bool prompts)
     {
-        var fragment = Build(features, chooseDir, license);
+        var fragment = Build(features, chooseDir, license, prompts);
         var known = new HashSet<string>(DialogRefs(fragment).Concat(Dialogs(fragment).Select(d => (string)d.Attribute("Id")!)));
 
         var targets = Publishes(fragment).Where(p => p.Event is "NewDialog" or "SpawnDialog").Select(p => p.Value)
@@ -57,9 +66,9 @@ public class ModernDialogTests
 
     [Theory]
     [MemberData(nameof(Variants))]
-    public void Control_events_are_unique_and_controls_have_unique_ids(bool features, bool chooseDir, string? license)
+    public void Control_events_are_unique_and_controls_have_unique_ids(bool features, bool chooseDir, string? license, bool prompts)
     {
-        var fragment = Build(features, chooseDir, license);
+        var fragment = Build(features, chooseDir, license, prompts);
 
         // The ControlEvent table's key: dialog, control, event, argument and condition.
         var keys = Publishes(fragment).Select(p => (p.Dialog, p.Control, p.Event, p.Value, p.Condition)).ToList();
@@ -161,5 +170,59 @@ public class ModernDialogTests
         var install = welcome.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Install");
         Assert.Contains("InstallKitLicenseAccepted", (string)install.Attribute("DisableCondition")!);
         Assert.Contains(Publishes(fragment), p => p.Control == "Install" && p.Event == "SetTargetPath" && p.Value == "INSTALLDIR");
+    }
+
+    [Fact]
+    public void Prompts_get_a_settings_page_between_the_welcome_page_and_the_install()
+    {
+        var fragment = Build(prompts: true);
+
+        var welcome = Dialogs(fragment).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.WelcomeId);
+        var welcomeButton = welcome.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Install");
+        Assert.Equal("Next", (string)welcomeButton.Attribute("Text")!);
+
+        var options = Dialogs(fragment).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.OptionsId);
+        var edits = options.Elements(Ns + "Control").Where(c => (string)c.Attribute("Type")! == "Edit").ToList();
+        Assert.Equal(new[] { "SERVER", "PORT" }, edits.Select(c => (string)c.Attribute("Property")!));
+        Assert.Contains("Server address", options.Elements(Ns + "Control").Select(c => (string?)c.Attribute("Text")));
+
+        var publishes = Publishes(fragment).ToList();
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.WelcomeId && p.Control == "Install" && p.Event == "NewDialog" && p.Value == ModernDialogXml.OptionsId);
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.OptionsId && p.Control == "Back" && p.Value == ModernDialogXml.WelcomeId);
+
+        // Without features the settings page is the last page: it checks the disk space and starts the install.
+        var next = options.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Next");
+        Assert.Equal("Install", (string)next.Attribute("Text")!);
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.OptionsId && p.Control == "Next" && p.Event == "EndDialog" && p.Value == "Return");
+    }
+
+    [Fact]
+    public void A_required_prompt_disables_next_while_its_box_is_empty()
+    {
+        var options = Dialogs(Build(prompts: true)).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.OptionsId);
+        var next = options.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Next");
+
+        Assert.Equal("SERVER = \"\"", (string)next.Attribute("DisableCondition")!);
+    }
+
+    [Fact]
+    public void With_features_and_prompts_the_settings_page_leads_to_the_feature_page_and_back_goes_to_it()
+    {
+        var fragment = Build(features: true, prompts: true);
+        var publishes = Publishes(fragment).ToList();
+
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.OptionsId && p.Control == "Next" && p.Event == "NewDialog" && p.Value == "CustomizeDlg");
+        Assert.DoesNotContain(publishes, p => p.Dialog == ModernDialogXml.OptionsId && p.Control == "Next" && p.Event == "EndDialog");
+        var back = publishes.Single(p => p.Dialog == "CustomizeDlg" && p.Control == "Back" && p.Order == 2);
+        Assert.Equal(ModernDialogXml.OptionsId, back.Value);
+        Assert.Equal("WixUI_InstallMode <> \"Change\"", back.Condition);
+    }
+
+    [Fact]
+    public void Without_prompts_there_is_no_settings_page()
+    {
+        var fragment = Build();
+
+        Assert.DoesNotContain(Dialogs(fragment), d => (string)d.Attribute("Id")! == ModernDialogXml.OptionsId);
     }
 }
