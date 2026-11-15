@@ -363,7 +363,9 @@ Describe 'Versions of a side-by-side product' {
 
         Get-SideEntries | Should -HaveCount 1
         (Get-SideEntries)[0].DisplayName | Should -Be 'InstallKit QA Side 1.1'
-        Get-SideDir '1.0' | Should -Not -Exist
+        # The service's heartbeat.txt is not part of the MSI, so the folder itself may stay; its files must not.
+        Join-Path (Get-SideDir '1.0') 'QaDemo.exe' | Should -Not -Exist
+        Join-Path (Get-SideDir '1.0') 'config' | Should -Not -Exist
         Get-Service 'InstallKitQaSide-1.0' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Join-Path (Get-SideDir '1.1') 'QaDemo.exe' | Should -Exist
         Get-Service 'InstallKitQaSide-1.1' | Should -Not -BeNullOrEmpty
@@ -373,7 +375,8 @@ Describe 'Versions of a side-by-side product' {
         Invoke-Msi "/x $((Get-SideEntries)[0].PSChildName)" '5e-side-uninstall-1.1'
 
         Get-SideEntries | Should -HaveCount 0
-        Get-SideDir '1.1' | Should -Not -Exist
+        Join-Path (Get-SideDir '1.1') 'QaDemo.exe' | Should -Not -Exist
+        Join-Path (Get-SideDir '1.1') 'config' | Should -Not -Exist
         Get-Service 'InstallKitQaSide-1.1' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
 }
