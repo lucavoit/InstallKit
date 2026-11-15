@@ -293,4 +293,30 @@ public class MsiEngineTests
         // The other file of the folder is still installed, once.
         Assert.Single(folder.Descendants(), e => e.Name.LocalName == "File" && (A(e, "Source") ?? "").EndsWith("other.txt"));
     }
+
+    [Fact]
+    public void The_modern_welcome_page_of_a_product_with_features_leads_to_the_feature_page()
+    {
+        var workspace = new Wxs.Workspace();
+
+        var wxs = Wxs.Msi(workspace, workspace.App()
+            .WithFeature("Tray", "Notification agent")
+            .WithDirectory(workspace.Docs, "agent", "Tray")
+            .WithModernUi());
+
+        // Our dialog set replaced WixUI_Minimal, whose single Install page is what a missing feature page looks like.
+        var uiRefs = wxs.All("UIRef").Select(r => A(r, "Id")).ToList();
+        Assert.Contains("InstallKit_Modern", uiRefs);
+        Assert.DoesNotContain("WixUI_Minimal", uiRefs);
+        Assert.Contains(wxs.All("Feature"), f => A(f, "Id") == "Tray");
+
+        var welcome = wxs.One("Dialog", "InstallKit_WelcomeDlg");
+        var button = welcome.Elements().Single(e => e.Name.LocalName == "Control" && A(e, "Id") == "Install");
+        Assert.Equal("Next", A(button, "Text"));
+        Assert.Contains(button.Elements(), p => p.Name.LocalName == "Publish" && A(p, "Event") == "NewDialog" && A(p, "Value") == "CustomizeDlg");
+        Assert.DoesNotContain(button.Elements(), p => p.Name.LocalName == "Publish" && A(p, "Event") == "EndDialog");
+
+        Assert.Contains(wxs.All("Show"), s => A(s, "Dialog") == "InstallKit_WelcomeDlg" && A(s, "Condition") == "NOT Installed");
+        Assert.Contains(wxs.All("DialogRef"), d => A(d, "Id") == "CustomizeDlg");
+    }
 }
