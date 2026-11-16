@@ -188,27 +188,20 @@ public sealed class SetupSession : IDisposable
     }
 
     /// <summary>
-    /// Replaces the text of an input box. Windows Installer takes the new value into its property when the box changes; a Tab
-    /// afterwards also moves the focus away, which covers controls that only commit on leaving.
+    /// Replaces the text of an input box the way a person does: click into it, select everything, type, and leave with Tab.
+    /// Setting the value through UI Automation instead does not reliably reach the Windows Installer property: it looked
+    /// right on screen while a button that depends on the property stayed disabled.
     /// </summary>
     public void SetText(AutomationElement edit, string text)
     {
         output.WriteLine($"set text '{text}'");
-        if (edit.Patterns.Value.IsSupported)
-        {
-            edit.Patterns.Value.Pattern.SetValue(text);
-        }
+        edit.Click();
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+        if (text.Length == 0)
+            Keyboard.Type(VirtualKeyShort.DELETE);
         else
-        {
-            edit.Focus();
-            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
-            if (text.Length == 0)
-                Keyboard.Type(VirtualKeyShort.DELETE);
-            else
-                Keyboard.Type(text);
-        }
-
-        edit.Focus();
+            Keyboard.Type(text);
+        output.WriteLine($"the box now shows '{ReadText(edit)}'");
         Keyboard.Type(VirtualKeyShort.TAB);
     }
 
@@ -341,8 +334,12 @@ public sealed class SetupSession : IDisposable
             .Append(SafeControlType(element)).Append(" name='").Append(SafeName(element)).Append("'")
             .Append(" id='").Append(Safe(() => element.AutomationId)).Append("'")
             .Append(" class='").Append(Safe(() => element.ClassName)).Append("'")
-            .Append(" enabled=").Append(Safe(() => element.IsEnabled.ToString()))
-            .AppendLine();
+            .Append(" enabled=").Append(Safe(() => element.IsEnabled.ToString()));
+
+        // What an input box holds is what the tests are about, so the tree shows it.
+        if (SafeControlType(element) == ControlType.Edit)
+            text.Append(" value='").Append(Safe(() => ReadText(element))).Append("'");
+        text.AppendLine();
 
         AutomationElement[] children;
         try
