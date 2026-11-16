@@ -13,7 +13,7 @@ public class FolderPermissionTests
         var config = Directory.CreateDirectory(Path.Combine(dir, "cfg")).FullName;
         File.WriteAllText(Path.Combine(config, "a.json"), "");
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--payload", $"App={dir}", "--output", dir }));
-        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App").WithDirectory(config, "config");
+        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App").Directory(config, "config"));
         return (plan, builder);
     }
 
@@ -23,8 +23,9 @@ public class FolderPermissionTests
     public void Builder_collects_permissions_for_the_install_dir_and_subfolders()
     {
         var msi = MsiBuilder.Create("App")
-            .WithFolderPermission("Authenticated Users", FolderRights.Modify)
-            .WithFolderPermission("Users", FolderRights.Read, "data/logs/")
+            .Machine(m => m
+                .FolderPermission("Authenticated Users", FolderRights.Modify)
+                .FolderPermission("Users", FolderRights.Read, "data/logs/"))
             .Build();
 
         Assert.Null(msi.FolderPermissions[0].Folder);
@@ -50,9 +51,10 @@ public class FolderPermissionTests
     {
         var (plan, builder) = NewPlan();
         plan.Msi(builder
-            .WithFolderPermission("Authenticated Users", FolderRights.Modify)
-            .WithFolderPermission("Users", FolderRights.Modify, "logs")
-            .WithFolderPermission(@"NT AUTHORITY\LocalService", FolderRights.Read, "config"));
+            .Machine(m => m
+                .FolderPermission("Authenticated Users", FolderRights.Modify)
+                .FolderPermission("Users", FolderRights.Modify, "logs")
+                .FolderPermission(@"NT AUTHORITY\LocalService", FolderRights.Read, "config")));
 
         Assert.Empty(Codes(plan));
     }
@@ -63,7 +65,7 @@ public class FolderPermissionTests
     public void An_account_is_required(string account)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFolderPermission(account, FolderRights.Read));
+        plan.Msi(builder.Machine(m => m.FolderPermission(account, FolderRights.Read)));
 
         Assert.Contains("IK250", Codes(plan));
     }
@@ -76,7 +78,7 @@ public class FolderPermissionTests
     public void A_folder_must_stay_below_the_install_directory(string folder)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFolderPermission("Users", FolderRights.Read, folder));
+        plan.Msi(builder.Machine(m => m.FolderPermission("Users", FolderRights.Read, folder)));
 
         Assert.Contains("IK251", Codes(plan));
     }
@@ -85,7 +87,7 @@ public class FolderPermissionTests
     public void A_folder_inside_a_payload_folder_is_rejected_but_the_payload_folder_itself_is_fine()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFolderPermission("Users", FolderRights.Read, @"config\secrets"));
+        plan.Msi(builder.Machine(m => m.FolderPermission("Users", FolderRights.Read, @"config\secrets")));
 
         var error = InstallerValidator.Validate(plan).Single();
         Assert.Equal("IK252", error.Code);
@@ -96,7 +98,7 @@ public class FolderPermissionTests
     public void The_same_account_and_folder_twice_is_reported()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFolderPermission("Users", FolderRights.Read, "logs").WithFolderPermission("USERS", FolderRights.Modify, "logs"));
+        plan.Msi(builder.Machine(m => m.FolderPermission("Users", FolderRights.Read, "logs").FolderPermission("USERS", FolderRights.Modify, "logs")));
 
         Assert.Contains("IK253", Codes(plan));
     }

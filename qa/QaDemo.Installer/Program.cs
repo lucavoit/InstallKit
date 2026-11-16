@@ -9,46 +9,49 @@ return InstallerHost.Run(args, plan =>
         .WithUpgradeCode("7c3f0d52-8a41-4e6b-b1d9-2f54a8c3e917") // never change: the upgrade tests rely on it
         .WithDescription("QA demo installer for InstallKit.")
         .WithOutputFileName("QaDemo")
-        .WithPayload("QaDemo")
-        .WithDirectory(@"..\content\config", "config")
-        .WithFeature("Docs", "Documentation")
-        .WithFeature("Samples", "Sample files, not installed unless asked for", installedByDefault: false)
-        .WithDirectory(@"..\content\docs", "docs", feature: "Docs")
-        .WithDirectory(@"..\content\samples", "samples", feature: "Samples")
-        // A service that only exists when its feature is installed.
-        .WithFeature("Worker", "A second service, installed on request", installedByDefault: false)
-        .WithPayload("QaDemo", "worker", feature: "Worker")
-        .WithService(@"worker\QaDemo.exe", "InstallKitQaWorker", s => s.WithDisplayName("InstallKit QA Worker"))
         .WithMainExecutable("QaDemo.exe")
-        .WithStartMenuShortcut()
-        .WithDesktopShortcut()
-        .WithModernUi(chooseInstallDir: true)
-        .WithAccentColor("#6A1B9A")
-        .WithProperty("MODE", "client")                          // overridden on the msiexec command line
-        .OnAfterInstall(QaSetup.WriteMode, "MODE")
-        .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "InstallPath", "[INSTALLDIR]")
-        .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", null, "InstallKit QA Demo")
-        .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "Telemetry", 0)
-        .WithRegistryValue(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "LogDir", @"%ProgramData%\InstallKitQa", RegistryValueKind.ExpandString)
-        .WithPathEntry("[INSTALLDIR]bin")
-        .WithEnvironmentVariable("INSTALLKIT_QA_HOME", "[INSTALLDIR]")
-        .WithFileAssociation(".ikqa", "InstallKit QA file")
-        .WithUrlProtocol("installkitqa", "InstallKit QA link")
-        .WithFirewallRule("InstallKit QA Demo port", "48765")
-        .WithFirewallRule("InstallKit QA Demo program", executable: "QaDemo.exe", scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private)
-        .WithXmlValue(@"config\qa.config", "/configuration/appSettings/add[@key='Server']/@value", "[MODE]")
-        // Asked for on the settings page of the modern UI; here it is the default or the command line that provides it.
-        .WithPromptedProperty("QA_REGION", "Region", "eu-west", required: true)
-        .WithXmlValue(@"config\qa.config", "/configuration/appSettings/add[@key='Region']/@value", "[QA_REGION]")
-        .WithCloseApplication("InstallKitQaClose.exe", terminate: true, timeoutSeconds: 3)
-        .WithFolderPermission("Authenticated Users", FolderRights.Modify)
-        .WithFolderPermission("Users", FolderRights.Modify, "logs")
-        .WithFolderPermission(@"NT AUTHORITY\LocalService", FolderRights.Read, "config")
-        .RunAfterInstall("QaDemo.exe", "--init [MODE]")
-        .RunBeforeUninstall("QaDemo.exe", "--unregister")
-        .WithService("QaDemo.exe", "InstallKitQaDemo", s => s
-            .WithDisplayName("InstallKit QA Demo")
-            .WithDescription("Service installed by the InstallKit QA pipeline.")));
+        .Content(c => c
+            .Payload("QaDemo")
+            .Directory(@"..\content\config", "config"))
+        .Feature("Docs", "Documentation", f => f.Directory(@"..\content\docs", "docs"))
+        .Feature("Samples", "Sample files, not installed unless asked for", f => f.Directory(@"..\content\samples", "samples"), installedByDefault: false)
+        // A service that only exists when its feature is installed (the Service entry below).
+        .Feature("Worker", "A second service, installed on request", f => f.Payload("QaDemo", "worker"), installedByDefault: false)
+        .Appearance(a => a
+            .Modern(chooseInstallDir: true)
+            .AccentColor("#6A1B9A"))
+        .Shell(s => s
+            .StartMenuShortcut()
+            .DesktopShortcut()
+            .FileAssociation(".ikqa", "InstallKit QA file")
+            .UrlProtocol("installkitqa", "InstallKit QA link"))
+        .Settings(s => s
+            .Property("MODE", "client")                          // overridden on the msiexec command line
+            // Asked for on the settings page of the modern UI; here it is the default or the command line that provides it.
+            .Prompt("QA_REGION", "Region", "eu-west", required: true))
+        .Machine(m => m
+            .Registry(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "InstallPath", "[INSTALLDIR]")
+            .Registry(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", null, "InstallKit QA Demo")
+            .Registry(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "Telemetry", 0)
+            .Registry(RegistryHive.LocalMachine, @"Software\InstallKit\QA Demo", "LogDir", @"%ProgramData%\InstallKitQa", RegistryValueKind.ExpandString)
+            .PathEntry("[INSTALLDIR]bin")
+            .EnvironmentVariable("INSTALLKIT_QA_HOME", "[INSTALLDIR]")
+            .FirewallRule("InstallKit QA Demo port", "48765")
+            .FirewallRule("InstallKit QA Demo program", executable: "QaDemo.exe", scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private)
+            .XmlValue(@"config\qa.config", "/configuration/appSettings/add[@key='Server']/@value", "[MODE]")
+            .XmlValue(@"config\qa.config", "/configuration/appSettings/add[@key='Region']/@value", "[QA_REGION]")
+            .FolderPermission("Authenticated Users", FolderRights.Modify)
+            .FolderPermission("Users", FolderRights.Modify, "logs")
+            .FolderPermission(@"NT AUTHORITY\LocalService", FolderRights.Read, "config")
+            .Service("QaDemo.exe", "InstallKitQaDemo", s => s
+                .WithDisplayName("InstallKit QA Demo")
+                .WithDescription("Service installed by the InstallKit QA pipeline."))
+            .Service(@"worker\QaDemo.exe", "InstallKitQaWorker", s => s.WithDisplayName("InstallKit QA Worker")))
+        .Lifecycle(l => l
+            .OnAfterInstall(QaSetup.WriteMode, "MODE")
+            .CloseApplication("InstallKitQaClose.exe", terminate: true, timeoutSeconds: 3)
+            .RunAfterInstall("QaDemo.exe", "--init [MODE]")
+            .RunBeforeUninstall("QaDemo.exe", "--unregister")));
 
     // A second product whose versions install side by side: 1.0.x and 1.1.x are different lines, so 1.1.0 does not
     // replace 1.0.0, while 1.0.1 replaces 1.0.0. The QA tests install them next to each other.
@@ -57,9 +60,10 @@ return InstallerHost.Run(args, plan =>
         .WithUpgradeCode("a8c2d417-6e3b-4f90-b5d1-7c4e0a92f685") // never change
         .WithOutputFileName("QaSide")
         .WithSideBySide(SideBySideMode.MajorMinor)
-        .WithPayload("QaDemo")
-        .WithDirectory(@"..\content\config", "config")
-        .WithService("QaDemo.exe", "InstallKitQaSide", s => s.WithDisplayName("InstallKit QA Side")));
+        .Content(c => c
+            .Payload("QaDemo")
+            .Directory(@"..\content\config", "config"))
+        .Machine(m => m.Service("QaDemo.exe", "InstallKitQaSide", s => s.WithDisplayName("InstallKit QA Side"))));
 
     // A second bundle that is only built, not installed: it makes WiX compile the prerequisite helpers (embedded
     // installers, a .NET runtime, WebView2, a download). The "installers" are placeholder files; Burn never runs them here.
@@ -76,18 +80,19 @@ return InstallerHost.Run(args, plan =>
         .WithManufacturer("InstallKit")
         .WithUpgradeCode("3d9b2f68-0c47-4a15-8e72-b5a4c19d6f03")
         .WithOutputFileName("QaPrerequisitesSetup")
-        .WithVcRedist(Placeholder("vc_redist.x64.exe"))
-        .WithVcRedist(PrerequisiteInstaller.FromDownload("https://aka.ms/vs/17/release/vc_redist.x86.exe", new string('A', 128), 13_000_000), PrerequisiteArchitecture.X86)
-        .WithDotNetRuntime(DotNetRuntimeKind.WindowsDesktop, 8, Placeholder("windowsdesktop-runtime-8-win-x64.exe"))
-        .WithWebView2(PrerequisiteInstaller.FromDownload("https://go.microsoft.com/fwlink/p/?LinkId=2124703", new string('B', 128), 1_800_000, "MicrosoftEdgeWebview2Setup.exe"))
-        .WithMsi(msi));
+        .Prerequisites(p => p
+            .VcRedist(Placeholder("vc_redist.x64.exe"))
+            .VcRedist(PrerequisiteInstaller.FromDownload("https://aka.ms/vs/17/release/vc_redist.x86.exe", new string('A', 128), 13_000_000), PrerequisiteArchitecture.X86)
+            .DotNetRuntime(DotNetRuntimeKind.WindowsDesktop, 8, Placeholder("windowsdesktop-runtime-8-win-x64.exe"))
+            .WebView2(PrerequisiteInstaller.FromDownload("https://go.microsoft.com/fwlink/p/?LinkId=2124703", new string('B', 128), 1_800_000, "MicrosoftEdgeWebview2Setup.exe")))
+        .Packages(k => k.Msi(msi)));
 
     plan.Bundle(BundleBuilder.Create("InstallKit QA Demo")
         .WithManufacturer("InstallKit")
         .WithUpgradeCode("e1a64b07-53c9-4f2d-9e8a-6b0d17c4f2a3")
         .WithOutputFileName("QaDemoSetup")
-        .WithNetFramework(NetFrameworkVersion.NetFx48)
-        .WithMsi(msi));
+        .Prerequisites(p => p.NetFramework(NetFrameworkVersion.NetFx48))
+        .Packages(k => k.Msi(msi)));
 });
 
 static class QaSetup

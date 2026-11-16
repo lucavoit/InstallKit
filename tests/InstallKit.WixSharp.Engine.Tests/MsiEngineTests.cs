@@ -29,10 +29,11 @@ public class MsiEngineTests
         var workspace = new Wxs.Workspace();
 
         var wxs = Wxs.Msi(workspace, workspace.App()
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\Contoso\App", "InstallPath", "[INSTALLDIR]")
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\Contoso\App", null, "default")
-            .WithRegistryValue(RegistryHive.CurrentUser, @"Software\Contoso\App", "Logs", @"%LOCALAPPDATA%\Logs", RegistryValueKind.ExpandString)
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\Contoso\App", "Telemetry", 0));
+            .Machine(m => m
+                .Registry(RegistryHive.LocalMachine, @"Software\Contoso\App", "InstallPath", "[INSTALLDIR]")
+                .Registry(RegistryHive.LocalMachine, @"Software\Contoso\App", null, "default")
+                .Registry(RegistryHive.CurrentUser, @"Software\Contoso\App", "Logs", @"%LOCALAPPDATA%\Logs", RegistryValueKind.ExpandString)
+                .Registry(RegistryHive.LocalMachine, @"Software\Contoso\App", "Telemetry", 0)));
 
         // WixSharp rejects registry values inside a directory, so they are components of their own.
         Assert.DoesNotContain(wxs.One("Directory", "INSTALLDIR").Descendants(), e => e.Name.LocalName == "RegistryKey");
@@ -50,7 +51,7 @@ public class MsiEngineTests
     {
         var workspace = new Wxs.Workspace();
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithMainExecutable("App.exe").WithFileAssociation(".foo", "Foo document").WithUrlProtocol("myapp", "My App link"));
+        var wxs = Wxs.Msi(workspace, workspace.App().WithMainExecutable("App.exe").Shell(s => s.FileAssociation(".foo", "Foo document").UrlProtocol("myapp", "My App link")));
 
         var commands = wxs.All("RegistryValue").Where(v => (A(v, "Value") ?? "").Contains("%1")).ToList();
         Assert.Equal(2, commands.Count);
@@ -64,7 +65,7 @@ public class MsiEngineTests
     {
         var workspace = new Wxs.Workspace();
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithPathEntry("[INSTALLDIR]bin").WithPathEntry("[INSTALLDIR]tools", prepend: true).WithEnvironmentVariable("APP_HOME", "[INSTALLDIR]"));
+        var wxs = Wxs.Msi(workspace, workspace.App().Machine(m => m.PathEntry("[INSTALLDIR]bin").PathEntry("[INSTALLDIR]tools", prepend: true).EnvironmentVariable("APP_HOME", "[INSTALLDIR]")));
 
         var variables = wxs.All("Environment").ToDictionary(e => A(e, "Id")!);
         Assert.Equal(("PATH", "last", "set"), (A(variables["InstallKitEnv1"], "Name"), A(variables["InstallKitEnv1"], "Part"), A(variables["InstallKitEnv1"], "Action")));
@@ -79,7 +80,7 @@ public class MsiEngineTests
     {
         var workspace = new Wxs.Workspace();
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithScope(InstallScope.PerUser).WithEnvironmentVariable("APP_HOME", "x"));
+        var wxs = Wxs.Msi(workspace, workspace.App().WithScope(InstallScope.PerUser).Machine(m => m.EnvironmentVariable("APP_HOME", "x")));
 
         Assert.Equal("no", A(wxs.One("Environment"), "System"));
     }
@@ -90,8 +91,9 @@ public class MsiEngineTests
         var workspace = new Wxs.Workspace();
 
         var wxs = Wxs.Msi(workspace, workspace.App()
-            .WithFirewallRule("Web", "8080")
-            .WithFirewallRule("Service", executable: "Svc.exe", scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private));
+            .Machine(m => m
+                .FirewallRule("Web", "8080")
+                .FirewallRule("Service", executable: "Svc.exe", scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private)));
 
         var rules = wxs.All("FirewallException").ToDictionary(r => A(r, "Name")!);
         // WixSharp leaves an exception disabled unless it is asked to enable it.
@@ -107,9 +109,10 @@ public class MsiEngineTests
         var workspace = new Wxs.Workspace();
 
         var wxs = Wxs.Msi(workspace, workspace.App()
-            .WithFolderPermission("Authenticated Users", FolderRights.Modify)
-            .WithFolderPermission("Users", FolderRights.Modify, "logs")
-            .WithFolderPermission(@"NT AUTHORITY\LocalService", FolderRights.Read, "bin"));
+            .Machine(m => m
+                .FolderPermission("Authenticated Users", FolderRights.Modify)
+                .FolderPermission("Users", FolderRights.Modify, "logs")
+                .FolderPermission(@"NT AUTHORITY\LocalService", FolderRights.Read, "bin")));
 
         var installDir = wxs.One("Directory", "INSTALLDIR");
         var inside = installDir.Descendants().Where(e => e.Name.LocalName == "PermissionEx").ToList();
@@ -146,7 +149,7 @@ public class MsiEngineTests
     {
         var workspace = new Wxs.Workspace();
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithXmlValue("app.config", "/configuration/appSettings/add[@key='Server']/@value", "[SERVER]"));
+        var wxs = Wxs.Msi(workspace, workspace.App().Machine(m => m.XmlValue("app.config", "/configuration/appSettings/add[@key='Server']/@value", "[SERVER]")));
 
         var edit = wxs.One("XmlFile");
         Assert.Equal("setValue", A(edit, "Action"));
@@ -164,7 +167,7 @@ public class MsiEngineTests
     {
         var workspace = new Wxs.Workspace();
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithCloseApplication("App.exe", terminate: true, timeoutSeconds: 10).WithCloseApplication("Other.exe"));
+        var wxs = Wxs.Msi(workspace, workspace.App().Lifecycle(l => l.CloseApplication("App.exe", terminate: true, timeoutSeconds: 10).CloseApplication("Other.exe")));
 
         var rules = wxs.All("CloseApplication").ToDictionary(r => A(r, "Target")!);
         Assert.Equal(("0", "10"), (A(rules["App.exe"], "TerminateProcess"), A(rules["App.exe"], "Timeout")));
@@ -178,10 +181,8 @@ public class MsiEngineTests
         var workspace = new Wxs.Workspace();
 
         var wxs = Wxs.Msi(workspace, workspace.App()
-            .WithFeature("Documentation", "Help files")
-            .WithFeature("Samples", installedByDefault: false)
-            .WithDirectory(workspace.Docs, "docs", "Documentation")
-            .WithDirectory(workspace.Docs, "samples", "Samples"));
+            .Feature("Documentation", "Help files", f => f.Directory(workspace.Docs, "docs"))
+            .Feature("Samples", f => f.Directory(workspace.Docs, "samples"), installedByDefault: false));
 
         var features = wxs.All("Feature").ToDictionary(f => A(f, "Id")!);
         // WixSharp numbers the default feature when it has built several projects in one process ("Complete.1").
@@ -206,7 +207,7 @@ public class MsiEngineTests
     {
         var workspace = new Wxs.Workspace();
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithPromptedProperty("SERVER", "Server", "localhost").WithPromptedProperty("NOTES", "Notes").WithProperty("MODE", "client"));
+        var wxs = Wxs.Msi(workspace, workspace.App().Settings(s => s.Prompt("SERVER", "Server", "localhost").Prompt("NOTES", "Notes").Property("MODE", "client")));
 
         var properties = wxs.All("Property").Where(p => new[] { "SERVER", "NOTES", "MODE" }.Contains(A(p, "Id"))).ToDictionary(p => A(p, "Id")!);
         Assert.Equal(("localhost", "yes"), (A(properties["SERVER"], "Value"), A(properties["SERVER"], "Secure")));
@@ -220,7 +221,7 @@ public class MsiEngineTests
     {
         var workspace = new Wxs.Workspace();
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithService("Svc.exe", "MySvc", s => s.WithDisplayName("My Service")));
+        var wxs = Wxs.Msi(workspace, workspace.App().Machine(m => m.Service("Svc.exe", "MySvc", s => s.WithDisplayName("My Service"))));
 
         var component = wxs.One("ServiceInstall").Parent!;
         Assert.EndsWith("Svc.exe", A(component.Elements().Single(e => e.Name.LocalName == "File"), "Source"));
@@ -233,7 +234,7 @@ public class MsiEngineTests
     {
         var workspace = new Wxs.Workspace();
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithSideBySide(SideBySideMode.MajorMinor).WithService("Svc.exe", "MySvc"));
+        var wxs = Wxs.Msi(workspace, workspace.App().WithSideBySide(SideBySideMode.MajorMinor).Machine(m => m.Service("Svc.exe", "MySvc")));
 
         var package = wxs.One("Package");
         Assert.Equal("My App 3.1", A(package, "Name"));
@@ -261,7 +262,7 @@ public class MsiEngineTests
         var longConfig = "A.Very.Long.Application.Configuration.File.Name.For.Testing.Limits.config";
         System.IO.File.WriteAllText(System.IO.Path.Combine(workspace.Payload, longConfig), "<configuration/>");
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithXmlValue(longConfig, "/configuration/@x", "1"));
+        var wxs = Wxs.Msi(workspace, workspace.App().Machine(m => m.XmlValue(longConfig, "/configuration/@x", "1")));
 
         Assert.All(wxs.All("Component").Concat(wxs.All("File")), e => Assert.True(A(e, "Id")!.Length <= 72, A(e, "Id")));
 
@@ -284,7 +285,7 @@ public class MsiEngineTests
         System.IO.File.WriteAllText(System.IO.Path.Combine(tools, "Tool.exe"), "x");
         System.IO.File.WriteAllText(System.IO.Path.Combine(tools, "other.txt"), "x");
 
-        var wxs = Wxs.Msi(workspace, workspace.App().WithDirectory(tools, "tools").WithService(@"tools\Tool.exe", "ToolSvc"));
+        var wxs = Wxs.Msi(workspace, workspace.App().Content(c => c.Directory(tools, "tools")).Machine(m => m.Service(@"tools\Tool.exe", "ToolSvc")));
 
         var folder = wxs.One("Directory", "INSTALLDIR").Elements().Single(e => e.Name.LocalName == "Directory" && A(e, "Name") == "tools");
         var component = wxs.One("ServiceInstall").Parent!;
@@ -294,15 +295,15 @@ public class MsiEngineTests
         Assert.Single(folder.Descendants(), e => e.Name.LocalName == "File" && (A(e, "Source") ?? "").EndsWith("other.txt"));
     }
 
+    // The modern UI generates its dialog images with GDI+, so this one only runs on Windows (as does CI).
     [Fact]
     public void The_modern_welcome_page_of_a_product_with_features_leads_to_the_feature_page()
     {
         var workspace = new Wxs.Workspace();
 
         var wxs = Wxs.Msi(workspace, workspace.App()
-            .WithFeature("Tray", "Notification agent")
-            .WithDirectory(workspace.Docs, "agent", "Tray")
-            .WithModernUi());
+            .Feature("Tray", "Notification agent", f => f.Directory(workspace.Docs, "agent"))
+            .Appearance(a => a.Modern()));
 
         // Our dialog set replaced WixUI_Minimal, whose single Install page is what a missing feature page looks like.
         var uiRefs = wxs.All("UIRef").Select(r => A(r, "Id")).ToList();
@@ -332,10 +333,10 @@ public class MsiEngineTests
         System.IO.File.WriteAllText(System.IO.Path.Combine(worker, "worker.config"), "<configuration/>");
 
         var wxs = Wxs.Msi(workspace, workspace.App()
-            .WithFeature("Worker", installedByDefault: false)
-            .WithDirectory(worker, "worker", "Worker")
-            .WithService(@"worker\Worker.exe", "WorkerSvc")
-            .WithXmlValue(@"worker\worker.config", "/configuration/@x", "1"));
+            .Feature("Worker", f => f.Directory(worker, "worker"), installedByDefault: false)
+            .Machine(m => m
+                .Service(@"worker\Worker.exe", "WorkerSvc")
+                .XmlValue(@"worker\worker.config", "/configuration/@x", "1")));
 
         var feature = wxs.All("Feature").Single(f => A(f, "Id") == "Worker");
         var refs = feature.Elements().Where(e => e.Name.LocalName == "ComponentRef").Select(r => A(r, "Id")).ToHashSet();

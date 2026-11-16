@@ -19,8 +19,8 @@ public class SideBySideTests
     }
 
     static MsiBuilder App(SideBySideMode mode) =>
-        MsiBuilder.Create("My App").WithManufacturer("Contoso").WithUpgradeCode(BaseCode).WithPayload("App").WithSideBySide(mode)
-            .WithService("Svc.exe", "MySvc", s => s.WithDisplayName("My Service"));
+        MsiBuilder.Create("My App").WithManufacturer("Contoso").WithUpgradeCode(BaseCode).Content(c => c.Payload("App")).WithSideBySide(mode)
+            .Machine(m => m.Service("Svc.exe", "MySvc", s => s.WithDisplayName("My Service")));
 
     [Theory]
     [InlineData("3.5.6.9", SideBySideMode.None, "")]
@@ -118,8 +118,8 @@ public class SideBySideTests
     public void A_missing_or_invalid_upgrade_code_is_left_for_the_validator()
     {
         var plan = NewPlan();
-        var missing = plan.Msi(MsiBuilder.Create("A").WithPayload("App").WithSideBySide(SideBySideMode.Major));
-        var invalid = plan.Msi(MsiBuilder.Create("B").WithUpgradeCode("nope").WithPayload("App").WithSideBySide(SideBySideMode.Major));
+        var missing = plan.Msi(MsiBuilder.Create("A").Content(c => c.Payload("App")).WithSideBySide(SideBySideMode.Major));
+        var invalid = plan.Msi(MsiBuilder.Create("B").WithUpgradeCode("nope").Content(c => c.Payload("App")).WithSideBySide(SideBySideMode.Major));
 
         SideBySide.Apply(plan);
 
@@ -152,7 +152,7 @@ public class SideBySideTests
     {
         var plan = NewPlan();
         var msi = plan.Msi(App(SideBySideMode.MajorMinor));
-        plan.Bundle(BundleBuilder.Create("My App").WithUpgradeCode(BundleCode).WithMsi(msi));
+        plan.Bundle(BundleBuilder.Create("My App").WithUpgradeCode(BundleCode).Packages(k => k.Msi(msi)));
         SideBySide.Apply(plan);
 
         Assert.Contains("IK271", InstallerValidator.Validate(plan).Select(e => e.Code));
@@ -163,7 +163,7 @@ public class SideBySideTests
     {
         var plan = NewPlan("3.1.0");
         var msi = plan.Msi(App(SideBySideMode.MajorMinor));
-        var bundle = plan.Bundle(BundleBuilder.Create("My App").WithUpgradeCode(BundleCode).WithSideBySide(SideBySideMode.MajorMinor).WithMsi(msi));
+        var bundle = plan.Bundle(BundleBuilder.Create("My App").WithUpgradeCode(BundleCode).WithSideBySide(SideBySideMode.MajorMinor).Packages(k => k.Msi(msi)));
 
         SideBySide.Apply(plan);
 
