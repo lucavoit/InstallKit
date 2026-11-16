@@ -37,10 +37,13 @@ public class WizardTests
         setup.WaitForPage("features", p => p.HasText("Samples"));
         setup.Dump("features");
 
-        // Cancel asks first; Yes ends the setup with "user exit" and installs nothing.
+        // Cancel asks first. Yes leads to the "interrupted" page, which waits for Finish; the setup then ends with
+        // "user exit" and has installed nothing.
         setup.Click("Cancel");
         setup.WaitForPage("cancel question", p => p.HasButton("Yes"));
         setup.Click("Yes");
+        setup.WaitForPage("interrupted", p => p.HasText("interrupted") && p.HasButton("Finish"));
+        setup.Click("Finish");
         Assert.Equal(UserExit, setup.WaitForExit());
     }
 }
