@@ -92,6 +92,16 @@ namespace InstallKit.WixSharp
                 // Standard dialogs we reuse as-is.
                 dialogRefs.Distinct().Select(id => E("DialogRef", A("Id", id))),
 
+                // The folder browser has an OK button without events: the dialog set that uses it has to give it some
+                // (WixUI_InstallDir and WixUI_FeatureTree do the same), or the button does nothing (ICE17).
+                options.ChooseInstallDir || features
+                    ? new[]
+                    {
+                        Publish(ns, "BrowseDlg", "OK", "SetTargetPath", "[_BrowseProperty]", 3),
+                        Publish(ns, "BrowseDlg", "OK", "EndDialog", "Return", 4),
+                    }
+                    : null,
+
                 // Repair / remove flow (as in WixUI_Minimal, and WixUI_FeatureTree for the feature page).
                 Publish(ns, "MaintenanceWelcomeDlg", "Next", "NewDialog", "MaintenanceTypeDlg"),
                 Publish(ns, "MaintenanceTypeDlg", "RepairButton", "NewDialog", "VerifyReadyDlg"),
@@ -115,9 +125,9 @@ namespace InstallKit.WixSharp
 
                 E("InstallUISequence",
                     E("Show", A("Dialog", WelcomeId), A("Before", "ProgressDlg"), A("Condition", "NOT Installed")),
-                    // Running the MSI again on an installed product offers repair, remove and (with features) change.
-                    E("Show", A("Dialog", "ResumeDlg"), A("Before", "ProgressDlg"), A("Condition", "Installed AND (RESUME OR Preselected)")),
-                    E("Show", A("Dialog", "MaintenanceWelcomeDlg"), A("Before", "ProgressDlg"), A("Condition", "Installed AND NOT RESUME AND NOT Preselected AND NOT PATCH")),
+                    // Running the MSI again on an installed product offers repair, remove and (with features) change. The
+                    // DialogRefs above bring ResumeDlg and MaintenanceWelcomeDlg with their own Show entries, which WiX
+                    // defines as virtual: scheduling them here too is a conflict (WIX7009), so we leave them to the extension.
                     E("Show", A("Dialog", FinishId), A("OnExit", "success"))),
                 E("AdminUISequence",
                     E("Show", A("Dialog", FinishId), A("OnExit", "success"))));

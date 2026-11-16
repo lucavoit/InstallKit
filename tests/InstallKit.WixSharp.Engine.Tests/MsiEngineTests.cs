@@ -295,6 +295,34 @@ public class MsiEngineTests
     }
 
     [Fact]
+    public void The_modern_welcome_page_of_a_product_with_features_leads_to_the_feature_page()
+    {
+        var workspace = new Wxs.Workspace();
+
+        var wxs = Wxs.Msi(workspace, workspace.App()
+            .WithFeature("Tray", "Notification agent")
+            .WithDirectory(workspace.Docs, "agent", "Tray")
+            .WithModernUi());
+
+        // Our dialog set replaced WixUI_Minimal, whose single Install page is what a missing feature page looks like.
+        var uiRefs = wxs.All("UIRef").Select(r => A(r, "Id")).ToList();
+        Assert.Contains("InstallKit_Modern", uiRefs);
+        Assert.DoesNotContain("WixUI_Minimal", uiRefs);
+        // WixSharp writes the stock set as a WixUI element (WiX 4 and later); left in place it would be linked and ours dropped.
+        Assert.DoesNotContain(wxs.All("WixUI"), e => A(e, "Id") == "WixUI_Minimal");
+        Assert.Contains(wxs.All("Feature"), f => A(f, "Id") == "Tray");
+
+        var welcome = wxs.One("Dialog", "InstallKit_WelcomeDlg");
+        var button = welcome.Elements().Single(e => e.Name.LocalName == "Control" && A(e, "Id") == "Install");
+        Assert.Equal("Next", A(button, "Text"));
+        Assert.Contains(button.Elements(), p => p.Name.LocalName == "Publish" && A(p, "Event") == "NewDialog" && A(p, "Value") == "CustomizeDlg");
+        Assert.DoesNotContain(button.Elements(), p => p.Name.LocalName == "Publish" && A(p, "Event") == "EndDialog");
+
+        Assert.Contains(wxs.All("Show"), s => A(s, "Dialog") == "InstallKit_WelcomeDlg" && A(s, "Condition") == "NOT Installed");
+        Assert.Contains(wxs.All("DialogRef"), d => A(d, "Id") == "CustomizeDlg");
+    }
+
+    [Fact]
     public void A_service_and_an_xml_edit_in_a_feature_belong_to_that_feature_and_not_to_the_core()
     {
         var workspace = new Wxs.Workspace();
