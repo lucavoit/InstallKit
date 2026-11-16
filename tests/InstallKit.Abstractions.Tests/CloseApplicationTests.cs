@@ -11,7 +11,7 @@ public class CloseApplicationTests
         var dir = Directory.CreateTempSubdirectory().FullName;
         File.WriteAllText(Path.Combine(dir, "App.exe"), "");
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--payload", $"App={dir}", "--output", dir }));
-        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App");
+        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App"));
         return (plan, builder);
     }
 
@@ -21,8 +21,9 @@ public class CloseApplicationTests
     public void Builder_collects_rules_with_defaults()
     {
         var msi = MsiBuilder.Create("App")
-            .WithCloseApplication("App.exe")
-            .WithCloseApplication("Helper.exe", terminate: true, timeoutSeconds: 20)
+            .Lifecycle(l => l
+                .CloseApplication("App.exe")
+                .CloseApplication("Helper.exe", terminate: true, timeoutSeconds: 20))
             .Build();
 
         Assert.Equal(("App.exe", false, 5), (msi.CloseApplications[0].ProcessName, msi.CloseApplications[0].Terminate, msi.CloseApplications[0].TimeoutSeconds));
@@ -34,7 +35,7 @@ public class CloseApplicationTests
     public void Valid_rules_pass()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithCloseApplication("App.exe").WithCloseApplication("Helper.exe", true, 600));
+        plan.Msi(builder.Lifecycle(l => l.CloseApplication("App.exe").CloseApplication("Helper.exe", true, 600)));
 
         Assert.Empty(Codes(plan));
     }
@@ -48,7 +49,7 @@ public class CloseApplicationTests
     public void A_process_name_must_be_a_file_name(string name)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithCloseApplication(name));
+        plan.Msi(builder.Lifecycle(l => l.CloseApplication(name)));
 
         Assert.Contains("IK230", Codes(plan));
     }
@@ -57,7 +58,7 @@ public class CloseApplicationTests
     public void Duplicates_are_reported_ignoring_case()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithCloseApplication("App.exe").WithCloseApplication("APP.EXE"));
+        plan.Msi(builder.Lifecycle(l => l.CloseApplication("App.exe").CloseApplication("APP.EXE")));
 
         Assert.Contains("IK231", Codes(plan));
     }
@@ -68,7 +69,7 @@ public class CloseApplicationTests
     public void The_timeout_must_be_reasonable(int seconds)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithCloseApplication("App.exe", timeoutSeconds: seconds));
+        plan.Msi(builder.Lifecycle(l => l.CloseApplication("App.exe", timeoutSeconds: seconds)));
 
         Assert.Contains("IK232", Codes(plan));
     }

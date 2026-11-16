@@ -328,7 +328,7 @@ namespace InstallKit.WixSharp
                     new ValidationError("IK163",
                         $"MSI '{msi.Name}': no generated custom action for the {handler.Stage} handler " +
                         $"'{GeneratedInstallActions.KeyOf(handler.Handler.Method)}'. Register it as a static method " +
-                        "(.OnAfterInstall(Setup.Configure)) in a project that references InstallKit.Abstractions, which ships the generator."),
+                        "(.Lifecycle(l => l.OnAfterInstall(Setup.Configure))) in a project that references InstallKit.Abstractions, which ships the generator."),
                 });
 
                 var elevated = handler.Stage == InstallStage.AfterInstall;

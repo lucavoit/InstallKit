@@ -33,13 +33,15 @@ public class BuilderTests
             .WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001")
             .WithVersion(new Version(2, 0, 1))
             .WithUi(InstallerUi.InstallDir)
-            .WithPayload("App")
-            .WithPayload("Tools", "tools")
+            .Content(c => c
+                .Payload("App")
+                .Payload("Tools", "tools"))
             .WithMainExecutable("App.exe")
-            .WithDesktopShortcut()
-            .WithStartMenuShortcut(false)
-            .WithService("Svc.exe", "Svc", s => s.WithDisplayName("My service").WithStartMode(ServiceStartMode.Manual))
-            .WithProperty("MODE", "server")
+            .Shell(s => s
+                .DesktopShortcut()
+                .StartMenuShortcut(false))
+            .Machine(m => m.Service("Svc.exe", "Svc", s => s.WithDisplayName("My service").WithStartMode(ServiceStartMode.Manual)))
+            .Settings(s => s.Property("MODE", "server"))
             .Build();
 
         Assert.Equal("Contoso", msi.Manufacturer);
@@ -57,7 +59,7 @@ public class BuilderTests
     [Fact]
     public void Builders_do_not_share_collections()
     {
-        var first = MsiBuilder.Create("A").WithPayload("A").Build();
+        var first = MsiBuilder.Create("A").Content(c => c.Payload("A")).Build();
         var second = MsiBuilder.Create("B").Build();
 
         Assert.Single(first.Payloads);
@@ -73,13 +75,13 @@ public class BuilderTests
 
         var app = plan.Msi(MsiBuilder.Create("App")
             .WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001")
-            .WithPayload("App")
+            .Content(c => c.Payload("App"))
             .WithMainExecutable("App.exe"));
 
         var bundle = plan.Bundle(BundleBuilder.Create("App")
             .WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000002")
-            .WithNetFramework(NetFrameworkVersion.NetFx48)
-            .WithMsi(app, m => m.DisplayInternalUi = true));
+            .Prerequisites(p => p.NetFramework(NetFrameworkVersion.NetFx48))
+            .Packages(k => k.Msi(app, m => m.DisplayInternalUi = true)));
 
         Assert.Empty(InstallerValidator.Validate(plan));
         Assert.Equal("AppSetup", bundle.ResolvedOutputFileName);

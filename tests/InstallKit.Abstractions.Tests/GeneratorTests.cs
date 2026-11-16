@@ -72,9 +72,10 @@ public class GeneratorTests
                 static class Program
                 {
                     static void Define() => MsiBuilder.Create("App")
-                        .OnAfterInstall(Setup.Configure, "MODE")
-                        .OnBeforeInstall(Setup.Nested.Check)
-                        .OnLoad(Setup.Configure);
+                        .Lifecycle(l => l
+                            .OnAfterInstall(Setup.Configure, "MODE")
+                            .OnBeforeInstall(Setup.Nested.Check)
+                            .OnLoad(Setup.Configure));
                 }
             }
             """);
@@ -101,7 +102,7 @@ public class GeneratorTests
             {
                 public void Instance(InstallEvent e) { }
                 private static void Hidden(InstallEvent e) { }
-                static void Define() => MsiBuilder.Create("App").OnAfterInstall({{argument}});
+                static void Define() => MsiBuilder.Create("App").Lifecycle(l => l.OnAfterInstall({{argument}}));
             }
             """);
 
@@ -116,7 +117,7 @@ public class GeneratorTests
             public static class Setup
             {
                 public static void Configure(InstallEvent e) { }
-                static void Define() => MsiBuilder.Create("App").OnAfterInstall(Configure);
+                static void Define() => MsiBuilder.Create("App").Lifecycle(l => l.OnAfterInstall(Configure));
             }
             """, withDtf: false);
 

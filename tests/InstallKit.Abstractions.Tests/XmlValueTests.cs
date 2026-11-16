@@ -14,7 +14,7 @@ public class XmlValueTests
         File.WriteAllText(Path.Combine(dir, "App.exe.config"), "<configuration/>");
         File.WriteAllText(Path.Combine(dir, "settings.json"), "{}");
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--payload", $"App={dir}", "--output", dir }));
-        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App");
+        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App"));
         return (plan, builder);
     }
 
@@ -23,7 +23,7 @@ public class XmlValueTests
     [Fact]
     public void Builder_and_property_style_collect_values()
     {
-        var msi = MsiBuilder.Create("App").WithXmlValue("App.exe.config", ServerXPath, "[SERVER]").Build();
+        var msi = MsiBuilder.Create("App").Machine(m => m.XmlValue("App.exe.config", ServerXPath, "[SERVER]")).Build();
         Assert.Equal(("App.exe.config", ServerXPath, "[SERVER]"), (msi.XmlValues[0].File, msi.XmlValues[0].XPath, msi.XmlValues[0].Value));
 
         Assert.Single(new MsiDefinition("App").AddXmlValue("a.config", "/a/@b", "c").XmlValues);
@@ -43,7 +43,7 @@ public class XmlValueTests
     public void A_valid_value_in_an_installed_file_passes()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithXmlValue("App.exe.config", ServerXPath, "[SERVER]").WithXmlValue("App.exe.config", "/configuration/@x", ""));
+        plan.Msi(builder.Machine(m => m.XmlValue("App.exe.config", ServerXPath, "[SERVER]").XmlValue("App.exe.config", "/configuration/@x", "")));
 
         Assert.Empty(Codes(plan));
     }
@@ -52,7 +52,7 @@ public class XmlValueTests
     public void The_file_must_be_installed()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithXmlValue("Missing.config", ServerXPath, "x"));
+        plan.Msi(builder.Machine(m => m.XmlValue("Missing.config", ServerXPath, "x")));
 
         Assert.Contains("IK121", Codes(plan));
     }
@@ -63,7 +63,7 @@ public class XmlValueTests
     public void A_bad_xpath_is_reported(string xpath)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithXmlValue("App.exe.config", xpath, "x"));
+        plan.Msi(builder.Machine(m => m.XmlValue("App.exe.config", xpath, "x")));
 
         Assert.Contains("IK221", Codes(plan));
     }
@@ -72,7 +72,7 @@ public class XmlValueTests
     public void A_missing_file_name_is_reported()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithXmlValue("", "/a/@b", "x"));
+        plan.Msi(builder.Machine(m => m.XmlValue("", "/a/@b", "x")));
 
         Assert.Contains("IK220", Codes(plan));
     }
@@ -81,7 +81,7 @@ public class XmlValueTests
     public void Json_files_are_not_supported_yet()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithXmlValue("settings.json", "/a/@b", "x"));
+        plan.Msi(builder.Machine(m => m.XmlValue("settings.json", "/a/@b", "x")));
 
         var error = InstallerValidator.Validate(plan).Single();
         Assert.Equal("IK222", error.Code);

@@ -11,7 +11,7 @@ public class EnvironmentVariableTests
         var dir = Directory.CreateTempSubdirectory().FullName;
         File.WriteAllText(Path.Combine(dir, "App.exe"), "");
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--payload", $"App={dir}", "--output", dir }));
-        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App");
+        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App"));
         return (plan, builder);
     }
 
@@ -21,9 +21,10 @@ public class EnvironmentVariableTests
     public void Path_entries_append_by_default_and_can_prepend()
     {
         var msi = MsiBuilder.Create("App")
-            .WithPathEntry("[INSTALLDIR]bin")
-            .WithPathEntry("[INSTALLDIR]tools", prepend: true)
-            .WithEnvironmentVariable("APP_HOME", "[INSTALLDIR]")
+            .Machine(m => m
+                .PathEntry("[INSTALLDIR]bin")
+                .PathEntry("[INSTALLDIR]tools", prepend: true)
+                .EnvironmentVariable("APP_HOME", "[INSTALLDIR]"))
             .Build();
 
         Assert.Equal(3, msi.EnvironmentVariables.Count);
@@ -47,7 +48,7 @@ public class EnvironmentVariableTests
     public void Valid_variables_pass()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithPathEntry("[INSTALLDIR]bin").WithEnvironmentVariable("path", "[INSTALLDIR]x", EnvironmentVariableAction.Prepend).WithEnvironmentVariable("APP_HOME", "[INSTALLDIR]"));
+        plan.Msi(builder.Machine(m => m.PathEntry("[INSTALLDIR]bin").EnvironmentVariable("path", "[INSTALLDIR]x", EnvironmentVariableAction.Prepend).EnvironmentVariable("APP_HOME", "[INSTALLDIR]")));
 
         Assert.Empty(Codes(plan));
     }
@@ -58,7 +59,7 @@ public class EnvironmentVariableTests
     public void A_bad_name_is_reported(string name)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithEnvironmentVariable(name, "x"));
+        plan.Msi(builder.Machine(m => m.EnvironmentVariable(name, "x")));
 
         Assert.Contains("IK180", Codes(plan));
     }
@@ -67,27 +68,27 @@ public class EnvironmentVariableTests
     public void An_empty_value_is_reported()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithEnvironmentVariable("A", " "));
+        plan.Msi(builder.Machine(m => m.EnvironmentVariable("A", " ")));
 
         Assert.Contains("IK181", Codes(plan));
     }
 
     [Fact]
-    public void Setting_path_is_rejected_and_points_at_WithPathEntry()
+    public void Setting_path_is_rejected_and_points_at_PathEntry()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithEnvironmentVariable("Path", "C:\\tools"));
+        plan.Msi(builder.Machine(m => m.EnvironmentVariable("Path", "C:\\tools")));
 
         var error = InstallerValidator.Validate(plan).Single();
         Assert.Equal("IK182", error.Code);
-        Assert.Contains("WithPathEntry", error.Message);
+        Assert.Contains("PathEntry", error.Message);
     }
 
     [Fact]
     public void One_folder_per_path_entry()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithPathEntry("[INSTALLDIR]a;[INSTALLDIR]b"));
+        plan.Msi(builder.Machine(m => m.PathEntry("[INSTALLDIR]a;[INSTALLDIR]b")));
 
         Assert.Contains("IK183", Codes(plan));
     }

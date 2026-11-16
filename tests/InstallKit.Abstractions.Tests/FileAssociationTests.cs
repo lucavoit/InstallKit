@@ -12,7 +12,7 @@ public class FileAssociationTests
         File.WriteAllText(Path.Combine(dir, "App.exe"), "");
         File.WriteAllText(Path.Combine(dir, "Viewer.exe"), "");
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--payload", $"App={dir}", "--output", dir }));
-        var builder = MsiBuilder.Create("My App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App").WithMainExecutable("App.exe");
+        var builder = MsiBuilder.Create("My App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App")).WithMainExecutable("App.exe");
         return (plan, builder);
     }
 
@@ -21,7 +21,7 @@ public class FileAssociationTests
     [Fact]
     public void A_file_association_becomes_progid_and_open_command_values()
     {
-        var msi = MsiBuilder.Create("My App").WithMainExecutable("App.exe").WithFileAssociation(".foo", "Foo document").Build();
+        var msi = MsiBuilder.Create("My App").WithMainExecutable("App.exe").Shell(s => s.FileAssociation(".foo", "Foo document")).Build();
 
         var entries = msi.ResolvedRegistryEntries;
         Assert.Equal(4, entries.Count);
@@ -38,7 +38,7 @@ public class FileAssociationTests
     public void The_executable_and_progid_can_be_chosen()
     {
         var msi = MsiBuilder.Create("My App").WithMainExecutable("App.exe")
-            .WithFileAssociation(".bar", "Bar file", "tools/Viewer.exe", "Contoso.Bar")
+            .Shell(s => s.FileAssociation(".bar", "Bar file", "tools/Viewer.exe", "Contoso.Bar"))
             .Build();
 
         var entries = msi.ResolvedRegistryEntries;
@@ -49,7 +49,7 @@ public class FileAssociationTests
     [Fact]
     public void A_url_protocol_becomes_the_scheme_key_with_a_url_protocol_marker()
     {
-        var msi = MsiBuilder.Create("My App").WithMainExecutable("App.exe").WithUrlProtocol("myapp", "My App link").Build();
+        var msi = MsiBuilder.Create("My App").WithMainExecutable("App.exe").Shell(s => s.UrlProtocol("myapp", "My App link")).Build();
 
         var entries = msi.ResolvedRegistryEntries;
         Assert.Equal(("myapp", null, "URL:My App link"), (entries[0].Key, entries[0].Name, entries[0].Value));
@@ -61,8 +61,8 @@ public class FileAssociationTests
     public void Resolved_entries_keep_the_plain_registry_values_first()
     {
         var msi = MsiBuilder.Create("My App").WithMainExecutable("App.exe")
-            .WithFileAssociation(".foo", "Foo")
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\A", "N", "v")
+            .Shell(s => s.FileAssociation(".foo", "Foo"))
+            .Machine(m => m.Registry(RegistryHive.LocalMachine, @"Software\A", "N", "v"))
             .Build();
 
         Assert.Single(msi.RegistryEntries);
@@ -74,7 +74,7 @@ public class FileAssociationTests
     public void Valid_associations_pass()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFileAssociation(".foo", "Foo").WithFileAssociation(".bar", "Bar", "Viewer.exe").WithUrlProtocol("my-app+1", "Link"));
+        plan.Msi(builder.Shell(s => s.FileAssociation(".foo", "Foo").FileAssociation(".bar", "Bar", "Viewer.exe").UrlProtocol("my-app+1", "Link")));
 
         Assert.Empty(Codes(plan));
     }
@@ -86,7 +86,7 @@ public class FileAssociationTests
     public void A_bad_extension_is_reported(string extension)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFileAssociation(extension, "x"));
+        plan.Msi(builder.Shell(s => s.FileAssociation(extension, "x")));
 
         Assert.Contains("IK190", Codes(plan));
     }
@@ -98,7 +98,7 @@ public class FileAssociationTests
     public void A_bad_scheme_is_reported(string scheme)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithUrlProtocol(scheme, "x"));
+        plan.Msi(builder.Shell(s => s.UrlProtocol(scheme, "x")));
 
         Assert.Contains("IK191", Codes(plan));
     }
@@ -107,11 +107,11 @@ public class FileAssociationTests
     public void A_handler_needs_a_program_that_is_installed()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFileAssociation(".foo", "x", "Missing.exe"));
+        plan.Msi(builder.Shell(s => s.FileAssociation(".foo", "x", "Missing.exe")));
         Assert.Contains("IK121", Codes(plan));
 
         var withoutMain = new InstallerPlan(InstallerContext.FromEnvironment(new string[0]));
-        withoutMain.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000003").WithDirectory(Path.GetTempPath()).WithUrlProtocol("myapp", "x"));
+        withoutMain.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000003").Content(c => c.Directory(Path.GetTempPath())).Shell(s => s.UrlProtocol("myapp", "x")));
         Assert.Contains("IK192", Codes(withoutMain));
     }
 
@@ -119,8 +119,12 @@ public class FileAssociationTests
     public void Duplicates_and_bad_progids_are_reported()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFileAssociation(".foo", "x").WithFileAssociation(".FOO", "y").WithFileAssociation(".bar", "z", null, "1bad")
-            .WithUrlProtocol("myapp", "a").WithUrlProtocol("MyApp", "b"));
+        plan.Msi(builder.Shell(s => s
+            .FileAssociation(".foo", "x")
+            .FileAssociation(".FOO", "y")
+            .FileAssociation(".bar", "z", null, "1bad")
+            .UrlProtocol("myapp", "a")
+            .UrlProtocol("MyApp", "b")));
 
         var codes = Codes(plan);
         Assert.Contains("IK193", codes);

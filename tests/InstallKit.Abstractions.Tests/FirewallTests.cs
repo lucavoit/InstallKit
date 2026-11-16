@@ -11,7 +11,7 @@ public class FirewallTests
         var dir = Directory.CreateTempSubdirectory().FullName;
         File.WriteAllText(Path.Combine(dir, "Svc.exe"), "");
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--payload", $"App={dir}", "--output", dir }));
-        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App");
+        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App"));
         return (plan, builder);
     }
 
@@ -21,8 +21,9 @@ public class FirewallTests
     public void Builder_collects_rules_with_defaults()
     {
         var msi = MsiBuilder.Create("App")
-            .WithFirewallRule("App web", "8080")
-            .WithFirewallRule("App service", executable: "Svc.exe", protocol: FirewallProtocol.Any, scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private)
+            .Machine(m => m
+                .FirewallRule("App web", "8080")
+                .FirewallRule("App service", executable: "Svc.exe", protocol: FirewallProtocol.Any, scope: FirewallScope.LocalSubnet, profile: FirewallProfile.Private))
             .Build();
 
         Assert.Equal(2, msi.FirewallRules.Count);
@@ -45,7 +46,7 @@ public class FirewallTests
     public void Valid_ports_pass(string port)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFirewallRule("Web", port, FirewallProtocol.Udp));
+        plan.Msi(builder.Machine(m => m.FirewallRule("Web", port, FirewallProtocol.Udp)));
 
         Assert.Empty(Codes(plan));
     }
@@ -60,7 +61,7 @@ public class FirewallTests
     public void Invalid_ports_are_reported(string port)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFirewallRule("Web", port));
+        plan.Msi(builder.Machine(m => m.FirewallRule("Web", port)));
 
         Assert.Contains("IK212", Codes(plan));
     }
@@ -69,7 +70,7 @@ public class FirewallTests
     public void A_rule_needs_a_port_or_a_program()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFirewallRule("Nothing"));
+        plan.Msi(builder.Machine(m => m.FirewallRule("Nothing")));
 
         Assert.Contains("IK211", Codes(plan));
     }
@@ -78,7 +79,7 @@ public class FirewallTests
     public void A_rule_needs_a_name()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFirewallRule("", "80"));
+        plan.Msi(builder.Machine(m => m.FirewallRule("", "80")));
 
         Assert.Contains("IK210", Codes(plan));
     }
@@ -87,7 +88,7 @@ public class FirewallTests
     public void A_port_needs_tcp_or_udp()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFirewallRule("Web", "80", FirewallProtocol.Any));
+        plan.Msi(builder.Machine(m => m.FirewallRule("Web", "80", FirewallProtocol.Any)));
 
         Assert.Contains("IK213", Codes(plan));
     }
@@ -96,7 +97,7 @@ public class FirewallTests
     public void A_program_rule_checks_the_program_is_installed()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithFirewallRule("Ok", executable: "Svc.exe", protocol: FirewallProtocol.Any).WithFirewallRule("Missing", executable: "Nope.exe", protocol: FirewallProtocol.Any));
+        plan.Msi(builder.Machine(m => m.FirewallRule("Ok", executable: "Svc.exe", protocol: FirewallProtocol.Any).FirewallRule("Missing", executable: "Nope.exe", protocol: FirewallProtocol.Any)));
 
         var error = InstallerValidator.Validate(plan).Single();
         Assert.Equal("IK121", error.Code);
@@ -107,7 +108,7 @@ public class FirewallTests
     public void Per_user_installs_cannot_open_the_firewall()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithScope(InstallScope.PerUser).WithFirewallRule("Web", "80"));
+        plan.Msi(builder.WithScope(InstallScope.PerUser).Machine(m => m.FirewallRule("Web", "80")));
 
         Assert.Contains("IK214", Codes(plan));
     }

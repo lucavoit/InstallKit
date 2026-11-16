@@ -11,7 +11,7 @@ public class RegistryTests
         var dir = Directory.CreateTempSubdirectory().FullName;
         File.WriteAllText(Path.Combine(dir, "App.exe"), "");
         var plan = new InstallerPlan(InstallerContext.FromEnvironment(new[] { "--payload", $"App={dir}", "--output", dir }));
-        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App");
+        var builder = MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App"));
         return (plan, builder);
     }
 
@@ -21,10 +21,11 @@ public class RegistryTests
     public void Builder_collects_registry_values_of_every_kind()
     {
         var msi = MsiBuilder.Create("App")
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\Contoso\App", "InstallPath", "[INSTALLDIR]")
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\Contoso\App", null, "default value")
-            .WithRegistryValue(RegistryHive.CurrentUser, @"Software\Contoso\App", "Logs", @"%LOCALAPPDATA%\App", RegistryValueKind.ExpandString)
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\Contoso\App", "Telemetry", 0)
+            .Machine(m => m
+                .Registry(RegistryHive.LocalMachine, @"Software\Contoso\App", "InstallPath", "[INSTALLDIR]")
+                .Registry(RegistryHive.LocalMachine, @"Software\Contoso\App", null, "default value")
+                .Registry(RegistryHive.CurrentUser, @"Software\Contoso\App", "Logs", @"%LOCALAPPDATA%\App", RegistryValueKind.ExpandString)
+                .Registry(RegistryHive.LocalMachine, @"Software\Contoso\App", "Telemetry", 0))
             .Build();
 
         Assert.Equal(4, msi.RegistryEntries.Count);
@@ -56,8 +57,9 @@ public class RegistryTests
     {
         var (plan, builder) = NewPlan();
         plan.Msi(builder
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\Contoso\App", "Mode", "x")
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\Contoso\App", "Level", 3));
+            .Machine(m => m
+                .Registry(RegistryHive.LocalMachine, @"Software\Contoso\App", "Mode", "x")
+                .Registry(RegistryHive.LocalMachine, @"Software\Contoso\App", "Level", 3)));
 
         Assert.Empty(Codes(plan));
     }
@@ -68,7 +70,7 @@ public class RegistryTests
     public void A_bad_key_is_reported(string key)
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithRegistryValue(RegistryHive.LocalMachine, key, "N", "v"));
+        plan.Msi(builder.Machine(m => m.Registry(RegistryHive.LocalMachine, key, "N", "v")));
 
         Assert.Contains("IK170", Codes(plan));
     }
@@ -77,7 +79,7 @@ public class RegistryTests
     public void A_dword_must_be_a_number()
     {
         var (plan, builder) = NewPlan();
-        plan.Msi(builder.WithRegistryValue(RegistryHive.LocalMachine, @"Software\A", "N", "abc", RegistryValueKind.DWord));
+        plan.Msi(builder.Machine(m => m.Registry(RegistryHive.LocalMachine, @"Software\A", "N", "abc", RegistryValueKind.DWord)));
 
         Assert.Contains("IK171", Codes(plan));
     }
@@ -87,8 +89,9 @@ public class RegistryTests
     {
         var (plan, builder) = NewPlan();
         plan.Msi(builder.WithScope(InstallScope.PerUser)
-            .WithRegistryValue(RegistryHive.LocalMachine, @"Software\A", "N", "v")
-            .WithRegistryValue(RegistryHive.CurrentUser, @"Software\A", "N", "v"));
+            .Machine(m => m
+                .Registry(RegistryHive.LocalMachine, @"Software\A", "N", "v")
+                .Registry(RegistryHive.CurrentUser, @"Software\A", "N", "v")));
 
         var error = InstallerValidator.Validate(plan).Single();
         Assert.Equal("IK172", error.Code);

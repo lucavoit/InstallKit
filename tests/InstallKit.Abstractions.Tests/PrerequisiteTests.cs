@@ -25,7 +25,7 @@ public class PrerequisiteTests
     [Fact]
     public void A_vc_redist_from_a_file_adds_a_registry_search_and_a_detect_condition()
     {
-        var bundle = Bundle().WithVcRedist("vc_redist.x64.exe").Build();
+        var bundle = Bundle().Prerequisites(p => p.VcRedist("vc_redist.x64.exe")).Build();
 
         var item = Assert.IsType<ExeChainItem>(Assert.Single(bundle.Chain.Items));
         Assert.Equal("vc_redist.x64.exe", item.Path);
@@ -44,7 +44,7 @@ public class PrerequisiteTests
     [InlineData(PrerequisiteArchitecture.Arm64, "arm64", true)]
     public void The_vc_redist_registry_view_follows_the_architecture(PrerequisiteArchitecture architecture, string folder, bool win64)
     {
-        var search = Assert.IsType<RegistryBundleSearch>(Assert.Single(Bundle().WithVcRedist("a.exe", architecture).Build().Chain.Searches));
+        var search = Assert.IsType<RegistryBundleSearch>(Assert.Single(Bundle().Prerequisites(p => p.VcRedist("a.exe", architecture)).Build().Chain.Searches));
 
         Assert.EndsWith(@"Runtimes\" + folder, search.Key);
         Assert.Equal(win64, search.Win64);
@@ -53,7 +53,7 @@ public class PrerequisiteTests
     [Fact]
     public void A_dotnet_runtime_adds_a_dotnet_search_and_compares_the_major_version()
     {
-        var bundle = Bundle().WithDotNetRuntime(DotNetRuntimeKind.WindowsDesktop, 8, "dotnet.exe", PrerequisiteArchitecture.X64).Build();
+        var bundle = Bundle().Prerequisites(p => p.DotNetRuntime(DotNetRuntimeKind.WindowsDesktop, 8, "dotnet.exe", PrerequisiteArchitecture.X64)).Build();
 
         var search = Assert.IsType<DotNetBundleSearch>(Assert.Single(bundle.Chain.Searches));
         Assert.Equal((DotNetRuntimeKind.WindowsDesktop, 8, PrerequisiteArchitecture.X64), (search.Kind, search.MajorVersion, search.Architecture));
@@ -64,7 +64,7 @@ public class PrerequisiteTests
     [Fact]
     public void WebView2_looks_in_the_machine_and_the_user_registry()
     {
-        var bundle = Bundle().WithWebView2("webview2.exe").Build();
+        var bundle = Bundle().Prerequisites(p => p.WebView2("webview2.exe")).Build();
 
         var searches = bundle.Chain.Searches.Cast<RegistryBundleSearch>().ToList();
         Assert.Equal(new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser }, searches.Select(s => s.Root));
@@ -80,7 +80,7 @@ public class PrerequisiteTests
     {
         var installer = PrerequisiteInstaller.FromDownload("https://aka.ms/vs/17/release/vc_redist.x64.exe", Hash, 25_000_000);
 
-        var item = Assert.IsType<ExeChainItem>(Assert.Single(Bundle().WithVcRedist(installer).Build().Chain.Items));
+        var item = Assert.IsType<ExeChainItem>(Assert.Single(Bundle().Prerequisites(p => p.VcRedist(installer)).Build().Chain.Items));
         Assert.Same(installer, item.Download);
         Assert.Equal("vc_redist.x64.exe", item.Path);
         Assert.Equal("setup.exe", PrerequisiteInstaller.FromDownload("https://x.example/dl/setup.exe?v=1", Hash, 1).ResolvedFileName);
@@ -92,11 +92,12 @@ public class PrerequisiteTests
     {
         var (plan, dir) = NewPlan();
         plan.Bundle(Bundle()
-            .WithVcRedist(Path.Combine(dir, "vc_redist.x64.exe"))
-            .WithVcRedist(PrerequisiteInstaller.FromDownload("https://aka.ms/vs/17/release/vc_redist.x86.exe", Hash, 13_000_000), PrerequisiteArchitecture.X86)
-            .WithDotNetRuntime(DotNetRuntimeKind.Runtime, 8, Path.Combine(dir, "dotnet.exe"))
-            .WithWebView2(Path.Combine(dir, "webview2.exe"))
-            .WithMsi(plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App"))));
+            .Prerequisites(p => p
+                .VcRedist(Path.Combine(dir, "vc_redist.x64.exe"))
+                .VcRedist(PrerequisiteInstaller.FromDownload("https://aka.ms/vs/17/release/vc_redist.x86.exe", Hash, 13_000_000), PrerequisiteArchitecture.X86)
+                .DotNetRuntime(DotNetRuntimeKind.Runtime, 8, Path.Combine(dir, "dotnet.exe"))
+                .WebView2(Path.Combine(dir, "webview2.exe")))
+            .Packages(k => k.Msi(plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App"))))));
 
         Assert.Empty(Codes(plan));
     }
@@ -105,8 +106,8 @@ public class PrerequisiteTests
     public void An_embedded_prerequisite_must_exist()
     {
         var (plan, dir) = NewPlan();
-        plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App"));
-        plan.Bundle(Bundle().WithVcRedist(Path.Combine(dir, "missing.exe")));
+        plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App")));
+        plan.Bundle(Bundle().Prerequisites(p => p.VcRedist(Path.Combine(dir, "missing.exe"))));
 
         Assert.Contains("IK133", Codes(plan));
     }
@@ -117,7 +118,7 @@ public class PrerequisiteTests
     public void A_download_must_use_https(string url, string code)
     {
         var (plan, _) = NewPlan();
-        plan.Bundle(Bundle().WithVcRedist(PrerequisiteInstaller.FromDownload(url, Hash, 10, "a.exe")));
+        plan.Bundle(Bundle().Prerequisites(p => p.VcRedist(PrerequisiteInstaller.FromDownload(url, Hash, 10, "a.exe"))));
 
         Assert.Contains(code, Codes(plan));
     }
@@ -129,7 +130,7 @@ public class PrerequisiteTests
     public void A_download_needs_a_sha512_hash(string hash)
     {
         var (plan, _) = NewPlan();
-        plan.Bundle(Bundle().WithWebView2(PrerequisiteInstaller.FromDownload("https://x.example/a.exe", hash, 10)));
+        plan.Bundle(Bundle().Prerequisites(p => p.WebView2(PrerequisiteInstaller.FromDownload("https://x.example/a.exe", hash, 10))));
 
         Assert.Contains("IK261", Codes(plan));
     }
@@ -141,7 +142,7 @@ public class PrerequisiteTests
     public void A_download_needs_a_sane_size(long size)
     {
         var (plan, _) = NewPlan();
-        plan.Bundle(Bundle().WithWebView2(PrerequisiteInstaller.FromDownload("https://x.example/a.exe", Hash, size)));
+        plan.Bundle(Bundle().Prerequisites(p => p.WebView2(PrerequisiteInstaller.FromDownload("https://x.example/a.exe", Hash, size))));
 
         Assert.Contains("IK262", Codes(plan));
     }
@@ -152,7 +153,7 @@ public class PrerequisiteTests
     public void A_download_needs_a_usable_file_name(string name)
     {
         var (plan, _) = NewPlan();
-        plan.Bundle(Bundle().WithWebView2(PrerequisiteInstaller.FromDownload("https://x.example/a.exe", Hash, 10, name)));
+        plan.Bundle(Bundle().Prerequisites(p => p.WebView2(PrerequisiteInstaller.FromDownload("https://x.example/a.exe", Hash, 10, name))));
 
         Assert.Contains("IK263", Codes(plan));
     }
@@ -161,8 +162,8 @@ public class PrerequisiteTests
     public void Using_a_helper_twice_for_the_same_runtime_is_reported()
     {
         var (plan, dir) = NewPlan();
-        plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").WithPayload("App"));
-        plan.Bundle(Bundle().WithVcRedist(Path.Combine(dir, "vc_redist.x64.exe")).WithVcRedist(Path.Combine(dir, "vc_redist.x64.exe")));
+        plan.Msi(MsiBuilder.Create("App").WithUpgradeCode("2f0a4e2c-1111-4c1e-9b1a-000000000001").Content(c => c.Payload("App")));
+        plan.Bundle(Bundle().Prerequisites(p => p.VcRedist(Path.Combine(dir, "vc_redist.x64.exe")).VcRedist(Path.Combine(dir, "vc_redist.x64.exe"))));
 
         Assert.Contains("IK264", Codes(plan));
     }
@@ -173,7 +174,7 @@ public class PrerequisiteTests
     public void The_dotnet_major_version_must_be_plausible(int major)
     {
         var (plan, dir) = NewPlan();
-        plan.Bundle(Bundle().WithDotNetRuntime(DotNetRuntimeKind.Runtime, major, Path.Combine(dir, "dotnet.exe")));
+        plan.Bundle(Bundle().Prerequisites(p => p.DotNetRuntime(DotNetRuntimeKind.Runtime, major, Path.Combine(dir, "dotnet.exe"))));
 
         Assert.Contains("IK265", Codes(plan));
     }

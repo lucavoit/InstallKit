@@ -51,7 +51,7 @@ static class Wxs
         public InstallerContext Context { get; }
 
         public MsiBuilder App() =>
-            MsiBuilder.Create("My App").WithManufacturer("Contoso").WithUpgradeCode(Code).WithPayload("App");
+            MsiBuilder.Create("My App").WithManufacturer("Contoso").WithUpgradeCode(Code).Content(c => c.Payload("App"));
     }
 
     /// <summary>The WiX source of an MSI. Classic UI without branding, so no images are generated.</summary>
