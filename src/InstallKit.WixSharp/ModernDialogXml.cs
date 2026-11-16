@@ -249,7 +249,13 @@ namespace InstallKit.WixSharp
                         E("Publish", A("Event", "EndDialog"), A("Value", "Return"), A("Order", 2), A("Condition", "OutOfDiskSpace <> 1")),
                     });
             if (required.Count > 0)
-                forward.Add(A("DisableCondition", string.Join(" OR ", required)));
+            {
+                // Windows Installer only applies a condition while it is true: it never undoes it. Without the matching
+                // EnableCondition the button stays disabled for good once a required box has been emptied, even after the user
+                // types a value again.
+                var filled = options.Prompts.Where(p => p.Required).Select(p => $"{p.Property} <> \"\"");
+                forward.Add(A("DisableCondition", string.Join(" OR ", required)), A("EnableCondition", string.Join(" AND ", filled)));
+            }
 
             dialog.Add(
                 E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)),

@@ -201,6 +201,11 @@ public sealed class SetupSession : IDisposable
             Keyboard.Type(VirtualKeyShort.DELETE);
         else
             Keyboard.Type(text);
+
+        // The box handles the keystrokes after SendInput returns, so it may still be catching up.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (ReadText(edit) != text && DateTime.UtcNow < deadline)
+            Thread.Sleep(100);
         output.WriteLine($"the box now shows '{ReadText(edit)}'");
         Keyboard.Type(VirtualKeyShort.TAB);
     }

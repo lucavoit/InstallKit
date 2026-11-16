@@ -228,6 +228,24 @@ public class ModernDialogTests
         var next = options.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Next");
 
         Assert.Equal("SERVER = \"\"", (string)next.Attribute("DisableCondition")!);
+
+        // A condition is never undone by Windows Installer: the button needs its own enabling condition, or it stays
+        // disabled after the user empties the box and types a value again.
+        Assert.Equal("SERVER <> \"\"", (string)next.Attribute("EnableCondition")!);
+    }
+
+    [Fact]
+    public void Several_required_prompts_all_have_to_be_filled_to_enable_next()
+    {
+        var fragment = ModernDialogXml.BuildFragment(Ns, new ModernDialogOptions
+        {
+            Prompts = new[] { new ModernPrompt("A", "A", required: true), new ModernPrompt("B", "B", required: true), new ModernPrompt("C", "C", required: false) },
+        });
+        var options = Dialogs(fragment).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.OptionsId);
+        var next = options.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Next");
+
+        Assert.Equal("A = \"\" OR B = \"\"", (string)next.Attribute("DisableCondition")!);
+        Assert.Equal("A <> \"\" AND B <> \"\"", (string)next.Attribute("EnableCondition")!);
     }
 
     [Fact]
