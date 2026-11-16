@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Drives the real setup dialogs of the QA demo MSI with UI Automation (FlaUI): starts msiexec without /qn, clicks through
+    the pages and reads what they show. It needs Windows, an interactive desktop and the MSI, which CI builds first:
+      INSTALLKIT_UI_MSI   the MSI to start (without it every test is skipped)
+      INSTALLKIT_UI_OUT   where the UI trees, screenshots and the msiexec log go (default: a temp folder)
+    Not part of the unit tests: nothing here runs unless a CI job or a developer on Windows points it at an MSI.
+  -->
+  <PropertyGroup>
+    <!-- FlaUI only ships Windows assets, so this cannot run (the test host needs the Windows desktop framework) elsewhere. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- Lets the project compile on Linux and macOS, as the other Windows-only projects of the solution do. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="FlaUI.UIA3" Version="5.0.0" />
+  </ItemGroup>
+</Project>

@@ -16,6 +16,7 @@
     <Project Path="qa/QaDemo/QaDemo.csproj" />
     <Project Path="qa/QaDemo.Installer/QaDemo.Installer.csproj" />
     <Project Path="qa/QaDemo.Installer.Core/QaDemo.Installer.Core.csproj" />
+    <Project Path="qa/UiTests/InstallKit.UiTests.csproj" />
   </Folder>
   <Folder Name="/templates/">
     <Project Path="templates/InstallKit.Templates/InstallKit.Templates.csproj" />
