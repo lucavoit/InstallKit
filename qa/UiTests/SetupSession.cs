@@ -1,0 +1,318 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using FlaUI.Core;
+using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Capturing;
+using FlaUI.Core.Definitions;
+using FlaUI.UIA3;
+using Xunit.Abstractions;
+
+namespace InstallKit.UiTests;
+
+/// <summary>
+/// One run of an MSI with its dialogs: starts msiexec (no /qn), finds its windows through UI Automation and clicks buttons.
+/// Whenever a page does not show up it writes what is on screen (the whole UI Automation tree, and a screenshot) next to
+/// the msiexec log, so a failed run can be understood without seeing the machine.
+/// </summary>
+public sealed class SetupSession : IDisposable
+{
+    public const string MsiVariable = "INSTALLKIT_UI_MSI";
+    public const string OutVariable = "INSTALLKIT_UI_OUT";
+
+    static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(45);
+
+    readonly ITestOutputHelper output;
+    readonly UIA3Automation automation = new UIA3Automation();
+    readonly Process process;
+    int dumps;
+
+    SetupSession(Process process, string outDir, ITestOutputHelper output)
+    {
+        this.process = process;
+        OutDir = outDir;
+        this.output = output;
+    }
+
+    public static string? MsiPath => Environment.GetEnvironmentVariable(MsiVariable);
+
+    public string OutDir { get; }
+
+    public Process Process => process;
+
+    /// <summary>Starts the MSI in its default UI level, so the dialogs are shown.</summary>
+    public static SetupSession Start(ITestOutputHelper output, string name, string arguments = "")
+    {
+        var msi = Path.GetFullPath(MsiPath ?? throw new InvalidOperationException($"{MsiVariable} is not set."));
+        var outDir = Environment.GetEnvironmentVariable(OutVariable);
+        outDir = Path.GetFullPath(string.IsNullOrWhiteSpace(outDir) ? Path.Combine(Path.GetTempPath(), "installkit-ui") : outDir);
+        Directory.CreateDirectory(outDir);
+
+        var log = Path.Combine(outDir, name + ".msiexec.log");
+        var info = new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\" {arguments} /l*v \"{log}\"") { UseShellExecute = false };
+        var process = Process.Start(info) ?? throw new InvalidOperationException("msiexec did not start.");
+        output.WriteLine($"started msiexec {process.Id}: {info.Arguments}");
+        return new SetupSession(process, outDir, output);
+    }
+
+    /// <summary>The names of every element on every window of the setup: texts, buttons, tree items.</summary>
+    public sealed record Page(IReadOnlyList<string> Names, IReadOnlyList<string> Buttons)
+    {
+        public bool HasText(string text) => Names.Any(n => n.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0);
+
+        public bool HasButton(string text) => Buttons.Any(b => Same(b, text));
+    }
+
+    /// <summary>Waits until the windows of the setup show a page that satisfies <paramref name="isTheRightPage"/>.</summary>
+    public Page WaitForPage(string what, Func<Page, bool> isTheRightPage, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? DefaultTimeout);
+        Page? last = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            last = Snapshot();
+            if (last != null && isTheRightPage(last))
+            {
+                output.WriteLine($"page '{what}': buttons [{string.Join(", ", last.Buttons)}]");
+                return last;
+            }
+
+            if (process.HasExited)
+                break;
+            Thread.Sleep(250);
+        }
+
+        Dump($"missing-{what}");
+        throw new Xunit.Sdk.XunitException(
+            $"The page '{what}' did not show up within {(timeout ?? DefaultTimeout).TotalSeconds:0} seconds" +
+            (process.HasExited ? $" (msiexec exited with {process.ExitCode})" : "") +
+            $". Buttons seen: [{string.Join(", ", last?.Buttons ?? Array.Empty<string>())}]. The UI tree and a screenshot are in {OutDir}.");
+    }
+
+    /// <summary>Presses the button with this label (ignoring the mnemonic marks and arrows some labels have) on any window of the setup.</summary>
+    public void Click(string button)
+    {
+        var element = Retry(() => Buttons().FirstOrDefault(b => Same(b.Name, button) && b.IsEnabled), TimeSpan.FromSeconds(15));
+        if (element == null)
+        {
+            Dump($"missing-button-{button}");
+            throw new Xunit.Sdk.XunitException($"No enabled button '{button}' on the setup windows. The UI tree and a screenshot are in {OutDir}.");
+        }
+
+        output.WriteLine($"click '{button}'");
+        try
+        {
+            element.AsButton().Invoke();
+        }
+        catch (Exception e) when (e is not Xunit.Sdk.XunitException)
+        {
+            // Some controls do not offer the Invoke pattern: fall back to a real mouse click.
+            output.WriteLine($"invoke failed ({e.GetType().Name}), clicking with the mouse");
+            element.Click();
+        }
+    }
+
+    /// <summary>Waits for msiexec to end and returns its exit code.</summary>
+    public int WaitForExit(TimeSpan? timeout = null)
+    {
+        if (!process.WaitForExit((int)(timeout ?? TimeSpan.FromSeconds(60)).TotalMilliseconds))
+        {
+            Dump("msiexec-did-not-exit");
+            throw new Xunit.Sdk.XunitException($"msiexec did not exit. The UI tree and a screenshot are in {OutDir}.");
+        }
+
+        return process.ExitCode;
+    }
+
+    /// <summary>Writes the UI Automation tree of every window of the setup and a screenshot.</summary>
+    public void Dump(string name)
+    {
+        var stem = Path.Combine(OutDir, $"{++dumps:00}-{name}");
+        try
+        {
+            var text = new StringBuilder();
+            foreach (var window in Windows())
+                Describe(window, 0, text);
+            File.WriteAllText(stem + ".tree.txt", text.Length > 0 ? text.ToString() : "(no windows)");
+            output.WriteLine($"UI tree of '{name}':{Environment.NewLine}{text}");
+        }
+        catch (Exception e)
+        {
+            output.WriteLine($"could not read the UI tree: {e.Message}");
+        }
+
+        try
+        {
+            Capture.Screen().ToFile(stem + ".png");
+        }
+        catch (Exception e)
+        {
+            output.WriteLine($"could not take a screenshot: {e.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch (Exception)
+        {
+            // Already gone.
+        }
+
+        automation.Dispose();
+        process.Dispose();
+    }
+
+    // The windows msiexec shows: the wizard and its spawned dialogs (such as "Are you sure you want to cancel?")
+    // are all top-level windows of the msiexec process.
+    IEnumerable<AutomationElement> Windows()
+    {
+        try
+        {
+            return automation.GetDesktop().FindAllChildren()
+                .Where(w => w.Properties.ProcessId.ValueOrDefault == process.Id)
+                .ToList();
+        }
+        catch (Exception)
+        {
+            return Array.Empty<AutomationElement>();
+        }
+    }
+
+    IEnumerable<AutomationElement> Buttons()
+    {
+        foreach (var window in Windows())
+        {
+            IEnumerable<AutomationElement> all;
+            try
+            {
+                all = window.FindAllDescendants();
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            foreach (var element in all)
+            {
+                if (SafeControlType(element) == ControlType.Button)
+                    yield return element;
+            }
+        }
+    }
+
+    Page? Snapshot()
+    {
+        var names = new List<string>();
+        var buttons = new List<string>();
+        foreach (var window in Windows())
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(window.Name))
+                    names.Add(window.Name);
+                foreach (var element in window.FindAllDescendants())
+                {
+                    var name = SafeName(element);
+                    if (string.IsNullOrWhiteSpace(name))
+                        continue;
+                    names.Add(name);
+                    if (SafeControlType(element) == ControlType.Button)
+                        buttons.Add(name);
+                }
+            }
+            catch (Exception)
+            {
+                // The page was replaced while we were reading it: try again.
+                return null;
+            }
+        }
+
+        return names.Count == 0 ? null : new Page(names, buttons);
+    }
+
+    static void Describe(AutomationElement element, int depth, StringBuilder text)
+    {
+        text.Append(' ', depth * 2)
+            .Append(SafeControlType(element)).Append(" name='").Append(SafeName(element)).Append("'")
+            .Append(" id='").Append(Safe(() => element.AutomationId)).Append("'")
+            .Append(" class='").Append(Safe(() => element.ClassName)).Append("'")
+            .Append(" enabled=").Append(Safe(() => element.IsEnabled.ToString()))
+            .AppendLine();
+
+        AutomationElement[] children;
+        try
+        {
+            children = element.FindAllChildren();
+        }
+        catch (Exception)
+        {
+            return;
+        }
+
+        foreach (var child in children)
+            Describe(child, depth + 1, text);
+    }
+
+    static T? Retry<T>(Func<T?> find, TimeSpan timeout) where T : class
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        do
+        {
+            try
+            {
+                var found = find();
+                if (found != null)
+                    return found;
+            }
+            catch (Exception)
+            {
+                // The element went away between finding and reading it.
+            }
+
+            Thread.Sleep(250);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        return null;
+    }
+
+    static string SafeName(AutomationElement element) => Safe(() => element.Name);
+
+    static ControlType SafeControlType(AutomationElement element)
+    {
+        try
+        {
+            return element.ControlType;
+        }
+        catch (Exception)
+        {
+            return ControlType.Unknown;
+        }
+    }
+
+    static string Safe(Func<string?> read)
+    {
+        try
+        {
+            return read() ?? "";
+        }
+        catch (Exception)
+        {
+            return "";
+        }
+    }
+
+    // Button labels carry mnemonic marks and arrows ("&Next >"): compare without them.
+    static bool Same(string label, string wanted) => Normalize(label) == Normalize(wanted);
+
+    static string Normalize(string label) => new string(label.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+}

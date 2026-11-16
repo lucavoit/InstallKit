@@ -82,6 +82,51 @@ jobs:
           name: sample-${{ matrix.engine }}
           path: ${{ runner.temp }}/sample
 
+  # Clicks through the real setup dialogs of the QA demo MSI with UI Automation (qa/UiTests, FlaUI). The other checks look
+  # at the MSI tables or run msiexec silently; this one sees what a person sees. Hosted Windows runners have an
+  # interactive desktop and run as administrator. Every run uploads the UI trees, screenshots and msiexec logs.
+  ui:
+    name: UI (${{ matrix.engine }})
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: WixSharp
+            project: qa/QaDemo.Installer/QaDemo.Installer.csproj
+          - engine: WixSharpCore
+            project: qa/QaDemo.Installer.Core/QaDemo.Installer.Core.csproj
+    env:
+      QA_DIR: ${{ github.workspace }}/qa-out
+      INSTALLKIT_UI_OUT: ${{ github.workspace }}/ui-out
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Restore pinned WiX tool
+        run: dotnet tool restore
+
+      - name: Build QA installer 1.0.0
+        run: dotnet build ${{ matrix.project }} -c Release -p:InstallKitVersion=1.0.0 "-p:InstallKitOutputDir=${{ env.QA_DIR }}/1.0.0/"
+
+      - name: Drive the setup dialogs
+        shell: pwsh
+        env:
+          INSTALLKIT_UI_MSI: ${{ github.workspace }}/qa-out/1.0.0/QaDemo.msi
+        run: dotnet test qa/UiTests -c Release --logger "console;verbosity=detailed"
+
+      - name: Upload UI trees, screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-${{ matrix.engine }}
+          path: ${{ env.INSTALLKIT_UI_OUT }}
+          if-no-files-found: warn
+
   # End-to-end: build the QA demo installer as 1.0.0 and 1.1.0, then install, upgrade, repair and
   # uninstall it on the runner and assert the outcome with Pester (qa/tests/Installer.Tests.ps1).
   # Hosted runners are disposable and run as administrator, which these tests need.
