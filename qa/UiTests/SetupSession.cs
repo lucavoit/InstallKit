@@ -9,6 +9,8 @@ using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Capturing;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
+using FlaUI.Core.WindowsAPI;
 using FlaUI.UIA3;
 using Xunit.Abstractions;
 
@@ -114,6 +116,100 @@ public sealed class SetupSession : IDisposable
             output.WriteLine($"invoke failed ({e.GetType().Name}), clicking with the mouse");
             element.Click();
         }
+    }
+
+    /// <summary>Waits until <paramref name="condition"/> holds; dumps the screen and fails with <paramref name="what"/> if it does not.</summary>
+    public void WaitUntil(string what, Func<bool> condition, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(20));
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                if (condition())
+                    return;
+            }
+            catch (Exception e) when (e is not Xunit.Sdk.XunitException)
+            {
+                // The page changed while we were looking: look again.
+            }
+
+            Thread.Sleep(250);
+        }
+
+        Dump($"timeout-{what}");
+        throw new Xunit.Sdk.XunitException($"Timed out waiting until {what}. The UI tree and a screenshot are in {OutDir}.");
+    }
+
+    /// <summary>Whether the button with this label exists on a window of the setup and can be pressed.</summary>
+    public bool IsEnabled(string button) => Buttons().Any(b => Same(b.Name, button) && b.IsEnabled);
+
+    /// <summary>
+    /// The input boxes the setup shows (the install folder, a prompted value, the folder browser's path). Windows Installer
+    /// draws them as RichEdit controls; the combo box of the folder browser has a plain Edit inside it, which is left out.
+    /// </summary>
+    public IReadOnlyList<AutomationElement> Edits() => Windows().SelectMany(EditsOf).ToList();
+
+    /// <summary>The input box of the window that has this button, for when several windows (a dialog over a page) are open.</summary>
+    public AutomationElement EditOnWindowWith(string button)
+    {
+        foreach (var window in Windows())
+        {
+            if (window.FindAllDescendants().Any(e => SafeControlType(e) == ControlType.Button && Same(SafeName(e), button)))
+            {
+                var edit = EditsOf(window).FirstOrDefault();
+                if (edit != null)
+                    return edit;
+            }
+        }
+
+        Dump($"missing-edit-near-{button}");
+        throw new Xunit.Sdk.XunitException($"No input box on the window with the button '{button}'. The UI tree and a screenshot are in {OutDir}.");
+    }
+
+    /// <summary>The only input box on screen.</summary>
+    public AutomationElement Edit()
+    {
+        var edits = Edits();
+        if (edits.Count == 1)
+            return edits[0];
+
+        Dump("expected-one-edit");
+        throw new Xunit.Sdk.XunitException($"Expected one input box on screen, found {edits.Count}. The UI tree and a screenshot are in {OutDir}.");
+    }
+
+    public static string ReadText(AutomationElement edit)
+    {
+        if (edit.Patterns.Value.IsSupported)
+            return edit.Patterns.Value.Pattern.Value.ValueOrDefault ?? "";
+        if (edit.Patterns.Text.IsSupported)
+            return edit.Patterns.Text.Pattern.DocumentRange.GetText(-1).TrimEnd('\r', '\n');
+        return edit.Name ?? "";
+    }
+
+    /// <summary>
+    /// Replaces the text of an input box. Windows Installer takes the new value into its property when the box changes; a Tab
+    /// afterwards also moves the focus away, which covers controls that only commit on leaving.
+    /// </summary>
+    public void SetText(AutomationElement edit, string text)
+    {
+        output.WriteLine($"set text '{text}'");
+        if (edit.Patterns.Value.IsSupported)
+        {
+            edit.Patterns.Value.Pattern.SetValue(text);
+        }
+        else
+        {
+            edit.Focus();
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+            if (text.Length == 0)
+                Keyboard.Type(VirtualKeyShort.DELETE);
+            else
+                Keyboard.Type(text);
+        }
+
+        edit.Focus();
+        Keyboard.Type(VirtualKeyShort.TAB);
     }
 
     /// <summary>Waits for msiexec to end and returns its exit code.</summary>
@@ -283,6 +379,20 @@ public sealed class SetupSession : IDisposable
         while (DateTime.UtcNow < deadline);
 
         return null;
+    }
+
+    static IEnumerable<AutomationElement> EditsOf(AutomationElement window)
+    {
+        try
+        {
+            return window.FindAllDescendants()
+                .Where(e => SafeControlType(e) == ControlType.Edit && Safe(() => e.ClassName) == "RichEdit20W")
+                .ToList();
+        }
+        catch (Exception)
+        {
+            return Array.Empty<AutomationElement>();
+        }
     }
 
     static string SafeName(AutomationElement element) => Safe(() => element.Name);
