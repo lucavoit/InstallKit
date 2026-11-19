@@ -22,7 +22,7 @@ namespace InstallKit.WixSharp
     /// </summary>
     internal static class ModernDialogs
     {
-        public static void Apply(Project project, MsiDefinition msi, string? pageBackground = null)
+        public static void Apply(Project project, MsiDefinition msi, string? pageBackground = null, string? cancelBackground = null)
         {
             var options = new ModernDialogOptions
             {
@@ -31,6 +31,7 @@ namespace InstallKit.WixSharp
                 HasFeatures = msi.Features.Count > 0,
                 Palette = Palette.Create(msi.Branding?.Theme == InstallerTheme.Light, msi.Branding?.AccentColor, msi.Branding?.BackgroundColor, msi.Branding?.TextColor),
                 PageBackground = pageBackground,
+                CancelBackground = cancelBackground,
                 Prompts = msi.PromptedProperties.Select(p => new ModernPrompt(p.Name, p.Label, p.Required)).ToList(),
             };
 

@@ -283,4 +283,85 @@ public class ModernDialogTests
         Assert.Equal(ModernDialogXml.PageBitmapId, (string)background.Attribute("Text")!);
         Assert.DoesNotContain(welcome.Elements(Ns + "Control"), c => (string)c.Attribute("Id")! == "BottomLine");
     }
+
+    static XElement BuildSkinned(bool features, bool chooseDir, bool prompts, bool cancel = true) =>
+        ModernDialogXml.BuildFragment(Ns, new ModernDialogOptions
+        {
+            HasFeatures = features,
+            ChooseInstallDir = chooseDir,
+            Prompts = prompts ? TwoPrompts : new ModernPrompt[0],
+            PageBackground = @"C:\obj\app.page.bmp",
+            CancelBackground = cancel ? @"C:\obj\app.cancel.bmp" : null,
+        });
+
+    public static IEnumerable<object[]> SkinnedVariants() =>
+        from features in new[] { false, true }
+        from chooseDir in new[] { false, true }
+        from prompts in new[] { false, true }
+        select new object[] { features, chooseDir, prompts };
+
+    [Theory]
+    [MemberData(nameof(SkinnedVariants))]
+    public void Restyled_stock_dialogs_replace_WiXs_and_every_target_still_exists(bool features, bool chooseDir, bool prompts)
+    {
+        var fragment = BuildSkinned(features, chooseDir, prompts);
+        var ids = Dialogs(fragment).Select(d => (string)d.Attribute("Id")!).ToList();
+        var refs = DialogRefs(fragment).ToList();
+
+        // Ours replace WiX's: a dialog both defined here and referenced from the extension would be defined twice.
+        Assert.Empty(ids.Intersect(refs));
+        Assert.Equal(ids.Count, ids.Distinct().Count());
+        Assert.Contains("CancelDlg", ids);
+        Assert.Contains("VerifyReadyDlg", ids);
+
+        var known = new HashSet<string>(refs.Concat(ids));
+        var targets = Publishes(fragment).Where(p => p.Event is "NewDialog" or "SpawnDialog").Select(p => p.Value)
+            .Concat(Ui(fragment).Elements(Ns + "InstallUISequence").Elements().Select(e => (string)e.Attribute("Dialog")!)).Distinct();
+        Assert.All(targets, target => Assert.Contains(target, known));
+
+        foreach (var dialog in Dialogs(fragment))
+        {
+            var controls = dialog.Elements(Ns + "Control").Select(c => (string)c.Attribute("Id")!).ToList();
+            Assert.True(controls.Count == controls.Distinct().Count(), $"{(string)dialog.Attribute("Id")!} has duplicate control ids");
+        }
+
+        var keys = Publishes(fragment).Select(p => (p.Dialog, p.Control, p.Event, p.Value, p.Condition)).ToList();
+        Assert.Equal(keys.Count, keys.Distinct().Count());
+    }
+
+    [Fact]
+    public void Restyled_stock_dialogs_are_scheduled_by_us_not_by_the_extension()
+    {
+        var fragment = BuildSkinned(features: false, chooseDir: false, prompts: false);
+        var install = Ui(fragment).Single(e => e.Name == Ns + "InstallUISequence").Elements(Ns + "Show").ToList();
+        var admin = Ui(fragment).Single(e => e.Name == Ns + "AdminUISequence").Elements(Ns + "Show").Select(e => (string)e.Attribute("Dialog")!).ToList();
+
+        Assert.Equal("ExecuteAction", (string)install.Single(e => (string)e.Attribute("Dialog")! == "ProgressDlg").Attribute("Before")!);
+        Assert.Equal("ProgressDlg", (string)install.Single(e => (string)e.Attribute("Dialog")! == "MaintenanceWelcomeDlg").Attribute("Before")!);
+        Assert.Equal("cancel", (string)install.Single(e => (string)e.Attribute("Dialog")! == "UserExit").Attribute("OnExit")!);
+        Assert.Contains("FatalError", admin);
+
+        var dialogs = install.Select(e => (string)e.Attribute("Dialog")!).ToList();
+        Assert.Equal(dialogs.Count, dialogs.Distinct().Count());
+    }
+
+    [Fact]
+    public void Without_a_cancel_background_the_cancel_prompt_stays_WiXs()
+    {
+        var fragment = BuildSkinned(features: false, chooseDir: false, prompts: false, cancel: false);
+
+        Assert.Contains("CancelDlg", DialogRefs(fragment));
+        Assert.DoesNotContain(Dialogs(fragment), d => (string)d.Attribute("Id")! == "CancelDlg");
+    }
+
+    [Fact]
+    public void The_error_popup_and_the_folder_and_feature_pages_keep_WiXs_look()
+    {
+        var refs = DialogRefs(BuildSkinned(features: true, chooseDir: true, prompts: false)).ToList();
+
+        // Windows Installer replaces the error text (and so drops our text style), so that popup cannot be dark.
+        Assert.Contains("ErrorDlg", refs);
+        Assert.Contains("BrowseDlg", refs);
+        Assert.Contains("CustomizeDlg", refs);
+    }
 }

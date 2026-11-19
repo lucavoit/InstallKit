@@ -106,10 +106,10 @@ namespace InstallKit.WixSharp
             if (!string.IsNullOrWhiteSpace(msi.LicenseFile))
                 project.LicenceFile = Path.GetFullPath(msi.LicenseFile);
 
-            var hero = ApplyBranding(project, msi, context, isModern || isWpf);
+            var images = ApplyBranding(project, msi, context, isModern || isWpf);
 
             if (isModern)
-                ModernDialogs.Apply(project, msi, hero);
+                ModernDialogs.Apply(project, msi, images.Page, images.Cancel);
 
 #if !INSTALLKIT_CORE
             if (project is ManagedProject managed)
@@ -302,19 +302,19 @@ namespace InstallKit.WixSharp
                 throw new InvalidOperationException($"'wix {arguments}' failed with exit code {process.ExitCode}.");
         }
 
-        /// <summary>Sets the dialog images; returns the full-page background of the modern pages, or <c>null</c>.</summary>
-        static string? ApplyBranding(Project project, MsiDefinition msi, InstallerContext context, bool isModern)
+        /// <summary>Sets the dialog images; returns the page and cancel prompt backgrounds of the modern pages, or <c>null</c>s.</summary>
+        static (string? Page, string? Cancel) ApplyBranding(Project project, MsiDefinition msi, InstallerContext context, bool isModern)
         {
             var branding = msi.Branding ?? new Branding();
 
             // Classic dialogs keep WiX's stock images unless branding is set; the modern UI is always branded.
             if (branding.IsEmpty && !isModern)
-                return null;
+                return (null, null);
 
             var generated = BrandingImages.Generate(msi.Name, branding, context.IntermediateDirectory, msi.ResolvedOutputFileName);
             project.BannerImage = string.IsNullOrWhiteSpace(branding.BannerImage) ? generated.Banner : Path.GetFullPath(branding.BannerImage);
             project.BackgroundImage = string.IsNullOrWhiteSpace(branding.BackgroundImage) ? generated.Background : Path.GetFullPath(branding.BackgroundImage);
-            return string.IsNullOrWhiteSpace(branding.BackgroundImage) ? generated.Page : null;
+            return (generated.Page, generated.Cancel);
         }
 
 #if !INSTALLKIT_CORE

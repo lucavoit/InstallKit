@@ -21,7 +21,7 @@ namespace InstallKit.WixSharp
         const int PageHeight = 360;      // the 370x270 dialog units of a modern page, buttons included
         const int SidePanelWidth = 164; // the WixUI welcome text starts right of this
 
-        public static (string Banner, string Background, string Page) Generate(string productName, Branding branding, string outputDirectory, string fileStem)
+        public static (string Banner, string Background, string Page, string Cancel) Generate(string productName, Branding branding, string outputDirectory, string fileStem)
         {
             Directory.CreateDirectory(outputDirectory);
             var palette = Palette.Create(branding.Theme == InstallerTheme.Light, branding.AccentColor, branding.BackgroundColor, branding.TextColor);
@@ -107,7 +107,18 @@ namespace InstallKit.WixSharp
                 bitmap.Save(page, ImageFormat.Bmp);
             }
 
-            return (banner, background, page);
+            // The small cancel prompt (260x85 dialog units): flat surface with a thin accent line on top.
+            var cancel = Path.Combine(outputDirectory, fileStem + ".cancel.bmp");
+            using (var bitmap = new Bitmap(347, 113))
+            using (var g = Prepare(bitmap))
+            {
+                g.Clear(dark ? Mix(background0, text0, 0.06) : background0);
+                using var line = new SolidBrush(accent);
+                g.FillRectangle(line, 0, 0, bitmap.Width, 3);
+                bitmap.Save(cancel, ImageFormat.Bmp);
+            }
+
+            return (banner, background, page, cancel);
         }
 
         /// <summary>Near-black surface with a soft glow of the accent in the top left corner and a faint one at the bottom.</summary>
