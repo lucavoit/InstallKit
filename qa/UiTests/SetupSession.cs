@@ -31,16 +31,46 @@ public sealed class SetupSession : IDisposable
     readonly ITestOutputHelper output;
     readonly UIA3Automation automation = new UIA3Automation();
     readonly Process process;
+    readonly string[] processNames;
+    string? logFile;
     int dumps;
 
-    SetupSession(Process process, string outDir, ITestOutputHelper output)
+    SetupSession(Process process, string outDir, ITestOutputHelper output, params string[] processNames)
     {
         this.process = process;
+        this.processNames = processNames;
         OutDir = outDir;
         this.output = output;
     }
 
+    public const string BundleVariable = "INSTALLKIT_UI_BUNDLE";
+    public const string FlatVariable = "INSTALLKIT_UI_FLAT";
+
+    /// <summary>The MSI has the flat WPF dialogs instead of the native ones (set by CI for that variant).</summary>
+    public static bool IsFlat => Environment.GetEnvironmentVariable(FlatVariable) == "1";
+
     public static string? MsiPath => Environment.GetEnvironmentVariable(MsiVariable);
+
+    public static string? BundlePath => Environment.GetEnvironmentVariable(BundleVariable);
+
+    /// <summary>
+    /// Starts the setup .exe of a bundle with its window. Burn runs the window from a copy of itself in a temporary
+    /// folder and waits for it, so the windows are found by the name of the program, not by the process we started.
+    /// </summary>
+    public static SetupSession StartBundle(ITestOutputHelper output, string name)
+    {
+        var exe = Path.GetFullPath(BundlePath ?? throw new InvalidOperationException($"{BundleVariable} is not set."));
+        var outDir = Environment.GetEnvironmentVariable(OutVariable);
+        outDir = Path.GetFullPath(string.IsNullOrWhiteSpace(outDir) ? Path.Combine(Path.GetTempPath(), "installkit-ui") : outDir);
+        Directory.CreateDirectory(outDir);
+
+        var log = Path.Combine(outDir, name + ".bundle.log");
+        var info = new ProcessStartInfo(exe, $"/log \"{log}\"") { UseShellExecute = false };
+        var process = Process.Start(info) ?? throw new InvalidOperationException("The bundle did not start.");
+        output.WriteLine($"started {exe} ({process.Id})");
+        // Burn shows the window from its standard bootstrapper application host, a process named wixstdba.
+        return new SetupSession(process, outDir, output, Path.GetFileNameWithoutExtension(exe), "wixstdba") { logFile = log };
+    }
 
     public string OutDir { get; }
 
@@ -58,7 +88,8 @@ public sealed class SetupSession : IDisposable
         var info = new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\" {arguments} /l*v \"{log}\"") { UseShellExecute = false };
         var process = Process.Start(info) ?? throw new InvalidOperationException("msiexec did not start.");
         output.WriteLine($"started msiexec {process.Id}: {info.Arguments}");
-        return new SetupSession(process, outDir, output);
+        // The managed (WPF) UI of an MSI runs in a second msiexec process, so windows are found by the name of the program too.
+        return new SetupSession(process, outDir, output, "msiexec") { logFile = log };
     }
 
     /// <summary>The names of every element on every window of the setup: texts, buttons, tree items.</summary>
@@ -89,6 +120,7 @@ public sealed class SetupSession : IDisposable
         }
 
         Dump($"missing-{what}");
+        output.WriteLine(Diagnostics());
         throw new Xunit.Sdk.XunitException(
             $"The page '{what}' did not show up within {(timeout ?? DefaultTimeout).TotalSeconds:0} seconds" +
             (process.HasExited ? $" (msiexec exited with {process.ExitCode})" : "") +
@@ -222,6 +254,106 @@ public sealed class SetupSession : IDisposable
         return process.ExitCode;
     }
 
+    /// <summary>
+    /// Takes the screenshot of a page that is meant to be looked at, once a page that satisfies <paramref name="isTheRightPage"/> is
+    /// on screen: the screen, and a picture of each window of the setup on its own. Never fails the test, because it is
+    /// for people (the pages that flash by, such as progress, may be gone before they are caught).
+    /// </summary>
+    public bool TryShow(string name, Func<Page, bool> isTheRightPage, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
+        while (DateTime.UtcNow < deadline && !process.HasExited)
+        {
+            var page = Snapshot();
+            if (page != null && isTheRightPage(page))
+            {
+                Show(name);
+                return true;
+            }
+
+            Thread.Sleep(100);
+        }
+
+        output.WriteLine($"page '{name}' was not on screen to photograph");
+        return false;
+    }
+
+    /// <summary>A screenshot of the screen and of each setup window, named like the pages of a tour: <c>03-welcome.png</c>.</summary>
+    public void Show(string name)
+    {
+        // A page has just appeared: let it finish drawing (and the flat UI style its window) before taking the picture.
+        Thread.Sleep(600);
+        var stem = Path.Combine(OutDir, $"{++dumps:00}-{name}");
+        try
+        {
+            Capture.Screen().ToFile(stem + ".png");
+            var index = 0;
+            foreach (var window in Windows())
+            {
+                if (window.BoundingRectangle.IsEmpty)
+                    continue;
+                Capture.Element(window).ToFile($"{stem}.window{++index}.png");
+            }
+
+            output.WriteLine($"screenshot '{name}'");
+        }
+        catch (Exception e)
+        {
+            output.WriteLine($"could not take a screenshot of '{name}': {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// What a person debugging a missing window would want: every top-level window on the desktop with its process, whether the
+    /// started process is still running, and the end of the log the setup wrote.
+    /// </summary>
+    public string Diagnostics(string? logName = null)
+    {
+        var text = new StringBuilder();
+        text.AppendLine($"started process {process.Id} exited={process.HasExited}" + (process.HasExited ? $" code={process.ExitCode}" : ""));
+        try
+        {
+            foreach (var window in automation.GetDesktop().FindAllChildren())
+            {
+                var pid = window.Properties.ProcessId.ValueOrDefault;
+                string name;
+                try
+                {
+                    using var p = Process.GetProcessById(pid);
+                    name = p.ProcessName;
+                }
+                catch (Exception)
+                {
+                    name = "?";
+                }
+
+                text.AppendLine($"window '{SafeName(window)}' class='{Safe(() => window.ClassName)}' process={pid} ({name})");
+            }
+        }
+        catch (Exception e)
+        {
+            text.AppendLine($"could not list the windows: {e.Message}");
+        }
+
+        try
+        {
+            foreach (var log in logFile != null ? new[] { logFile } : Directory.GetFiles(OutDir, (logName ?? "*") + "*.log"))
+            {
+                text.AppendLine($"--- {Path.GetFileName(log)} (last lines)");
+                using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream);
+                foreach (var line in reader.ReadToEnd().Split('\n').TakeLast(60))
+                    text.AppendLine(line.TrimEnd('\r'));
+            }
+        }
+        catch (Exception e)
+        {
+            text.AppendLine($"could not read the log: {e.Message}");
+        }
+
+        return text.ToString();
+    }
+
     /// <summary>Writes the UI Automation tree of every window of the setup and a screenshot.</summary>
     public void Dump(string name)
     {
@@ -272,12 +404,30 @@ public sealed class SetupSession : IDisposable
         try
         {
             return automation.GetDesktop().FindAllChildren()
-                .Where(w => w.Properties.ProcessId.ValueOrDefault == process.Id)
+                .Where(w => BelongsToSetup(w.Properties.ProcessId.ValueOrDefault))
                 .ToList();
         }
         catch (Exception)
         {
             return Array.Empty<AutomationElement>();
+        }
+    }
+
+    bool BelongsToSetup(int processId)
+    {
+        if (processId == process.Id)
+            return true;
+        if (processNames.Length == 0)
+            return false;
+
+        try
+        {
+            using var other = Process.GetProcessById(processId);
+            return processNames.Any(n => string.Equals(other.ProcessName, n, StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 

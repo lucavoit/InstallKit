@@ -47,7 +47,8 @@ namespace InstallKit
         // Set when the side-by-side naming was applied; a field so the generated builder does not expose it.
         internal string? AppliedSideBySideLine;
 
-        public InstallerUi Ui { get; set; } = InstallerUi.Minimal;
+        /// <summary>The dialog set. Defaults to <see cref="InstallerUi.Default"/>: the best UI the engine offers (the flat dialogs with WixSharp).</summary>
+        public InstallerUi Ui { get; set; } = InstallerUi.Default;
 
         /// <summary>Optional RTF license shown by the UI.</summary>
         public string? LicenseFile { get; set; }

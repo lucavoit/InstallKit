@@ -223,9 +223,30 @@ namespace InstallKit
         /// <summary>Uses the WPF dialogs, for custom XAML dialogs (see <see cref="InstallerUi.ModernWpf"/>).</summary>
         internal MsiBuilder UseWpfUi() => WithUi(InstallerUi.ModernWpf);
 
+        /// <summary>Uses the flat WPF dialogs (see <see cref="InstallerUi.ModernFlat"/>).</summary>
+        internal MsiBuilder UseFlatUi() => WithUi(InstallerUi.ModernFlat);
+
         internal MsiBuilder SetAccentColor(string hexColor)
         {
             BrandingOf().AccentColor = hexColor;
+            return this;
+        }
+
+        internal MsiBuilder SetTheme(InstallerTheme theme)
+        {
+            BrandingOf().Theme = theme;
+            return this;
+        }
+
+        internal MsiBuilder SetBackgroundColor(string hexColor)
+        {
+            BrandingOf().BackgroundColor = hexColor;
+            return this;
+        }
+
+        internal MsiBuilder SetTextColor(string hexColor)
+        {
+            BrandingOf().TextColor = hexColor;
             return this;
         }
 
@@ -347,6 +368,18 @@ namespace InstallKit
 
         internal BundleBuilder SetLogo(string logoFile)
         {
+            BrandingOf().LogoFile = logoFile;
+            return this;
+        }
+
+        internal BundleBuilder Brand(Action<InstallKit.Branding> change)
+        {
+            change(BrandingOf());
+            return this;
+        }
+
+        InstallKit.Branding BrandingOf()
+        {
             var branding = Branding.Value;
             if (branding == null)
             {
@@ -354,8 +387,7 @@ namespace InstallKit
                 WithBranding(branding);
             }
 
-            branding.LogoFile = logoFile;
-            return this;
+            return branding;
         }
 
         BundleChain ChainOf()

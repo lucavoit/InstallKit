@@ -24,7 +24,7 @@ namespace InstallKit
         /// <summary>Progress bar only.</summary>
         ProgressOnly,
 
-        /// <summary>Welcome / license / progress. Default.</summary>
+        /// <summary>Classic WiX: welcome / license / progress.</summary>
         Minimal,
 
         /// <summary>Adds a page to choose the install folder.</summary>
@@ -47,6 +47,21 @@ namespace InstallKit
         /// an engine with <see cref="InstallerCapabilities.WpfUi"/>; others fall back to <see cref="Modern"/>.
         /// </summary>
         ModernWpf,
+
+        /// <summary>
+        /// A flat, borderless-looking dark UI drawn with WPF: one page per step with big titles, flat accent buttons and a
+        /// custom checkbox and path box, in your theme and colours. Shows the license, install folder, prompted values and
+        /// optional features, and repair/remove. Needs .NET Framework 4.8 on the target machine and an engine with
+        /// <see cref="InstallerCapabilities.WpfUi"/>; others fall back to <see cref="ModernInstallDir"/>.
+        /// </summary>
+        ModernFlat,
+
+        /// <summary>
+        /// What nothing was chosen for, and the default of every MSI: the best UI the engine offers. The WixSharp engine shows the
+        /// flat WPF dialogs (<see cref="ModernFlat"/>), the WixSharp.Core engine the native modern dialogs with the install folder
+        /// (<see cref="ModernInstallDir"/>), which need nothing on the target machine. Choose a UI yourself to pin it.
+        /// </summary>
+        Default,
     }
 
     /// <summary>How a Windows service is started.</summary>

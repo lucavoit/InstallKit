@@ -460,6 +460,12 @@ namespace InstallKit
             if (!string.IsNullOrWhiteSpace(branding.AccentColor) && !IsHexColor(branding.AccentColor!))
                 errors.Add(new ValidationError("IK152", $"{label}: accent colour '{branding.AccentColor}' must look like #0067C0."));
 
+            if (!string.IsNullOrWhiteSpace(branding.BackgroundColor) && !IsHexColor(branding.BackgroundColor!))
+                errors.Add(new ValidationError("IK153", $"{label}: background colour '{branding.BackgroundColor}' must look like #0F1115."));
+
+            if (!string.IsNullOrWhiteSpace(branding.TextColor) && !IsHexColor(branding.TextColor!))
+                errors.Add(new ValidationError("IK154", $"{label}: text colour '{branding.TextColor}' must look like #F3F4F6."));
+
             if (!string.IsNullOrWhiteSpace(branding.LogoFile))
             {
                 if (!File.Exists(branding.LogoFile))

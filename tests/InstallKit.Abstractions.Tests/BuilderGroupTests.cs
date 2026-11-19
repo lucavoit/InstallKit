@@ -63,6 +63,20 @@ public class BuilderGroupTests
     }
 
     [Fact]
+    public void The_theme_defaults_to_dark_and_can_follow_the_windows_setting()
+    {
+        Assert.Equal(InstallerTheme.Dark, MsiBuilder.Create("App").Build().Branding.Theme);
+        Assert.Equal(InstallerTheme.Light, MsiBuilder.Create("App").Appearance(a => a.Flat().Theme(InstallerTheme.Light)).Build().Branding.Theme);
+        Assert.Equal(InstallerUi.ModernFlat, MsiBuilder.Create("App").Appearance(a => a.Flat()).Build().Ui);
+
+        var auto = MsiBuilder.Create("App").Appearance(a => a.Flat().Theme(InstallerTheme.Auto)).Build();
+        Assert.Equal(InstallerTheme.Auto, auto.Branding.Theme);
+
+        var bundle = BundleBuilder.Create("Setup").Appearance(a => a.Theme(InstallerTheme.Auto)).Build();
+        Assert.Equal(InstallerTheme.Auto, bundle.Branding.Theme);
+    }
+
+    [Fact]
     public void A_bundle_chains_items_in_the_order_the_groups_are_called()
     {
         var app = new MsiDefinition("App");

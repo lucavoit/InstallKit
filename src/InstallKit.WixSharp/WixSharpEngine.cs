@@ -57,7 +57,7 @@ namespace InstallKit.WixSharp
             installContents.AddRange(msi.FirewallRules.Select(ToFirewallException));
 
             var installDir = BuildFolder(msi.ResolvedInstallDirectory, installContents.ToArray(), PermissionsFor(msi, null), new Id(InstallDirId));
-            if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir)
+            if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir && msi.Ui != InstallerUi.ModernFlat)
                 Console.WriteLine($"InstallKit : warning IK246: MSI '{msi.Name}' has optional features, which users can only choose in the FeatureTree and Modern UIs or with ADDLOCAL and REMOVE on the command line. Set Ui = InstallerUi.Modern or InstallerUi.FeatureTree to show them.");
             var entities = new List<WixEntity> { installDir };
             entities.AddRange(msi.ResolvedRegistryEntries.Select(ToRegValue));
@@ -70,12 +70,13 @@ namespace InstallKit.WixSharp
 
             var isModern = msi.Ui == InstallerUi.Modern || msi.Ui == InstallerUi.ModernInstallDir;
             var isWpf = msi.Ui == InstallerUi.ModernWpf;
+            var isFlat = msi.Ui == InstallerUi.ModernFlat;
 
 #if INSTALLKIT_CORE
             var project = new Project(msi.Name, entities.ToArray());
 #else
             // ManagedProject (with its embedded UI host) only for the WPF dialogs.
-            var project = isWpf
+            var project = isWpf || isFlat
                 ? new ManagedProject(msi.Name, entities.ToArray())
                 : new Project(msi.Name, entities.ToArray());
 #endif
@@ -93,7 +94,7 @@ namespace InstallKit.WixSharp
             // A property that the user can set in a dialog has to be secure, or the elevated install would ignore the value.
             project.Properties = msi.Properties.Select(p => new Property(p.Key, p.Value))
                 .Concat(msi.PromptedProperties.Select(ToPromptedProperty)).ToArray();
-            if (msi.PromptedProperties.Count > 0 && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir)
+            if (msi.PromptedProperties.Count > 0 && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir && msi.Ui != InstallerUi.ModernFlat)
                 Console.WriteLine($"InstallKit : warning IK285: MSI '{msi.Name}' has prompted properties, which only the modern UIs ask for. With {msi.Ui} they keep their defaults unless given on the command line.");
 
             // WixSharp needs a ProductId per build; a random one is right for major upgrades.
@@ -106,14 +107,22 @@ namespace InstallKit.WixSharp
             if (!string.IsNullOrWhiteSpace(msi.LicenseFile))
                 project.LicenceFile = Path.GetFullPath(msi.LicenseFile);
 
-            ApplyBranding(project, msi, context, isModern || isWpf);
+            if (msi.Branding?.Theme == InstallerTheme.Auto && !isFlat && (isModern || isWpf))
+                Console.WriteLine($"InstallKit : warning IK204: MSI '{msi.Name}': Theme Auto follows the Windows setting only in the flat UI (Appearance.Flat). The native dialogs draw their colours when they are built, so they use Dark.");
+
+            var images = ApplyBranding(project, msi, context, isModern || isWpf || isFlat);
 
             if (isModern)
-                ModernDialogs.Apply(project, msi);
+                ModernDialogs.Apply(project, msi, images.Page, images.Cancel);
 
 #if !INSTALLKIT_CORE
             if (project is ManagedProject managed)
-                managed.ManagedUI = BuildWpfUi(msi);
+            {
+                if (isFlat)
+                    Flat.FlatUi.Apply(managed, msi, context);
+                else
+                    managed.ManagedUI = BuildWpfUi(msi);
+            }
             else if (msi.EngineCustomizations.OfType<WpfDialogInsertion>().Any())
                 Console.WriteLine($"InstallKit : warning IK202: MSI '{msi.Name}' adds WPF dialogs, which only show with Ui = ModernWpf.");
 #endif
@@ -192,12 +201,47 @@ namespace InstallKit.WixSharp
             if (bundleLogo != null)
                 wixBundle.Application.LogoFile = bundleLogo;
 
+            ApplyBundleTheme(wixBundle, bundle, context);
+
             KeepSource(wixBundle, bundle.ResolvedOutputFileName, context);
 
             foreach (var customize in bundle.EngineCustomizations.OfType<Action<Bundle>>())
                 customize(wixBundle);
 
             return wixBundle;
+        }
+
+        /// <summary>
+        /// Gives the setup window the chosen theme and colours: writes a theme file and points the standard bootstrapper
+        /// application at it once WixSharp has generated its element.
+        /// </summary>
+        static void ApplyBundleTheme(Bundle wixBundle, BundleDefinition bundle, InstallerContext context)
+        {
+            var branding = bundle.Branding ?? new Branding();
+            if (branding.Theme == InstallerTheme.Auto)
+                Console.WriteLine($"InstallKit : warning IK204: bundle '{bundle.Name}': Theme Auto cannot follow the Windows setting in a bundle window, which draws its colours when it is built. It uses Dark.");
+            var palette = Palette.Create(branding.Theme == InstallerTheme.Light, branding.AccentColor, branding.BackgroundColor, branding.TextColor);
+
+            wixBundle.WixSourceGenerated += document =>
+            {
+                var application = document.Descendants().FirstOrDefault(e => e.Name.LocalName == "WixStandardBootstrapperApplication");
+                if (application == null)
+                    return;
+
+                // Same choice the application makes from its Theme attribute (or, without one, from what the license is).
+                var themeName = (string)application.Attribute("Theme") ?? string.Empty;
+                var license = themeName.StartsWith("rtf", StringComparison.OrdinalIgnoreCase) ? BundleTheme.LicenseStyle.Rtf
+                    : themeName.StartsWith("hyperlink", StringComparison.OrdinalIgnoreCase) ? BundleTheme.LicenseStyle.Link
+                    : themeName.Length > 0 ? BundleTheme.LicenseStyle.None
+                    : application.Attribute("LicenseFile") != null ? BundleTheme.LicenseStyle.Rtf
+                    : application.Attribute("LicenseUrl") != null ? BundleTheme.LicenseStyle.Link
+                    : BundleTheme.LicenseStyle.None;
+
+                Directory.CreateDirectory(context.IntermediateDirectory);
+                var themeFile = Path.Combine(context.IntermediateDirectory, bundle.ResolvedOutputFileName + ".theme.xml");
+                BundleTheme.Build(palette, license).Save(themeFile);
+                application.SetAttributeValue("ThemeFile", themeFile);
+            };
         }
 
         /// <summary>Adds the lookups that prerequisite helpers need: registry values and installed .NET runtimes.</summary>
@@ -269,17 +313,19 @@ namespace InstallKit.WixSharp
                 throw new InvalidOperationException($"'wix {arguments}' failed with exit code {process.ExitCode}.");
         }
 
-        static void ApplyBranding(Project project, MsiDefinition msi, InstallerContext context, bool isModern)
+        /// <summary>Sets the dialog images; returns the page and cancel prompt backgrounds of the modern pages, or <c>null</c>s.</summary>
+        static (string? Page, string? Cancel) ApplyBranding(Project project, MsiDefinition msi, InstallerContext context, bool isModern)
         {
             var branding = msi.Branding ?? new Branding();
 
             // Classic dialogs keep WiX's stock images unless branding is set; the modern UI is always branded.
             if (branding.IsEmpty && !isModern)
-                return;
+                return (null, null);
 
             var generated = BrandingImages.Generate(msi.Name, branding, context.IntermediateDirectory, msi.ResolvedOutputFileName);
             project.BannerImage = string.IsNullOrWhiteSpace(branding.BannerImage) ? generated.Banner : Path.GetFullPath(branding.BannerImage);
             project.BackgroundImage = string.IsNullOrWhiteSpace(branding.BackgroundImage) ? generated.Background : Path.GetFullPath(branding.BackgroundImage);
+            return (generated.Page, generated.Cancel);
         }
 
 #if !INSTALLKIT_CORE

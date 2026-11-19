@@ -19,6 +19,20 @@ namespace InstallKit.WixSharp
         /// </summary>
         public bool HasFeatures { get; set; }
 
+        /// <summary>Colours of the pages. Defaults to the dark theme.</summary>
+        public Palette Palette { get; set; } = Palette.Create(light: false, accent: null, background: null, text: null);
+
+        /// <summary>
+        /// Full path of the full-page background (370x270 dialog units) the modern pages sit on, or <c>null</c> to use the
+        /// stock dialog bitmap. It also lets the footer with the buttons share the page's colour.
+        /// </summary>
+        public string? PageBackground { get; set; }
+
+        /// <summary>
+        /// Full path of the 260x85 dialog unit background of the cancel prompt, or <c>null</c> to leave that dialog stock.
+        /// </summary>
+        public string? CancelBackground { get; set; }
+
         /// <summary>Values to ask for on a page of their own after the welcome page (at most three fit).</summary>
         public IReadOnlyList<ModernPrompt> Prompts { get; set; } = new ModernPrompt[0];
     }
@@ -50,12 +64,14 @@ namespace InstallKit.WixSharp
         public const string WelcomeId = "InstallKit_WelcomeDlg";
         public const string FinishId = "InstallKit_FinishDlg";
         public const string OptionsId = "InstallKit_OptionsDlg";
+        public const string PageBitmapId = "IK_Bmp_Page";
+        public const string CancelBitmapId = "IK_Bmp_Cancel";
 
         // Dialog units. 370x270 is the standard WiX dialog size; the background bitmap covers 370x234.
-        const int Width = 370;
-        const int Height = 270;
-        const int ContentX = 135; // right of the 164 px accent panel in the generated background
-        const int ContentWidth = 220;
+        internal const int Width = 370;
+        internal const int Height = 270;
+        internal const int ContentX = 135; // right of the 164 px accent panel in the generated background
+        internal const int ContentWidth = 220;
 
         public static XElement BuildFragment(XNamespace ns, ModernDialogOptions options)
         {
@@ -64,14 +80,18 @@ namespace InstallKit.WixSharp
 
             var features = options.HasFeatures;
             var prompts = options.Prompts.Count > 0;
+            string D(string wixId) => StockDialogXml.Id(options, wixId);
             // The page before the feature page when installing: the settings page, or the welcome page.
             var beforeFeatures = prompts ? OptionsId : WelcomeId;
 
+            // With a page background the pages of the install and repair flows are our own (see StockDialogXml); the
+            // rest, popups and the folder and feature pages, stay WiX's.
+            var skin = StockDialogXml.Skins(options);
             var dialogRefs = new List<string>
             {
-                "ErrorDlg", "FatalError", "FilesInUse", "MsiRMFilesInUse", "PrepareDlg", "ProgressDlg", "ResumeDlg",
-                "UserExit", "CancelDlg", "OutOfDiskDlg", "MaintenanceWelcomeDlg", "MaintenanceTypeDlg", "VerifyReadyDlg",
-            };
+                "ErrorDlg", "FilesInUse", "MsiRMFilesInUse", "PrepareDlg", "OutOfDiskDlg", "OutOfRbDiskDlg", "WaitForCostingDlg",
+                "FatalError", "ProgressDlg", "ResumeDlg", "UserExit", "CancelDlg", "MaintenanceWelcomeDlg", "MaintenanceTypeDlg", "VerifyReadyDlg",
+            }.Where(id => !skin.Contains(id)).ToList();
             if (options.ChooseInstallDir || features)
                 dialogRefs.Add("BrowseDlg");
             if (features)
@@ -82,8 +102,14 @@ namespace InstallKit.WixSharp
                 E("TextStyle", A("Id", "WixUI_Font_Normal"), A("FaceName", "Segoe UI"), A("Size", 9)),
                 E("TextStyle", A("Id", "WixUI_Font_Bigger"), A("FaceName", "Segoe UI"), A("Size", 12)),
                 E("TextStyle", A("Id", "WixUI_Font_Title"), A("FaceName", "Segoe UI Semibold"), A("Size", 9)),
-                E("TextStyle", A("Id", "InstallKit_Font_Hero"), A("FaceName", "Segoe UI Light"), A("Size", 20)),
-                E("TextStyle", A("Id", "InstallKit_Font_Muted"), A("FaceName", "Segoe UI"), A("Size", 9), A("Red", 96), A("Green", 96), A("Blue", 96)),
+                // Our own pages sit on the generated page background; the reused dialogs keep the stock (light) body.
+                // The title colour is the text colour pulled slightly towards the background: Windows Installer drew a title in an
+                // almost white colour (243,244,246) black, while the same style with (216,217,219) was fine.
+                E("TextStyle", A("Id", "InstallKit_Font_Hero"), A("FaceName", "Segoe UI Semibold"), A("Size", 22), Colour(options.Palette.Text.Mix(options.Palette.Background, 0.08))),
+
+
+                E("TextStyle", A("Id", "InstallKit_Font_Body"), A("FaceName", "Segoe UI"), A("Size", 9), Colour(options.Palette.Text.Mix(options.Palette.Background, 0.12))),
+                E("TextStyle", A("Id", "InstallKit_Font_Muted"), A("FaceName", "Segoe UI"), A("Size", 9), Colour(options.Palette.Muted)),
                 E("Property", A("Id", "DefaultUIFont"), A("Value", "WixUI_Font_Normal")),
                 // The mode decides which buttons the repair dialog shows: Change is only there for the feature tree.
                 E("Property", A("Id", "WixUI_Mode"), A("Value", features ? "FeatureTree" : "Minimal")),
@@ -103,37 +129,47 @@ namespace InstallKit.WixSharp
                     : null,
 
                 // Repair / remove flow (as in WixUI_Minimal, and WixUI_FeatureTree for the feature page).
-                Publish(ns, "MaintenanceWelcomeDlg", "Next", "NewDialog", "MaintenanceTypeDlg"),
-                Publish(ns, "MaintenanceTypeDlg", "RepairButton", "NewDialog", "VerifyReadyDlg"),
-                Publish(ns, "MaintenanceTypeDlg", "RemoveButton", "NewDialog", "VerifyReadyDlg"),
-                Publish(ns, "MaintenanceTypeDlg", "Back", "NewDialog", "MaintenanceWelcomeDlg"),
+                Publish(ns, D("MaintenanceWelcomeDlg"), "Next", "NewDialog", D("MaintenanceTypeDlg")),
+                Publish(ns, D("MaintenanceTypeDlg"), "RepairButton", "NewDialog", D("VerifyReadyDlg")),
+                Publish(ns, D("MaintenanceTypeDlg"), "RemoveButton", "NewDialog", D("VerifyReadyDlg")),
+                Publish(ns, D("MaintenanceTypeDlg"), "Back", "NewDialog", D("MaintenanceWelcomeDlg")),
                 features
                     ? new[]
                     {
-                        Publish(ns, "MaintenanceTypeDlg", "ChangeButton", "NewDialog", "CustomizeDlg"),
-                        Publish(ns, "CustomizeDlg", "Back", "NewDialog", "MaintenanceTypeDlg", 1, "WixUI_InstallMode = \"Change\""),
+                        Publish(ns, D("MaintenanceTypeDlg"), "ChangeButton", "NewDialog", "CustomizeDlg"),
+                        Publish(ns, "CustomizeDlg", "Back", "NewDialog", D("MaintenanceTypeDlg"), 1, "WixUI_InstallMode = \"Change\""),
                         Publish(ns, "CustomizeDlg", "Back", "NewDialog", beforeFeatures, 2, "WixUI_InstallMode <> \"Change\""),
-                        Publish(ns, "CustomizeDlg", "Next", "NewDialog", "VerifyReadyDlg"),
-                        Publish(ns, "VerifyReadyDlg", "Back", "NewDialog", "CustomizeDlg", 1, "NOT Installed OR WixUI_InstallMode = \"Change\""),
-                        Publish(ns, "VerifyReadyDlg", "Back", "NewDialog", "MaintenanceTypeDlg", 2, "Installed AND WixUI_InstallMode <> \"Change\""),
+                        Publish(ns, "CustomizeDlg", "Next", "NewDialog", D("VerifyReadyDlg")),
+                        Publish(ns, D("VerifyReadyDlg"), "Back", "NewDialog", "CustomizeDlg", 1, "NOT Installed OR WixUI_InstallMode = \"Change\""),
+                        Publish(ns, D("VerifyReadyDlg"), "Back", "NewDialog", D("MaintenanceTypeDlg"), 2, "Installed AND WixUI_InstallMode <> \"Change\""),
                     }
-                    : new[] { Publish(ns, "VerifyReadyDlg", "Back", "NewDialog", "MaintenanceTypeDlg") },
+                    : new[] { Publish(ns, D("VerifyReadyDlg"), "Back", "NewDialog", D("MaintenanceTypeDlg")) },
 
+                skin.Count > 0 ? StockDialogXml.Dialogs(ns, options) : null,
                 Welcome(ns, options),
                 prompts ? Options(ns, options) : null,
-                Finish(ns),
+                Finish(ns, options),
 
                 E("InstallUISequence",
-                    E("Show", A("Dialog", WelcomeId), A("Before", "ProgressDlg"), A("Condition", "NOT Installed")),
+                    E("Show", A("Dialog", WelcomeId), A("Before", D("ProgressDlg")), A("Condition", "NOT Installed")),
+                    StockDialogXml.InstallShows(ns, options),
                     // Running the MSI again on an installed product offers repair, remove and (with features) change. The
                     // DialogRefs above bring ResumeDlg and MaintenanceWelcomeDlg with their own Show entries, which WiX
                     // defines as virtual: scheduling them here too is a conflict (WIX7009), so we leave them to the extension.
                     E("Show", A("Dialog", FinishId), A("OnExit", "success"))),
                 E("AdminUISequence",
-                    E("Show", A("Dialog", FinishId), A("OnExit", "success"))));
+                    E("Show", A("Dialog", FinishId), A("OnExit", "success")),
+                    StockDialogXml.AdminShows(ns, options)));
 
-            return E("Fragment", ui, E("UIRef", A("Id", "WixUI_Common")));
+            return E("Fragment",
+                options.PageBackground == null ? null : E("Binary", A("Id", PageBitmapId), A("SourceFile", options.PageBackground)),
+                options.CancelBackground == null ? null : E("Binary", A("Id", CancelBitmapId), A("SourceFile", options.CancelBackground)),
+                ui,
+                E("UIRef", A("Id", "WixUI_Common")));
         }
+
+        static XAttribute[] Colour(Rgb c) =>
+            new[] { new XAttribute("Red", c.R), new XAttribute("Green", c.G), new XAttribute("Blue", c.B) };
 
         static XElement Welcome(XNamespace ns, ModernDialogOptions options)
         {
@@ -147,7 +183,7 @@ namespace InstallKit.WixSharp
             var next = options.Prompts.Count > 0 ? OptionsId : features ? "CustomizeDlg" : null;
 
             var dialog = E("Dialog", A("Id", WelcomeId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
-                Bitmap(ns),
+                Bitmap(ns, options),
                 Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}[ProductName]"),
                 Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}Version [ProductVersion]  -  [Manufacturer]"));
 
@@ -163,7 +199,8 @@ namespace InstallKit.WixSharp
 
                 dialog.Add(
                     E("Control", A("Id", "Accept"), A("Type", "CheckBox"), A("X", ContentX), A("Y", y), A("Width", ContentWidth), A("Height", 14),
-                      A("Property", "InstallKitLicenseAccepted"), A("CheckBoxValue", "1"), A("Text", "I accept the license terms")));
+                      A("Property", "InstallKitLicenseAccepted"), A("CheckBoxValue", "1"), A("Transparent", "yes"),
+                      A("Text", "{\\InstallKit_Font_Body}I accept the license terms")));
                 y += 20;
             }
             else
@@ -205,11 +242,11 @@ namespace InstallKit.WixSharp
             }
 
             dialog.Add(
-                E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)),
+                options.PageBackground == null ? E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)) : null,
                 install,
                 E("Control", A("Id", "Cancel"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
                   A("Cancel", "yes"), A("Text", "Cancel"),
-                  E("Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+                  E("Publish", A("Event", "SpawnDialog"), A("Value", StockDialogXml.Id(options, "CancelDlg")))));
 
             return dialog;
         }
@@ -223,7 +260,7 @@ namespace InstallKit.WixSharp
             var features = options.HasFeatures;
 
             var dialog = E("Dialog", A("Id", OptionsId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
-                Bitmap(ns),
+                Bitmap(ns, options),
                 Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}Settings"),
                 Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}Tell setup a little about this installation."));
 
@@ -258,45 +295,50 @@ namespace InstallKit.WixSharp
             }
 
             dialog.Add(
-                E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)),
+                options.PageBackground == null ? E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)) : null,
                 E("Control", A("Id", "Back"), A("Type", "PushButton"), A("X", 180), A("Y", 243), A("Width", 56), A("Height", 17), A("Text", "Back"),
                   E("Publish", A("Event", "NewDialog"), A("Value", WelcomeId))),
                 forward,
                 E("Control", A("Id", "Cancel"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
                   A("Cancel", "yes"), A("Text", "Cancel"),
-                  E("Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+                  E("Publish", A("Event", "SpawnDialog"), A("Value", StockDialogXml.Id(options, "CancelDlg")))));
 
             return dialog;
         }
 
-        static XElement Finish(XNamespace ns)
+        static XElement Finish(XNamespace ns, ModernDialogOptions options)
         {
-            XElement E(string name, params object[] content) => new XElement(ns + name, content);
+            XElement E(string name, params object?[] content) => new XElement(ns + name, content);
             XAttribute A(string name, object value) => new XAttribute(name, value);
 
             return E("Dialog", A("Id", FinishId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
-                Bitmap(ns),
+                Bitmap(ns, options),
                 Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}All set"),
                 Text(ns, "Description", 62, 40, "Setup finished. Click Finish to close this window."),
-                E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)),
+                options.PageBackground == null ? E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)) : null,
                 E("Control", A("Id", "Finish"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
                   A("Default", "yes"), A("Cancel", "yes"), A("Text", "Finish"),
                   E("Publish", A("Event", "EndDialog"), A("Value", "Return"))));
         }
 
-        static XElement Bitmap(XNamespace ns) =>
+        internal static XElement Bitmap(XNamespace ns, ModernDialogOptions options) =>
             new XElement(ns + "Control",
                 new XAttribute("Id", "Background"), new XAttribute("Type", "Bitmap"),
-                new XAttribute("X", 0), new XAttribute("Y", 0), new XAttribute("Width", Width), new XAttribute("Height", 234),
-                new XAttribute("TabSkip", "no"), new XAttribute("Text", "WixUI_Bmp_Dialog"));
+                new XAttribute("X", 0), new XAttribute("Y", 0), new XAttribute("Width", Width),
+                // The page background reaches under the buttons; the stock bitmap stops above them.
+                new XAttribute("Height", options.PageBackground == null ? 234 : Height),
+                new XAttribute("TabSkip", "no"), new XAttribute("Text", options.PageBackground == null ? "WixUI_Bmp_Dialog" : PageBitmapId));
 
-        static XElement Text(XNamespace ns, string id, int y, int height, string text) =>
+        internal static XElement Text(XNamespace ns, string id, int y, int height, string text, string? showCondition = null) =>
             new XElement(ns + "Control",
                 new XAttribute("Id", id), new XAttribute("Type", "Text"),
                 new XAttribute("X", ContentX), new XAttribute("Y", y), new XAttribute("Width", ContentWidth), new XAttribute("Height", height),
-                new XAttribute("Transparent", "yes"), new XAttribute("NoPrefix", "yes"), new XAttribute("Text", text));
+                new XAttribute("Transparent", "yes"), new XAttribute("NoPrefix", "yes"),
+                showCondition == null ? null : new XAttribute("Hidden", "yes"),
+                showCondition == null ? null : new XAttribute("ShowCondition", showCondition),
+                new XAttribute("Text", text.StartsWith("{\\") ? text : "{\\InstallKit_Font_Body}" + text));
 
-        static XElement Publish(XNamespace ns, string dialog, string control, string @event, string value, int? order = null, string? condition = null) =>
+        internal static XElement Publish(XNamespace ns, string dialog, string control, string @event, string value, int? order = null, string? condition = null) =>
             new XElement(ns + "Publish",
                 new XAttribute("Dialog", dialog), new XAttribute("Control", control),
                 new XAttribute("Event", @event), new XAttribute("Value", value),

@@ -136,11 +136,44 @@ namespace InstallKit
         public bool CheckExitCode { get; set; } = true;
     }
 
+    /// <summary>Colour scheme of the modern dialogs (<see cref="InstallerUi.Modern"/>, <see cref="InstallerUi.ModernFlat"/>) and the bundle window.</summary>
+    public enum InstallerTheme
+    {
+        /// <summary>Dark pages with a soft accent glow. The default.</summary>
+        Dark = 0,
+
+        /// <summary>White pages with an accent side panel.</summary>
+        Light = 1,
+
+        /// <summary>
+        /// Follows the Windows setting of the person running the installer (Settings, Personalization, Colors, "Choose your
+        /// default app mode"): light or dark, decided when the setup starts. Only the flat WPF UI
+        /// (<see cref="InstallerUi.ModernFlat"/>) can do that: the native dialogs and the bundle window draw their colours when
+        /// they are built, so they use <see cref="Dark"/> and the build prints warning IK204.
+        /// </summary>
+        Auto = 2,
+    }
+
     /// <summary>Look of the installer UI. Applies to classic and modern dialogs and the bundle.</summary>
     public sealed class Branding
     {
-        /// <summary>Accent colour as <c>#RRGGBB</c>. Defaults to a neutral blue.</summary>
+        /// <summary>Colour scheme of the modern dialogs. Defaults to <see cref="InstallerTheme.Dark"/>.</summary>
+        public InstallerTheme Theme { get; set; }
+
+        /// <summary>Accent colour as <c>#RRGGBB</c>: side panel glow, banner line, headings of the bundle. Defaults to a neutral blue.</summary>
         public string? AccentColor { get; set; }
+
+        /// <summary>
+        /// Page background as <c>#RRGGBB</c>. Defaults to near-black for <see cref="InstallerTheme.Dark"/> and white for
+        /// <see cref="InstallerTheme.Light"/>. Applies to the modern dialogs and the bundle window.
+        /// </summary>
+        public string? BackgroundColor { get; set; }
+
+        /// <summary>
+        /// Text colour as <c>#RRGGBB</c>. Defaults to match the theme. Secondary text is derived from it and the
+        /// background. Applies to the modern dialogs and the bundle window.
+        /// </summary>
+        public string? TextColor { get; set; }
 
         /// <summary>Logo (.png recommended; .ico, .bmp and .jpg also work). Shown in dialogs and the bundle.</summary>
         public string? LogoFile { get; set; }
