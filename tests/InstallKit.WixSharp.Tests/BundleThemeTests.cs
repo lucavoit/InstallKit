@@ -20,7 +20,7 @@ public class BundleThemeTests
     {
         var fonts = Build().Elements(Ns + "Font").ToList();
 
-        Assert.All(fonts.Take(4), f => Assert.Equal("0F1115", (string)f.Attribute("Background")!));
+        Assert.All(fonts.Take(4), f => Assert.Equal("0F1116", (string)f.Attribute("Background")!));
         Assert.Equal("F3F4F6", (string)fonts[0].Attribute("Foreground")!);
     }
 

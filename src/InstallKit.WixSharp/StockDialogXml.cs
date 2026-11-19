@@ -36,6 +36,12 @@ namespace InstallKit.WixSharp
             return ids;
         }
 
+        /// <summary>
+        /// The id our version of a WiX dialog goes by. It must differ from WiX's: a reference to a dialog pulls in every
+        /// definition of that id, so reusing it fails the build with duplicate dialogs and controls (WIX0091).
+        /// </summary>
+        public static string Id(ModernDialogOptions options, string wixId) => Skins(options).Contains(wixId) ? "InstallKit_" + wixId : wixId;
+
         public static IEnumerable<XElement> Dialogs(XNamespace ns, ModernDialogOptions options)
         {
             var skin = Skins(options);
@@ -47,8 +53,8 @@ namespace InstallKit.WixSharp
                 all.AddRange(new[]
                 {
                     Progress(ns, options), MaintenanceWelcome(ns, options), MaintenanceType(ns, options), VerifyReady(ns, options),
-                    Resume(ns, options), Exit(ns, options, "UserExit", "Setup interrupted", "!(loc.UserExitDescription1) !(loc.UserExitDescription2)"),
-                    Exit(ns, options, "FatalError", "Setup failed", "!(loc.FatalErrorDescription1) !(loc.FatalErrorDescription2)"),
+                    Resume(ns, options), Exit(ns, options, Id(options, "UserExit"), "Setup interrupted", "!(loc.UserExitDescription1) !(loc.UserExitDescription2)"),
+                    Exit(ns, options, Id(options, "FatalError"), "Setup failed", "!(loc.FatalErrorDescription1) !(loc.FatalErrorDescription2)"),
                 });
             }
 
@@ -59,25 +65,26 @@ namespace InstallKit.WixSharp
         }
 
         /// <summary>The Show entries of the install UI sequence that WiX's dialogs would have brought.</summary>
-        public static IEnumerable<XElement> InstallShows(XNamespace ns, ISet<string> skin)
+        public static IEnumerable<XElement> InstallShows(XNamespace ns, ModernDialogOptions options)
         {
-            if (!skin.Contains("ProgressDlg"))
+            if (!Skins(options).Contains("ProgressDlg"))
                 yield break;
 
-            yield return Show(ns, "ProgressDlg", "Before", "ExecuteAction");
-            yield return Show(ns, "MaintenanceWelcomeDlg", "Before", "ProgressDlg", "Installed AND NOT RESUME AND NOT Preselected AND NOT PATCH");
-            yield return Show(ns, "ResumeDlg", "Before", "ProgressDlg", "Installed AND (RESUME OR Preselected)");
-            yield return Show(ns, "UserExit", "OnExit", "cancel");
-            yield return Show(ns, "FatalError", "OnExit", "error");
+            var progress = Id(options, "ProgressDlg");
+            yield return Show(ns, progress, "Before", "ExecuteAction");
+            yield return Show(ns, Id(options, "MaintenanceWelcomeDlg"), "Before", progress, "Installed AND NOT RESUME AND NOT Preselected AND NOT PATCH");
+            yield return Show(ns, Id(options, "ResumeDlg"), "Before", progress, "Installed AND (RESUME OR Preselected)");
+            yield return Show(ns, Id(options, "UserExit"), "OnExit", "cancel");
+            yield return Show(ns, Id(options, "FatalError"), "OnExit", "error");
         }
 
-        public static IEnumerable<XElement> AdminShows(XNamespace ns, ISet<string> skin)
+        public static IEnumerable<XElement> AdminShows(XNamespace ns, ModernDialogOptions options)
         {
-            if (!skin.Contains("ProgressDlg"))
+            if (!Skins(options).Contains("ProgressDlg"))
                 yield break;
 
-            yield return Show(ns, "UserExit", "OnExit", "cancel");
-            yield return Show(ns, "FatalError", "OnExit", "error");
+            yield return Show(ns, Id(options, "UserExit"), "OnExit", "cancel");
+            yield return Show(ns, Id(options, "FatalError"), "OnExit", "error");
         }
 
         static XElement Show(XNamespace ns, string dialog, string placement, string anchor, string? condition = null) =>
@@ -114,7 +121,7 @@ namespace InstallKit.WixSharp
                 ("Updating", "WixUI_InstallMode = \"Update\"", "!(loc.ProgressDlgTextUpdating)"),
             };
 
-            var dialog = E(ns, "Dialog", A("Id", "ProgressDlg"), A("Width", ModernDialogXml.Width), A("Height", ModernDialogXml.Height),
+            var dialog = E(ns, "Dialog", A("Id", Id(options, "ProgressDlg")), A("Width", ModernDialogXml.Width), A("Height", ModernDialogXml.Height),
                 A("Title", "[ProductName] Setup"), A("Modeless", "yes"),
                 ModernDialogXml.Bitmap(ns, options));
 
@@ -133,12 +140,12 @@ namespace InstallKit.WixSharp
                 Back(ns, 180),
                 Button(ns, "Next", 236, 56, "!(loc.WixUINext)", disabled: true),
                 Button(ns, "Cancel", 304, 56, "!(loc.WixUICancel)", isDefault: true, isCancel: true,
-                    content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+                    content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", Id(options, "CancelDlg")))));
             return dialog;
         }
 
         static XElement MaintenanceWelcome(XNamespace ns, ModernDialogOptions options) =>
-            E(ns, "Dialog", A("Id", "MaintenanceWelcomeDlg"), A("Width", ModernDialogXml.Width), A("Height", ModernDialogXml.Height), A("Title", "[ProductName] Setup"),
+            E(ns, "Dialog", A("Id", Id(options, "MaintenanceWelcomeDlg")), A("Width", ModernDialogXml.Width), A("Height", ModernDialogXml.Height), A("Title", "[ProductName] Setup"),
                 ModernDialogXml.Bitmap(ns, options),
                 ModernDialogXml.Text(ns, "Title", 20, 36, Hero + "[ProductName]"),
                 ModernDialogXml.Text(ns, "Subtitle", 58, 14, Muted + "Version [ProductVersion]  -  [Manufacturer]"),
@@ -146,11 +153,11 @@ namespace InstallKit.WixSharp
                 Back(ns),
                 Button(ns, "Next", 236, 56, "!(loc.WixUINext)", isDefault: true,
                     content: E(ns, "Publish", A("Event", "SpawnWaitDialog"), A("Value", "WaitForCostingDlg"), A("Condition", "!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1"))),
-                Button(ns, "Cancel", 304, 56, "!(loc.WixUICancel)", isCancel: true, content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+                Button(ns, "Cancel", 304, 56, "!(loc.WixUICancel)", isCancel: true, content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", Id(options, "CancelDlg")))));
 
         static XElement MaintenanceType(XNamespace ns, ModernDialogOptions options)
         {
-            var dialog = Page(ns, options, "MaintenanceTypeDlg", "Maintenance");
+            var dialog = Page(ns, options, Id(options, "MaintenanceTypeDlg"), "Maintenance");
 
             void AddAction(string key, string button, string textKey, int y, string disabledWhen, string defaultAttr)
             {
@@ -170,7 +177,7 @@ namespace InstallKit.WixSharp
             dialog.Add(
                 Back(ns, disabled: false),
                 Button(ns, "Next", 236, 56, "!(loc.WixUINext)", disabled: true),
-                Button(ns, "Cancel", 304, 56, "!(loc.WixUICancel)", isCancel: true, content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+                Button(ns, "Cancel", 304, 56, "!(loc.WixUICancel)", isCancel: true, content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", Id(options, "CancelDlg")))));
             return dialog;
         }
 
@@ -213,7 +220,7 @@ namespace InstallKit.WixSharp
                 ("UpdateNoShield", false, "VerifyReadyDlgUpdate", "WixUI_InstallMode = \"Update\" AND NOT ALLUSERS", "WixUI_InstallMode = \"Update\"", false, new[] { End() }),
             };
 
-            var dialog = E(ns, "Dialog", A("Id", "VerifyReadyDlg"), A("Width", ModernDialogXml.Width), A("Height", ModernDialogXml.Height),
+            var dialog = E(ns, "Dialog", A("Id", Id(options, "VerifyReadyDlg")), A("Width", ModernDialogXml.Width), A("Height", ModernDialogXml.Height),
                 A("Title", "[ProductName] Setup"), A("TrackDiskSpace", "yes"), ModernDialogXml.Bitmap(ns, options));
 
             foreach (var action in actions)
@@ -249,13 +256,13 @@ namespace InstallKit.WixSharp
             back.Add(A("DefaultCondition", "WixUI_InstallMode = \"Remove\""));
             dialog.Add(
                 back,
-                Button(ns, "Cancel", 304, 56, "!(loc.WixUICancel)", isCancel: true, content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+                Button(ns, "Cancel", 304, 56, "!(loc.WixUICancel)", isCancel: true, content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", Id(options, "CancelDlg")))));
             return dialog;
         }
 
         static XElement Resume(XNamespace ns, ModernDialogOptions options)
         {
-            var dialog = Page(ns, options, "ResumeDlg", "Resume setup",
+            var dialog = Page(ns, options, Id(options, "ResumeDlg"), "Resume setup",
                 ModernDialogXml.Text(ns, "Description", 66, 60, "!(loc.ResumeDlgDescription)"),
                 Back(ns, 156));
 
@@ -274,7 +281,7 @@ namespace InstallKit.WixSharp
                     }));
             }
 
-            dialog.Add(Button(ns, "Cancel", 304, 56, "!(loc.WixUICancel)", isCancel: true, content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+            dialog.Add(Button(ns, "Cancel", 304, 56, "!(loc.WixUICancel)", isCancel: true, content: E(ns, "Publish", A("Event", "SpawnDialog"), A("Value", Id(options, "CancelDlg")))));
             return dialog;
         }
 
@@ -289,7 +296,7 @@ namespace InstallKit.WixSharp
 
         /// <summary>The cancel prompt: a small dialog on its own background, with the question and Yes / No.</summary>
         static XElement Cancel(XNamespace ns, ModernDialogOptions options) =>
-            E(ns, "Dialog", A("Id", "CancelDlg"), A("Width", 260), A("Height", 85), A("Title", "[ProductName] Setup"),
+            E(ns, "Dialog", A("Id", Id(options, "CancelDlg")), A("Width", 260), A("Height", 85), A("Title", "[ProductName] Setup"),
                 E(ns, "Control", A("Id", "Background"), A("Type", "Bitmap"), A("X", 0), A("Y", 0), A("Width", 260), A("Height", 85),
                   A("TabSkip", "no"), A("Text", ModernDialogXml.CancelBitmapId)),
                 E(ns, "Control", A("Id", "Icon"), A("Type", "Icon"), A("X", 15), A("Y", 15), A("Width", 24), A("Height", 24),

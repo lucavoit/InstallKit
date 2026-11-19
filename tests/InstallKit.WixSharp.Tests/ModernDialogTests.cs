@@ -209,7 +209,7 @@ public class ModernDialogTests
         var options = Dialogs(fragment).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.OptionsId);
         var edits = options.Elements(Ns + "Control").Where(c => (string)c.Attribute("Type")! == "Edit").ToList();
         Assert.Equal(new[] { "SERVER", "PORT" }, edits.Select(c => (string)c.Attribute("Property")!));
-        Assert.Contains("Server address", options.Elements(Ns + "Control").Select(c => (string?)c.Attribute("Text")));
+        Assert.Contains("{\\InstallKit_Font_Body}Server address", options.Elements(Ns + "Control").Select(c => (string?)c.Attribute("Text")));
 
         var publishes = Publishes(fragment).ToList();
         Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.WelcomeId && p.Control == "Install" && p.Event == "NewDialog" && p.Value == ModernDialogXml.OptionsId);
@@ -311,8 +311,8 @@ public class ModernDialogTests
         // Ours replace WiX's: a dialog both defined here and referenced from the extension would be defined twice.
         Assert.Empty(ids.Intersect(refs));
         Assert.Equal(ids.Count, ids.Distinct().Count());
-        Assert.Contains("CancelDlg", ids);
-        Assert.Contains("VerifyReadyDlg", ids);
+        Assert.Contains("InstallKit_CancelDlg", ids);
+        Assert.Contains("InstallKit_VerifyReadyDlg", ids);
 
         var known = new HashSet<string>(refs.Concat(ids));
         var targets = Publishes(fragment).Where(p => p.Event is "NewDialog" or "SpawnDialog").Select(p => p.Value)
@@ -336,10 +336,10 @@ public class ModernDialogTests
         var install = Ui(fragment).Single(e => e.Name == Ns + "InstallUISequence").Elements(Ns + "Show").ToList();
         var admin = Ui(fragment).Single(e => e.Name == Ns + "AdminUISequence").Elements(Ns + "Show").Select(e => (string)e.Attribute("Dialog")!).ToList();
 
-        Assert.Equal("ExecuteAction", (string)install.Single(e => (string)e.Attribute("Dialog")! == "ProgressDlg").Attribute("Before")!);
-        Assert.Equal("ProgressDlg", (string)install.Single(e => (string)e.Attribute("Dialog")! == "MaintenanceWelcomeDlg").Attribute("Before")!);
-        Assert.Equal("cancel", (string)install.Single(e => (string)e.Attribute("Dialog")! == "UserExit").Attribute("OnExit")!);
-        Assert.Contains("FatalError", admin);
+        Assert.Equal("ExecuteAction", (string)install.Single(e => (string)e.Attribute("Dialog")! == "InstallKit_ProgressDlg").Attribute("Before")!);
+        Assert.Equal("InstallKit_ProgressDlg", (string)install.Single(e => (string)e.Attribute("Dialog")! == "InstallKit_MaintenanceWelcomeDlg").Attribute("Before")!);
+        Assert.Equal("cancel", (string)install.Single(e => (string)e.Attribute("Dialog")! == "InstallKit_UserExit").Attribute("OnExit")!);
+        Assert.Contains("InstallKit_FatalError", admin);
 
         var dialogs = install.Select(e => (string)e.Attribute("Dialog")!).ToList();
         Assert.Equal(dialogs.Count, dialogs.Distinct().Count());
@@ -351,7 +351,7 @@ public class ModernDialogTests
         var fragment = BuildSkinned(features: false, chooseDir: false, prompts: false, cancel: false);
 
         Assert.Contains("CancelDlg", DialogRefs(fragment));
-        Assert.DoesNotContain(Dialogs(fragment), d => (string)d.Attribute("Id")! == "CancelDlg");
+        Assert.DoesNotContain(Dialogs(fragment), d => (string)d.Attribute("Id")! == "InstallKit_CancelDlg");
     }
 
     [Fact]

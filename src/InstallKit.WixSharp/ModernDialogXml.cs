@@ -80,6 +80,7 @@ namespace InstallKit.WixSharp
 
             var features = options.HasFeatures;
             var prompts = options.Prompts.Count > 0;
+            string D(string wixId) => StockDialogXml.Id(options, wixId);
             // The page before the feature page when installing: the settings page, or the welcome page.
             var beforeFeatures = prompts ? OptionsId : WelcomeId;
 
@@ -124,21 +125,21 @@ namespace InstallKit.WixSharp
                     : null,
 
                 // Repair / remove flow (as in WixUI_Minimal, and WixUI_FeatureTree for the feature page).
-                Publish(ns, "MaintenanceWelcomeDlg", "Next", "NewDialog", "MaintenanceTypeDlg"),
-                Publish(ns, "MaintenanceTypeDlg", "RepairButton", "NewDialog", "VerifyReadyDlg"),
-                Publish(ns, "MaintenanceTypeDlg", "RemoveButton", "NewDialog", "VerifyReadyDlg"),
-                Publish(ns, "MaintenanceTypeDlg", "Back", "NewDialog", "MaintenanceWelcomeDlg"),
+                Publish(ns, D("MaintenanceWelcomeDlg"), "Next", "NewDialog", D("MaintenanceTypeDlg")),
+                Publish(ns, D("MaintenanceTypeDlg"), "RepairButton", "NewDialog", D("VerifyReadyDlg")),
+                Publish(ns, D("MaintenanceTypeDlg"), "RemoveButton", "NewDialog", D("VerifyReadyDlg")),
+                Publish(ns, D("MaintenanceTypeDlg"), "Back", "NewDialog", D("MaintenanceWelcomeDlg")),
                 features
                     ? new[]
                     {
-                        Publish(ns, "MaintenanceTypeDlg", "ChangeButton", "NewDialog", "CustomizeDlg"),
-                        Publish(ns, "CustomizeDlg", "Back", "NewDialog", "MaintenanceTypeDlg", 1, "WixUI_InstallMode = \"Change\""),
+                        Publish(ns, D("MaintenanceTypeDlg"), "ChangeButton", "NewDialog", "CustomizeDlg"),
+                        Publish(ns, "CustomizeDlg", "Back", "NewDialog", D("MaintenanceTypeDlg"), 1, "WixUI_InstallMode = \"Change\""),
                         Publish(ns, "CustomizeDlg", "Back", "NewDialog", beforeFeatures, 2, "WixUI_InstallMode <> \"Change\""),
-                        Publish(ns, "CustomizeDlg", "Next", "NewDialog", "VerifyReadyDlg"),
-                        Publish(ns, "VerifyReadyDlg", "Back", "NewDialog", "CustomizeDlg", 1, "NOT Installed OR WixUI_InstallMode = \"Change\""),
-                        Publish(ns, "VerifyReadyDlg", "Back", "NewDialog", "MaintenanceTypeDlg", 2, "Installed AND WixUI_InstallMode <> \"Change\""),
+                        Publish(ns, "CustomizeDlg", "Next", "NewDialog", D("VerifyReadyDlg")),
+                        Publish(ns, D("VerifyReadyDlg"), "Back", "NewDialog", "CustomizeDlg", 1, "NOT Installed OR WixUI_InstallMode = \"Change\""),
+                        Publish(ns, D("VerifyReadyDlg"), "Back", "NewDialog", D("MaintenanceTypeDlg"), 2, "Installed AND WixUI_InstallMode <> \"Change\""),
                     }
-                    : new[] { Publish(ns, "VerifyReadyDlg", "Back", "NewDialog", "MaintenanceTypeDlg") },
+                    : new[] { Publish(ns, D("VerifyReadyDlg"), "Back", "NewDialog", D("MaintenanceTypeDlg")) },
 
                 skin.Count > 0 ? StockDialogXml.Dialogs(ns, options) : null,
                 Welcome(ns, options),
@@ -146,15 +147,15 @@ namespace InstallKit.WixSharp
                 Finish(ns, options),
 
                 E("InstallUISequence",
-                    E("Show", A("Dialog", WelcomeId), A("Before", "ProgressDlg"), A("Condition", "NOT Installed")),
-                    StockDialogXml.InstallShows(ns, skin),
+                    E("Show", A("Dialog", WelcomeId), A("Before", D("ProgressDlg")), A("Condition", "NOT Installed")),
+                    StockDialogXml.InstallShows(ns, options),
                     // Running the MSI again on an installed product offers repair, remove and (with features) change. The
                     // DialogRefs above bring ResumeDlg and MaintenanceWelcomeDlg with their own Show entries, which WiX
                     // defines as virtual: scheduling them here too is a conflict (WIX7009), so we leave them to the extension.
                     E("Show", A("Dialog", FinishId), A("OnExit", "success"))),
                 E("AdminUISequence",
                     E("Show", A("Dialog", FinishId), A("OnExit", "success")),
-                    StockDialogXml.AdminShows(ns, skin)));
+                    StockDialogXml.AdminShows(ns, options)));
 
             return E("Fragment",
                 options.PageBackground == null ? null : E("Binary", A("Id", PageBitmapId), A("SourceFile", options.PageBackground)),
@@ -241,7 +242,7 @@ namespace InstallKit.WixSharp
                 install,
                 E("Control", A("Id", "Cancel"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
                   A("Cancel", "yes"), A("Text", "Cancel"),
-                  E("Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+                  E("Publish", A("Event", "SpawnDialog"), A("Value", StockDialogXml.Id(options, "CancelDlg")))));
 
             return dialog;
         }
@@ -296,7 +297,7 @@ namespace InstallKit.WixSharp
                 forward,
                 E("Control", A("Id", "Cancel"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
                   A("Cancel", "yes"), A("Text", "Cancel"),
-                  E("Publish", A("Event", "SpawnDialog"), A("Value", "CancelDlg"))));
+                  E("Publish", A("Event", "SpawnDialog"), A("Value", StockDialogXml.Id(options, "CancelDlg")))));
 
             return dialog;
         }
