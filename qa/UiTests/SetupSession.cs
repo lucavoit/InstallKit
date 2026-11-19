@@ -88,7 +88,8 @@ public sealed class SetupSession : IDisposable
         var info = new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\" {arguments} /l*v \"{log}\"") { UseShellExecute = false };
         var process = Process.Start(info) ?? throw new InvalidOperationException("msiexec did not start.");
         output.WriteLine($"started msiexec {process.Id}: {info.Arguments}");
-        return new SetupSession(process, outDir, output) { logFile = log };
+        // The managed (WPF) UI of an MSI runs in a second msiexec process, so windows are found by the name of the program too.
+        return new SetupSession(process, outDir, output, "msiexec") { logFile = log };
     }
 
     /// <summary>The names of every element on every window of the setup: texts, buttons, tree items.</summary>
