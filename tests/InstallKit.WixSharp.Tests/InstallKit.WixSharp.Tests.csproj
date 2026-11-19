@@ -17,6 +17,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\src\InstallKit.WixSharp\ModernDialogXml.cs" Link="ModernDialogXml.cs" />
+    <Compile Include="..\..\src\InstallKit.WixSharp\Palette.cs" Link="Palette.cs" />
+    <Compile Include="..\..\src\InstallKit.WixSharp\BundleTheme.cs" Link="BundleTheme.cs" />
     <Compile Include="..\..\src\InstallKit.WixSharp\IdentifierLimits.cs" Link="IdentifierLimits.cs" />
   </ItemGroup>
 </Project>

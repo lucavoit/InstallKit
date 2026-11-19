@@ -19,8 +19,8 @@ namespace InstallKit.WixSharp
         /// </summary>
         public bool HasFeatures { get; set; }
 
-        /// <summary>Dark theme: light text on the page background. Otherwise dark text.</summary>
-        public bool Dark { get; set; }
+        /// <summary>Colours of the pages. Defaults to the dark theme.</summary>
+        public Palette Palette { get; set; } = Palette.Create(light: false, accent: null, background: null, text: null);
 
         /// <summary>
         /// Full path of the full-page background (370x270 dialog units) the modern pages sit on, or <c>null</c> to use the
@@ -93,9 +93,9 @@ namespace InstallKit.WixSharp
                 E("TextStyle", A("Id", "WixUI_Font_Bigger"), A("FaceName", "Segoe UI"), A("Size", 12)),
                 E("TextStyle", A("Id", "WixUI_Font_Title"), A("FaceName", "Segoe UI Semibold"), A("Size", 9)),
                 // Our own pages sit on the generated page background; the reused dialogs keep the stock (light) body.
-                E("TextStyle", A("Id", "InstallKit_Font_Hero"), A("FaceName", "Segoe UI Semibold"), A("Size", 22), Rgb(options.Dark ? (243, 244, 246) : (24, 24, 27))),
-                E("TextStyle", A("Id", "InstallKit_Font_Body"), A("FaceName", "Segoe UI"), A("Size", 9), Rgb(options.Dark ? (209, 213, 219) : (39, 39, 42))),
-                E("TextStyle", A("Id", "InstallKit_Font_Muted"), A("FaceName", "Segoe UI"), A("Size", 9), Rgb(options.Dark ? (140, 148, 160) : (96, 96, 96))),
+                E("TextStyle", A("Id", "InstallKit_Font_Hero"), A("FaceName", "Segoe UI Semibold"), A("Size", 22), Colour(options.Palette.Text)),
+                E("TextStyle", A("Id", "InstallKit_Font_Body"), A("FaceName", "Segoe UI"), A("Size", 9), Colour(options.Palette.Text.Mix(options.Palette.Background, 0.12))),
+                E("TextStyle", A("Id", "InstallKit_Font_Muted"), A("FaceName", "Segoe UI"), A("Size", 9), Colour(options.Palette.Muted)),
                 E("Property", A("Id", "DefaultUIFont"), A("Value", "WixUI_Font_Normal")),
                 // The mode decides which buttons the repair dialog shows: Change is only there for the feature tree.
                 E("Property", A("Id", "WixUI_Mode"), A("Value", features ? "FeatureTree" : "Minimal")),
@@ -150,7 +150,7 @@ namespace InstallKit.WixSharp
                 E("UIRef", A("Id", "WixUI_Common")));
         }
 
-        static XAttribute[] Rgb((int R, int G, int B) c) =>
+        static XAttribute[] Colour(Rgb c) =>
             new[] { new XAttribute("Red", c.R), new XAttribute("Green", c.G), new XAttribute("Blue", c.B) };
 
         static XElement Welcome(XNamespace ns, ModernDialogOptions options)

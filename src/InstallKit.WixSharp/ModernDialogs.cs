@@ -29,7 +29,7 @@ namespace InstallKit.WixSharp
                 LicenseFile = string.IsNullOrWhiteSpace(msi.LicenseFile) ? null : Path.GetFullPath(msi.LicenseFile),
                 ChooseInstallDir = msi.Ui == InstallerUi.ModernInstallDir,
                 HasFeatures = msi.Features.Count > 0,
-                Dark = (msi.Branding?.Theme ?? InstallerTheme.Dark) == InstallerTheme.Dark,
+                Palette = Palette.Create(msi.Branding?.Theme == InstallerTheme.Light, msi.Branding?.AccentColor, msi.Branding?.BackgroundColor, msi.Branding?.TextColor),
                 PageBackground = pageBackground,
                 Prompts = msi.PromptedProperties.Select(p => new ModernPrompt(p.Name, p.Label, p.Required)).ToList(),
             };

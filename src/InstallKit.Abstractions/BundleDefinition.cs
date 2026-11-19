@@ -39,7 +39,7 @@ namespace InstallKit
 
         public string? IconFile { get; set; }
 
-        /// <summary>Logo shown by the bundle UI. Accent colours and dialog images do not apply to bundles.</summary>
+        /// <summary>Logo, theme and colours of the bundle window. The dialog images (banner, background) do not apply to bundles.</summary>
         public Branding Branding { get; set; } = new Branding();
 
         /// <summary>The packages installed, in order.</summary>

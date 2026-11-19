@@ -64,13 +64,13 @@ The fluent builders are the preferred way to describe installers, and every exam
   | --- | --- |
   | `Content(c => ...)` | `Payload`, `Directory`: files that are always installed |
   | `Feature(name, description, f => ...)` | an optional feature together with its files (`Payload`, `Directory`) |
-  | `Appearance(a => ...)` | `Modern`, `Wpf`, `Classic`, `Theme` (dark by default), `AccentColor`, `Logo` |
+  | `Appearance(a => ...)` | `Modern`, `Wpf`, `Classic`, `Theme` (dark by default), `AccentColor`, `BackgroundColor`, `TextColor`, `Logo` |
   | `Machine(m => ...)` | `Registry`, `EnvironmentVariable`, `PathEntry`, `FirewallRule`, `Service`, `FolderPermission`, `XmlValue` |
   | `Shell(s => ...)` | `FileAssociation`, `UrlProtocol`, `StartMenuShortcut`, `DesktopShortcut` |
   | `Lifecycle(l => ...)` | `CloseApplication`, `OnLoad`, `OnBeforeInstall`, `OnAfterInstall`, `RunAfterInstall`, `RunBeforeUninstall` |
   | `Settings(s => ...)` | `Property`, `Prompt` |
 
-  `BundleBuilder` has `Prerequisites(p => ...)` (`NetFramework`, `VcRedist`, `DotNetRuntime`, `WebView2`), `Packages(k => ...)` (`Msi`, `Exe`) and `Appearance(a => ...)` (`Logo`). A group can be used more than once, and items are chained in the order they are added.
+  `BundleBuilder` has `Prerequisites(p => ...)` (`NetFramework`, `VcRedist`, `DotNetRuntime`, `WebView2`), `Packages(k => ...)` (`Msi`, `Exe`) and `Appearance(a => ...)` (`Logo`, `Theme`, `AccentColor`, `BackgroundColor`, `TextColor`). A group can be used more than once, and items are chained in the order they are added.
 - **Start from `Create(...)`:** a bare `new MsiBuilder()` has no defaults and would reset them (for example `Ui` or the Start menu shortcut). `plan.Msi(...)` rejects a builder without a name.
 
 You can still set properties directly, with `plan.Msi("My App", msi => { msi.Manufacturer = "Contoso"; ... })`, for cases a builder method doesn't cover yet. Both produce the same `MsiDefinition`.
@@ -453,10 +453,14 @@ The modern UI shows a settings page after the welcome page with a labelled input
 MsiBuilder.Create("My App")
     .Appearance(a => a
         .Modern()                  // or Modern(chooseInstallDir: true), or Wpf()
+        .Theme(InstallerTheme.Dark) // the default; InstallerTheme.Light for white pages
         .AccentColor("#0067C0")
+        .BackgroundColor("#0F1115") // optional: overrides the theme's page colour
+        .TextColor("#F3F4F6")       // optional: overrides the theme's text colour
         .Logo("logo.png"));
 ```
 
+- **Colours:** the modern dialogs and the bundle window are dark by default. `Theme` picks dark or light, and `BackgroundColor`, `TextColor` and `AccentColor` (all `#RRGGBB`) override single colours; secondary text and input boxes are derived from them. Buttons, input frames and progress bars are drawn by Windows and keep the system look. The stock repair, error and progress dialogs keep a light body so their text stays readable.
 - **Branded images:** InstallKit generates the banner (493×58) and dialog (493×312) bitmaps in your accent colour with your logo, so even the classic dialogs look current. You can supply your own `.bmp` files through the `BannerImage` and `BackgroundImage` settings of `Branding`. Bundles use the logo too.
 - **Modern (native), with optional features:** the feature page is WiX's own feature tree dialog (with its Reset and Disk Usage buttons) in the classic banner style, between the branded welcome page and the "ready to install" page. Add or Remove Programs offers Change for such a product.
 - **Modern (native):** the dialogs are built from MSI's own dialog tables, in Segoe UI on the branded background. The target machine needs nothing extra, and it works the same on both engines. The progress, error and repair/remove pages reuse WiX's dialogs, which pick up the same fonts and banner. Its texts are English for now.
@@ -481,7 +485,7 @@ A bundle is a single setup `.exe` that installs its packages in chain order:
 ```csharp
 plan.Bundle(BundleBuilder.Create("My App")
     .WithUpgradeCode("5a2e7c41-9d83-4b6f-8e15-c3a09f4d2b77")
-    .Appearance(a => a.Logo("logo.png"))
+    .Appearance(a => a.Logo("logo.png"))   // also Theme, AccentColor, BackgroundColor, TextColor
     .Prerequisites(p => p.NetFramework(NetFrameworkVersion.NetFx48))
     .Packages(k => k
         .Exe(@"prereqs\vc_redist.x64.exe", e => e.DetectCondition = "VCRedistInstalled") // a Burn variable you set with a search

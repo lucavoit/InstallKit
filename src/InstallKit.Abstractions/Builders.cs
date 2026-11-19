@@ -235,6 +235,18 @@ namespace InstallKit
             return this;
         }
 
+        internal MsiBuilder SetBackgroundColor(string hexColor)
+        {
+            BrandingOf().BackgroundColor = hexColor;
+            return this;
+        }
+
+        internal MsiBuilder SetTextColor(string hexColor)
+        {
+            BrandingOf().TextColor = hexColor;
+            return this;
+        }
+
         internal MsiBuilder SetLogo(string logoFile)
         {
             BrandingOf().LogoFile = logoFile;
@@ -353,6 +365,18 @@ namespace InstallKit
 
         internal BundleBuilder SetLogo(string logoFile)
         {
+            BrandingOf().LogoFile = logoFile;
+            return this;
+        }
+
+        internal BundleBuilder Brand(Action<InstallKit.Branding> change)
+        {
+            change(BrandingOf());
+            return this;
+        }
+
+        InstallKit.Branding BrandingOf()
+        {
             var branding = Branding.Value;
             if (branding == null)
             {
@@ -360,8 +384,7 @@ namespace InstallKit
                 WithBranding(branding);
             }
 
-            branding.LogoFile = logoFile;
-            return this;
+            return branding;
         }
 
         BundleChain ChainOf()

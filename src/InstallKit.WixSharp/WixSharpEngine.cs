@@ -192,12 +192,45 @@ namespace InstallKit.WixSharp
             if (bundleLogo != null)
                 wixBundle.Application.LogoFile = bundleLogo;
 
+            ApplyBundleTheme(wixBundle, bundle, context);
+
             KeepSource(wixBundle, bundle.ResolvedOutputFileName, context);
 
             foreach (var customize in bundle.EngineCustomizations.OfType<Action<Bundle>>())
                 customize(wixBundle);
 
             return wixBundle;
+        }
+
+        /// <summary>
+        /// Gives the setup window the chosen theme and colours: writes a theme file and points the standard bootstrapper
+        /// application at it once WixSharp has generated its element.
+        /// </summary>
+        static void ApplyBundleTheme(Bundle wixBundle, BundleDefinition bundle, InstallerContext context)
+        {
+            var branding = bundle.Branding ?? new Branding();
+            var palette = Palette.Create(branding.Theme == InstallerTheme.Light, branding.AccentColor, branding.BackgroundColor, branding.TextColor);
+
+            wixBundle.WixSourceGenerated += document =>
+            {
+                var application = document.Descendants().FirstOrDefault(e => e.Name.LocalName == "WixStandardBootstrapperApplication");
+                if (application == null)
+                    return;
+
+                // Same choice the application makes from its Theme attribute (or, without one, from what the license is).
+                var themeName = (string)application.Attribute("Theme") ?? string.Empty;
+                var license = themeName.StartsWith("rtf", StringComparison.OrdinalIgnoreCase) ? BundleTheme.LicenseStyle.Rtf
+                    : themeName.StartsWith("hyperlink", StringComparison.OrdinalIgnoreCase) ? BundleTheme.LicenseStyle.Link
+                    : themeName.Length > 0 ? BundleTheme.LicenseStyle.None
+                    : application.Attribute("LicenseFile") != null ? BundleTheme.LicenseStyle.Rtf
+                    : application.Attribute("LicenseUrl") != null ? BundleTheme.LicenseStyle.Link
+                    : BundleTheme.LicenseStyle.None;
+
+                Directory.CreateDirectory(context.IntermediateDirectory);
+                var themeFile = Path.Combine(context.IntermediateDirectory, bundle.ResolvedOutputFileName + ".theme.xml");
+                BundleTheme.Build(palette, license).Save(themeFile);
+                application.SetAttributeValue("ThemeFile", themeFile);
+            };
         }
 
         /// <summary>Adds the lookups that prerequisite helpers need: registry values and installed .NET runtimes.</summary>

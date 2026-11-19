@@ -94,6 +94,20 @@ namespace InstallKit
             return this;
         }
 
+        /// <summary>The page background of the modern dialogs, as <c>#RRGGBB</c>. Defaults to the theme's.</summary>
+        public AppearanceBuilder BackgroundColor(string hexColor)
+        {
+            _msi.SetBackgroundColor(hexColor);
+            return this;
+        }
+
+        /// <summary>The text colour of the modern dialogs, as <c>#RRGGBB</c>. Defaults to the theme's.</summary>
+        public AppearanceBuilder TextColor(string hexColor)
+        {
+            _msi.SetTextColor(hexColor);
+            return this;
+        }
+
         /// <summary>The logo shown in the dialogs.</summary>
         public AppearanceBuilder Logo(string logoFile)
         {
@@ -372,6 +386,34 @@ namespace InstallKit
         public BundleAppearanceBuilder Logo(string logoFile)
         {
             _bundle.SetLogo(logoFile);
+            return this;
+        }
+
+        /// <summary>Dark (the default) or light setup window.</summary>
+        public BundleAppearanceBuilder Theme(InstallerTheme theme)
+        {
+            _bundle.Brand(b => b.Theme = theme);
+            return this;
+        }
+
+        /// <summary>The accent colour (window headings), as <c>#RRGGBB</c>.</summary>
+        public BundleAppearanceBuilder AccentColor(string hexColor)
+        {
+            _bundle.Brand(b => b.AccentColor = hexColor);
+            return this;
+        }
+
+        /// <summary>The window background, as <c>#RRGGBB</c>. Defaults to the theme's.</summary>
+        public BundleAppearanceBuilder BackgroundColor(string hexColor)
+        {
+            _bundle.Brand(b => b.BackgroundColor = hexColor);
+            return this;
+        }
+
+        /// <summary>The text colour, as <c>#RRGGBB</c>. Defaults to the theme's.</summary>
+        public BundleAppearanceBuilder TextColor(string hexColor)
+        {
+            _bundle.Brand(b => b.TextColor = hexColor);
             return this;
         }
     }

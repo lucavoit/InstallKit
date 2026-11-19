@@ -272,7 +272,7 @@ public class ModernDialogTests
     [Fact]
     public void Page_background_covers_the_whole_dialog_and_drops_the_footer_line()
     {
-        var fragment = ModernDialogXml.BuildFragment(Ns, new ModernDialogOptions { Dark = true, PageBackground = @"C:\obj\app.page.bmp" });
+        var fragment = ModernDialogXml.BuildFragment(Ns, new ModernDialogOptions { PageBackground = @"C:\obj\app.page.bmp" });
 
         var binary = fragment.Element(Ns + "Binary")!;
         Assert.Equal(ModernDialogXml.PageBitmapId, (string)binary.Attribute("Id")!);

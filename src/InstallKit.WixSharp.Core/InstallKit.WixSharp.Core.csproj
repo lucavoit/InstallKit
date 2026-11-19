@@ -28,6 +28,8 @@
     <Compile Include="..\InstallKit.WixSharp\WixSharpCustomizations.cs" Link="WixSharpCustomizations.cs" />
     <Compile Include="..\InstallKit.WixSharp\ModernDialogs.cs" Link="ModernDialogs.cs" />
     <Compile Include="..\InstallKit.WixSharp\ModernDialogXml.cs" Link="ModernDialogXml.cs" />
+    <Compile Include="..\InstallKit.WixSharp\Palette.cs" Link="Palette.cs" />
+    <Compile Include="..\InstallKit.WixSharp\BundleTheme.cs" Link="BundleTheme.cs" />
     <Compile Include="..\InstallKit.WixSharp\IdentifierLimits.cs" Link="IdentifierLimits.cs" />
   </ItemGroup>
 </Project>

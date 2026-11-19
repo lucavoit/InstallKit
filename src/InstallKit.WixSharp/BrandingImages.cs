@@ -24,9 +24,12 @@ namespace InstallKit.WixSharp
         public static (string Banner, string Background, string Page) Generate(string productName, Branding branding, string outputDirectory, string fileStem)
         {
             Directory.CreateDirectory(outputDirectory);
-            var accent = ColorTranslator.FromHtml(string.IsNullOrWhiteSpace(branding.AccentColor) ? Branding.DefaultAccentColor : branding.AccentColor!);
+            var palette = Palette.Create(branding.Theme == InstallerTheme.Light, branding.AccentColor, branding.BackgroundColor, branding.TextColor);
+            var accent = ToColor(palette.Accent);
+            var background0 = ToColor(palette.Background);
+            var text0 = ToColor(palette.Text);
             using var logo = LoadLogo(branding.LogoFile);
-            var dark = branding.Theme == InstallerTheme.Dark;
+            var dark = palette.IsDark;
 
             var banner = Path.Combine(outputDirectory, fileStem + ".banner.bmp");
             using (var bitmap = new Bitmap(Width, BannerHeight))
@@ -48,7 +51,7 @@ namespace InstallKit.WixSharp
             {
                 g.Clear(Color.White);
                 if (dark)
-                    PaintDark(g, accent, new Rectangle(0, 0, SidePanelWidth, DialogHeight));
+                    PaintDark(g, accent, background0, new Rectangle(0, 0, SidePanelWidth, DialogHeight));
                 else
                     using (var panel = new SolidBrush(accent))
                         g.FillRectangle(panel, 0, 0, SidePanelWidth, DialogHeight);
@@ -60,7 +63,7 @@ namespace InstallKit.WixSharp
                 else
                 {
                     using var font = new Font("Segoe UI Semibold", 13f, GraphicsUnit.Point);
-                    using var text = new SolidBrush(dark ? Color.FromArgb(243, 244, 246) : ReadableOn(accent));
+                    using var text = new SolidBrush(dark ? text0 : ReadableOn(accent));
                     g.DrawString(productName, font, text, new RectangleF(16, 40, SidePanelWidth - 32, 120));
                 }
 
@@ -74,17 +77,17 @@ namespace InstallKit.WixSharp
                 var all = new Rectangle(0, 0, Width, PageHeight);
                 if (dark)
                 {
-                    PaintDark(g, accent, all);
+                    PaintDark(g, accent, background0, all);
                     // A slightly lifted card on the left holds the logo; the right side stays calm for the text.
-                    using var card = new SolidBrush(Color.FromArgb(34, 255, 255, 255));
+                    using var card = new SolidBrush(Color.FromArgb(34, text0));
                     using var path = RoundedRectangle(new Rectangle(20, 24, SidePanelWidth - 40, PageHeight - 78), 14);
                     g.FillPath(card, path);
-                    using var edge = new Pen(Color.FromArgb(40, 255, 255, 255));
+                    using var edge = new Pen(Color.FromArgb(40, text0));
                     g.DrawPath(edge, path);
                 }
                 else
                 {
-                    g.Clear(Color.White);
+                    g.Clear(background0);
                     using var panel = new SolidBrush(accent);
                     g.FillRectangle(panel, 0, 0, SidePanelWidth, PageHeight);
                 }
@@ -97,7 +100,7 @@ namespace InstallKit.WixSharp
                 else
                 {
                     using var font = new Font("Segoe UI Semibold", 14f, GraphicsUnit.Point);
-                    using var text = new SolidBrush(dark ? Color.FromArgb(243, 244, 246) : ReadableOn(accent));
+                    using var text = new SolidBrush(dark ? text0 : ReadableOn(accent));
                     g.DrawString(productName, font, text, new RectangleF(32, 44, SidePanelWidth - 64, 160));
                 }
 
@@ -108,9 +111,8 @@ namespace InstallKit.WixSharp
         }
 
         /// <summary>Near-black surface with a soft glow of the accent in the top left corner and a faint one at the bottom.</summary>
-        static void PaintDark(Graphics g, Color accent, Rectangle area)
+        static void PaintDark(Graphics g, Color accent, Color baseColor, Rectangle area)
         {
-            var baseColor = Color.FromArgb(15, 17, 22);
             using (var fill = new LinearGradientBrush(area, Mix(baseColor, accent, 0.06), baseColor, LinearGradientMode.Vertical))
                 g.FillRectangle(fill, area);
 
@@ -133,6 +135,8 @@ namespace InstallKit.WixSharp
             };
             g.FillPath(brush, path);
         }
+
+        static Color ToColor(Rgb c) => Color.FromArgb(c.R, c.G, c.B);
 
         static Color Mix(Color a, Color b, double amount) => Color.FromArgb(
             (int)(a.R + (b.R - a.R) * amount), (int)(a.G + (b.G - a.G) * amount), (int)(a.B + (b.B - a.B) * amount));

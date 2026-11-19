@@ -152,8 +152,20 @@ namespace InstallKit
         /// <summary>Colour scheme of the modern dialogs. Defaults to <see cref="InstallerTheme.Dark"/>.</summary>
         public InstallerTheme Theme { get; set; }
 
-        /// <summary>Accent colour as <c>#RRGGBB</c>. Defaults to a neutral blue.</summary>
+        /// <summary>Accent colour as <c>#RRGGBB</c>: side panel glow, banner line, headings of the bundle. Defaults to a neutral blue.</summary>
         public string? AccentColor { get; set; }
+
+        /// <summary>
+        /// Page background as <c>#RRGGBB</c>. Defaults to near-black for <see cref="InstallerTheme.Dark"/> and white for
+        /// <see cref="InstallerTheme.Light"/>. Applies to the modern dialogs and the bundle window.
+        /// </summary>
+        public string? BackgroundColor { get; set; }
+
+        /// <summary>
+        /// Text colour as <c>#RRGGBB</c>. Defaults to match the theme. Secondary text is derived from it and the
+        /// background. Applies to the modern dialogs and the bundle window.
+        /// </summary>
+        public string? TextColor { get; set; }
 
         /// <summary>Logo (.png recommended; .ico, .bmp and .jpg also work). Shown in dialogs and the bundle.</summary>
         public string? LogoFile { get; set; }
