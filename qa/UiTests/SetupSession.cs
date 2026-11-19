@@ -32,6 +32,7 @@ public sealed class SetupSession : IDisposable
     readonly UIA3Automation automation = new UIA3Automation();
     readonly Process process;
     readonly string[] processNames;
+    string? logFile;
     int dumps;
 
     SetupSession(Process process, string outDir, ITestOutputHelper output, params string[] processNames)
@@ -68,7 +69,7 @@ public sealed class SetupSession : IDisposable
         var process = Process.Start(info) ?? throw new InvalidOperationException("The bundle did not start.");
         output.WriteLine($"started {exe} ({process.Id})");
         // Burn shows the window from its standard bootstrapper application host, a process named wixstdba.
-        return new SetupSession(process, outDir, output, Path.GetFileNameWithoutExtension(exe), "wixstdba");
+        return new SetupSession(process, outDir, output, Path.GetFileNameWithoutExtension(exe), "wixstdba") { logFile = log };
     }
 
     public string OutDir { get; }
@@ -87,7 +88,7 @@ public sealed class SetupSession : IDisposable
         var info = new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\" {arguments} /l*v \"{log}\"") { UseShellExecute = false };
         var process = Process.Start(info) ?? throw new InvalidOperationException("msiexec did not start.");
         output.WriteLine($"started msiexec {process.Id}: {info.Arguments}");
-        return new SetupSession(process, outDir, output);
+        return new SetupSession(process, outDir, output) { logFile = log };
     }
 
     /// <summary>The names of every element on every window of the setup: texts, buttons, tree items.</summary>
@@ -118,6 +119,7 @@ public sealed class SetupSession : IDisposable
         }
 
         Dump($"missing-{what}");
+        output.WriteLine(Diagnostics());
         throw new Xunit.Sdk.XunitException(
             $"The page '{what}' did not show up within {(timeout ?? DefaultTimeout).TotalSeconds:0} seconds" +
             (process.HasExited ? $" (msiexec exited with {process.ExitCode})" : "") +
@@ -332,7 +334,7 @@ public sealed class SetupSession : IDisposable
 
         try
         {
-            foreach (var log in Directory.GetFiles(OutDir, (logName ?? "*") + "*.log"))
+            foreach (var log in logFile != null ? new[] { logFile } : Directory.GetFiles(OutDir, (logName ?? "*") + "*.log"))
             {
                 text.AppendLine($"--- {Path.GetFileName(log)} (last lines)");
                 using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
