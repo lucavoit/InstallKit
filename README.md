@@ -448,6 +448,7 @@ The modern UI shows a settings page after the welcome page with a labelled input
 | `Modern` | Native, branded: one welcome page (license and accept box when set), progress, finish; repair/remove |
 | `ModernInstallDir` | `Modern` with the install folder and a Browse button on the welcome page |
 | `ModernWpf` | WPF dialogs, which allow custom XAML dialogs (`WixSharp` engine only) |
+| `ModernFlat` | Flat, dark WPF dialogs with custom-drawn buttons, check box and path box (`Appearance(a => a.Flat())`; `WixSharp` engine only) |
 
 ```csharp
 MsiBuilder.Create("My App")
@@ -464,6 +465,7 @@ MsiBuilder.Create("My App")
 - **Branded images:** InstallKit generates the banner (493×58) and dialog (493×312) bitmaps in your accent colour with your logo, so even the classic dialogs look current. You can supply your own `.bmp` files through the `BannerImage` and `BackgroundImage` settings of `Branding`. Bundles use the logo too.
 - **Modern (native), with optional features:** the feature page is WiX's own feature tree dialog (with its Reset and Disk Usage buttons) in the classic banner style, between the branded welcome page and the "ready to install" page. Add or Remove Programs offers Change for such a product.
 - **Modern (native):** the dialogs are built from MSI's own dialog tables, in Segoe UI on the branded background. The target machine needs nothing extra, and it works the same on both engines. The progress, error and repair/remove pages reuse WiX's dialogs, which pick up the same fonts and banner. Its texts are English for now.
+- **ModernFlat (`a.Flat()`):** the Advanced-Installer-like look. Every page is drawn by WPF in your theme and colours: a big title, flat accent buttons, a custom check box and path box, and a window caption that follows the page colour on Windows 10 and 11. It shows the license (when set), install folder, prompted values and optional features, progress, and repair/remove. It needs .NET Framework 4.8 on the target machine and adds about 1 MB to the MSI. The `WixSharpCore` engine shows the native `ModernInstallDir` dialogs instead (warning `IK200`). The window frame itself is still Windows' own, and the confirmation boxes WixSharp shows (such as cancelling during the install) are standard Windows message boxes.
 - **ModernWpf:** needs .NET Framework 4.8 on the target machine and adds about 1 MB to the MSI. The `WixSharpCore` engine falls back to `Modern` with warning `IK200`.
 - Silent installs (`/qn`) show no UI at all.
 
