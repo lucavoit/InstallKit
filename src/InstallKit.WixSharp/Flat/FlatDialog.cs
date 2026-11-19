@@ -74,7 +74,7 @@ namespace InstallKit.WixSharp.Flat
             else
             {
                 productName = session.Property("ProductName");
-                Look = Palette.Create(light == "1", NullIfEmpty(session.Property(FlatKeys.Accent)),
+                Look = Palette.Create(IsLight(light), NullIfEmpty(session.Property(FlatKeys.Accent)),
                     NullIfEmpty(session.Property(FlatKeys.Background)), NullIfEmpty(session.Property(FlatKeys.Text)));
                 rememberedLook = Look;
                 rememberedProductName = productName;
@@ -132,6 +132,25 @@ namespace InstallKit.WixSharp.Flat
             {
                 var pages = Session.Property(FlatKeys.Pages);
                 return string.IsNullOrEmpty(pages) ? new string[0] : pages.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            }
+        }
+
+        // "1" light, "0" dark, "auto" what Windows is set to for apps (dark when it cannot be read).
+        static bool IsLight(string setting)
+        {
+            if (setting == "1")
+                return true;
+            if (setting != "auto")
+                return false;
+
+            try
+            {
+                var value = Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", null);
+                return value is int light && light != 0;
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
 

@@ -88,7 +88,7 @@ jobs:
   # The tour tests (TourTests) photograph every page of the install, repair and remove flows and the bundle window, in the
   # dark theme (the default) on both engines and in the light theme on one: download the ui-* artifacts of the run to look at them.
   ui:
-    name: UI (${{ matrix.engine }}, ${{ matrix.theme }}${{ matrix.ui && format(', {0}', matrix.ui) || '' }})
+    name: UI (${{ matrix.engine }}, ${{ matrix.theme }}${{ matrix.pref && format(' {0}', matrix.pref) || '' }}${{ matrix.ui && format(', {0}', matrix.ui) || '' }})
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
@@ -113,6 +113,17 @@ jobs:
             theme: light
             ui: flat
             project: qa/QaDemo.Installer/QaDemo.Installer.csproj
+          # Theme Auto follows the Windows app mode: the preference is set before the tests, once to light and once to dark.
+          - engine: WixSharp
+            theme: auto
+            pref: light
+            ui: flat
+            project: qa/QaDemo.Installer/QaDemo.Installer.csproj
+          - engine: WixSharp
+            theme: auto
+            pref: dark
+            ui: flat
+            project: qa/QaDemo.Installer/QaDemo.Installer.csproj
     env:
       QA_DIR: ${{ github.workspace }}/qa-out
       INSTALLKIT_UI_OUT: ${{ github.workspace }}/ui-out
@@ -131,6 +142,13 @@ jobs:
       - name: Build QA installer 1.0.0
         run: dotnet build ${{ matrix.project }} -c Release -p:InstallKitVersion=1.0.0 "-p:InstallKitOutputDir=${{ env.QA_DIR }}/1.0.0/"
 
+      - name: Set the Windows app mode preference
+        if: matrix.pref != ''
+        shell: pwsh
+        run: |
+          $value = if ('${{ matrix.pref }}' -eq 'light') { 1 } else { 0 }
+          reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme /t REG_DWORD /d $value /f
+
       - name: Drive the setup dialogs
         shell: pwsh
         env:
@@ -144,11 +162,11 @@ jobs:
         shell: pwsh
         run: |
           $shots = Get-ChildItem "$env:INSTALLKIT_UI_OUT" -Filter *.png -ErrorAction SilentlyContinue | Sort-Object Name
-          "### Screenshots (${{ matrix.engine }}, ${{ matrix.theme }}${{ matrix.ui && format(', {0}', matrix.ui) || '' }})" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "### Screenshots (${{ matrix.engine }}, ${{ matrix.theme }}${{ matrix.pref && format(' {0}', matrix.pref) || '' }}${{ matrix.ui && format(', {0}', matrix.ui) || '' }})" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           if (-not $shots) { "No screenshots were taken." | Out-File $env:GITHUB_STEP_SUMMARY -Append }
           else {
-            "$($shots.Count) pictures, one per page: download the **ui-${{ matrix.engine }}-${{ matrix.theme }}${{ matrix.ui && format('-{0}', matrix.ui) || '' }}** artifact of this run." | Out-File $env:GITHUB_STEP_SUMMARY -Append
+            "$($shots.Count) pictures, one per page: download the **ui-${{ matrix.engine }}-${{ matrix.theme }}${{ matrix.pref && format('-{0}', matrix.pref) || '' }}${{ matrix.ui && format('-{0}', matrix.ui) || '' }}** artifact of this run." | Out-File $env:GITHUB_STEP_SUMMARY -Append
             "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
             $shots | ForEach-Object { "- ``$($_.Name)``" } | Out-File $env:GITHUB_STEP_SUMMARY -Append
           }
@@ -157,7 +175,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-${{ matrix.engine }}-${{ matrix.theme }}${{ matrix.ui && format('-{0}', matrix.ui) || '' }}
+          name: ui-${{ matrix.engine }}-${{ matrix.theme }}${{ matrix.pref && format('-{0}', matrix.pref) || '' }}${{ matrix.ui && format('-{0}', matrix.ui) || '' }}
           path: ${{ env.INSTALLKIT_UI_OUT }}
           if-no-files-found: warn
 

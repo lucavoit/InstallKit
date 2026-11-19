@@ -28,8 +28,11 @@ return InstallerHost.Run(args, plan =>
             a.AccentColor("#6A1B9A");
 
             // CI also builds the light theme, so both can be looked at (qa/UiTests/TourTests.cs takes the screenshots).
-            if (Environment.GetEnvironmentVariable("QA_THEME") == "light")
+            var theme = Environment.GetEnvironmentVariable("QA_THEME");
+            if (theme == "light")
                 a.Theme(InstallerTheme.Light);
+            else if (theme == "auto")
+                a.Theme(InstallerTheme.Auto);
         })
         .Shell(s => s
             .StartMenuShortcut()
@@ -105,8 +108,11 @@ return InstallerHost.Run(args, plan =>
         .Appearance(a =>
         {
             a.AccentColor("#6A1B9A");
-            if (Environment.GetEnvironmentVariable("QA_THEME") == "light")
+            var theme = Environment.GetEnvironmentVariable("QA_THEME");
+            if (theme == "light")
                 a.Theme(InstallerTheme.Light);
+            else if (theme == "auto")
+                a.Theme(InstallerTheme.Auto);
         })
         .Prerequisites(p => p.NetFramework(NetFrameworkVersion.NetFx48))
         .Packages(k => k.Msi(msi)));

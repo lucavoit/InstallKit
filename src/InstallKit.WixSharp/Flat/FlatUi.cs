@@ -15,16 +15,19 @@ namespace InstallKit.WixSharp.Flat
         {
             var branding = msi.Branding ?? new Branding();
             var palette = Palette.Create(branding.Theme == InstallerTheme.Light, branding.AccentColor, branding.BackgroundColor, branding.TextColor);
+            var auto = branding.Theme == InstallerTheme.Auto;
 
             var hasSettings = msi.PromptedProperties.Count > 0;
             var hasFeatures = msi.Features.Count > 0;
             var pages = string.Join(";", new[] { hasSettings ? "settings" : null, hasFeatures ? "features" : null }.Where(p => p != null));
 
             var properties = project.Properties.ToList();
-            properties.Add(new Property(FlatKeys.Light, branding.Theme == InstallerTheme.Light ? "1" : "0"));
+            // "auto" is resolved when the setup starts. The page and text colours are only written when the user chose them: otherwise
+            // they follow the theme, which is not known yet ("-" means not set; an MSI property cannot be empty).
+            properties.Add(new Property(FlatKeys.Light, auto ? "auto" : branding.Theme == InstallerTheme.Light ? "1" : "0"));
             properties.Add(new Property(FlatKeys.Accent, "#" + palette.Accent.Hex));
-            properties.Add(new Property(FlatKeys.Background, "#" + palette.Background.Hex));
-            properties.Add(new Property(FlatKeys.Text, "#" + palette.Text.Hex));
+            properties.Add(new Property(FlatKeys.Background, string.IsNullOrWhiteSpace(branding.BackgroundColor) ? "-" : branding.BackgroundColor));
+            properties.Add(new Property(FlatKeys.Text, string.IsNullOrWhiteSpace(branding.TextColor) ? "-" : branding.TextColor));
             properties.Add(new Property(FlatKeys.License, string.IsNullOrWhiteSpace(msi.LicenseFile) ? "0" : "1"));
             properties.Add(new Property(FlatKeys.Pages, pages.Length > 0 ? pages : "-"));
             if (hasSettings)

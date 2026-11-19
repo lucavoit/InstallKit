@@ -107,6 +107,9 @@ namespace InstallKit.WixSharp
             if (!string.IsNullOrWhiteSpace(msi.LicenseFile))
                 project.LicenceFile = Path.GetFullPath(msi.LicenseFile);
 
+            if (msi.Branding?.Theme == InstallerTheme.Auto && !isFlat && (isModern || isWpf))
+                Console.WriteLine($"InstallKit : warning IK204: MSI '{msi.Name}': Theme Auto follows the Windows setting only in the flat UI (Appearance.Flat). The native dialogs draw their colours when they are built, so they use Dark.");
+
             var images = ApplyBranding(project, msi, context, isModern || isWpf || isFlat);
 
             if (isModern)
@@ -215,6 +218,8 @@ namespace InstallKit.WixSharp
         static void ApplyBundleTheme(Bundle wixBundle, BundleDefinition bundle, InstallerContext context)
         {
             var branding = bundle.Branding ?? new Branding();
+            if (branding.Theme == InstallerTheme.Auto)
+                Console.WriteLine($"InstallKit : warning IK204: bundle '{bundle.Name}': Theme Auto cannot follow the Windows setting in a bundle window, which draws its colours when it is built. It uses Dark.");
             var palette = Palette.Create(branding.Theme == InstallerTheme.Light, branding.AccentColor, branding.BackgroundColor, branding.TextColor);
 
             wixBundle.WixSourceGenerated += document =>
