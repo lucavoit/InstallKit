@@ -216,6 +216,7 @@ namespace InstallKit.WixSharp.Flat
             try
             {
                 var window = ShellWindow();
+                Session.Log("InstallKit flat UI: shell window " + window + ", sized " + sized);
                 if (window == IntPtr.Zero)
                     return;
 
@@ -234,9 +235,17 @@ namespace InstallKit.WixSharp.Flat
                 Set(window, 34 /* BORDER_COLOR */, ColorRef(Look.Background));
                 Set(window, 36 /* TEXT_COLOR */, ColorRef(Look.Text));
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 // An older Windows without these attributes keeps its standard caption.
+                try
+                {
+                    Session.Log("InstallKit flat UI: window styling failed: " + e);
+                }
+                catch (Exception)
+                {
+                    // Nothing more to do.
+                }
             }
         }
 

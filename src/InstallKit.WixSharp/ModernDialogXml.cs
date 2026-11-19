@@ -104,6 +104,10 @@ namespace InstallKit.WixSharp
                 E("TextStyle", A("Id", "WixUI_Font_Title"), A("FaceName", "Segoe UI Semibold"), A("Size", 9)),
                 // Our own pages sit on the generated page background; the reused dialogs keep the stock (light) body.
                 E("TextStyle", A("Id", "InstallKit_Font_Hero"), A("FaceName", "Segoe UI"), A("Size", 20), A("Bold", "yes"), Colour(options.Palette.Text)),
+                // EXPERIMENT: does the colour of a text style depend on its size? (Hero text came out black at 20 and 22.)
+                E("TextStyle", A("Id", "InstallKit_Font_Hero12"), A("FaceName", "Segoe UI"), A("Size", 12), Colour(options.Palette.Text)),
+                E("TextStyle", A("Id", "InstallKit_Font_Hero14"), A("FaceName", "Segoe UI"), A("Size", 14), Colour(options.Palette.Text)),
+                E("TextStyle", A("Id", "InstallKit_Font_Hero16"), A("FaceName", "Segoe UI"), A("Size", 16), Colour(options.Palette.Text)),
                 E("TextStyle", A("Id", "InstallKit_Font_Body"), A("FaceName", "Segoe UI"), A("Size", 9), Colour(options.Palette.Text.Mix(options.Palette.Background, 0.12))),
                 E("TextStyle", A("Id", "InstallKit_Font_Muted"), A("FaceName", "Segoe UI"), A("Size", 9), Colour(options.Palette.Muted)),
                 E("Property", A("Id", "DefaultUIFont"), A("Value", "WixUI_Font_Normal")),
@@ -180,7 +184,7 @@ namespace InstallKit.WixSharp
 
             var dialog = E("Dialog", A("Id", WelcomeId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
                 Bitmap(ns, options),
-                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}[ProductName]"),
+                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero12}[ProductName]"),
                 Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}Version [ProductVersion]  -  [Manufacturer]"));
 
             var y = 82;
@@ -257,7 +261,7 @@ namespace InstallKit.WixSharp
 
             var dialog = E("Dialog", A("Id", OptionsId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
                 Bitmap(ns, options),
-                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}Settings"),
+                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero14}Settings"),
                 Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}Tell setup a little about this installation."));
 
             var y = 82;
@@ -309,7 +313,7 @@ namespace InstallKit.WixSharp
 
             return E("Dialog", A("Id", FinishId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
                 Bitmap(ns, options),
-                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}All set"),
+                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero16}All set"),
                 Text(ns, "Description", 62, 40, "Setup finished. Click Finish to close this window."),
                 options.PageBackground == null ? E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)) : null,
                 E("Control", A("Id", "Finish"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
