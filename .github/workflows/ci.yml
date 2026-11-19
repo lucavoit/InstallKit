@@ -88,7 +88,7 @@ jobs:
   # The tour tests (TourTests) photograph every page of the install, repair and remove flows and the bundle window, in the
   # dark theme (the default) on both engines and in the light theme on one: download the ui-* artifacts of the run to look at them.
   ui:
-    name: UI (${{ matrix.engine }}, ${{ matrix.theme }})
+    name: UI (${{ matrix.engine }}, ${{ matrix.theme }}${{ matrix.ui && format(', {0}', matrix.ui) || '' }})
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
@@ -104,10 +104,20 @@ jobs:
           - engine: WixSharp
             theme: light
             project: qa/QaDemo.Installer/QaDemo.Installer.csproj
+          # The flat WPF UI (Appearance.Flat), WixSharp engine only (the Core engine falls back to the native dialogs).
+          - engine: WixSharp
+            theme: dark
+            ui: flat
+            project: qa/QaDemo.Installer/QaDemo.Installer.csproj
+          - engine: WixSharp
+            theme: light
+            ui: flat
+            project: qa/QaDemo.Installer/QaDemo.Installer.csproj
     env:
       QA_DIR: ${{ github.workspace }}/qa-out
       INSTALLKIT_UI_OUT: ${{ github.workspace }}/ui-out
       QA_THEME: ${{ matrix.theme }}
+      QA_UI: ${{ matrix.ui }}
     steps:
       - uses: actions/checkout@v4
 
@@ -126,6 +136,7 @@ jobs:
         env:
           INSTALLKIT_UI_MSI: ${{ github.workspace }}/qa-out/1.0.0/QaDemo.msi
           INSTALLKIT_UI_BUNDLE: ${{ github.workspace }}/qa-out/1.0.0/QaDemoSetup.exe
+          INSTALLKIT_UI_FLAT: ${{ matrix.ui == 'flat' && '1' || '0' }}
         run: dotnet test qa/UiTests -c Release --logger "console;verbosity=detailed"
 
       - name: List the screenshots
@@ -133,11 +144,11 @@ jobs:
         shell: pwsh
         run: |
           $shots = Get-ChildItem "$env:INSTALLKIT_UI_OUT" -Filter *.png -ErrorAction SilentlyContinue | Sort-Object Name
-          "### Screenshots (${{ matrix.engine }}, ${{ matrix.theme }})" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "### Screenshots (${{ matrix.engine }}, ${{ matrix.theme }}${{ matrix.ui && format(', {0}', matrix.ui) || '' }})" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           if (-not $shots) { "No screenshots were taken." | Out-File $env:GITHUB_STEP_SUMMARY -Append }
           else {
-            "$($shots.Count) pictures, one per page: download the **ui-${{ matrix.engine }}-${{ matrix.theme }}** artifact of this run." | Out-File $env:GITHUB_STEP_SUMMARY -Append
+            "$($shots.Count) pictures, one per page: download the **ui-${{ matrix.engine }}-${{ matrix.theme }}${{ matrix.ui && format('-{0}', matrix.ui) || '' }}** artifact of this run." | Out-File $env:GITHUB_STEP_SUMMARY -Append
             "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
             $shots | ForEach-Object { "- ``$($_.Name)``" } | Out-File $env:GITHUB_STEP_SUMMARY -Append
           }
@@ -146,7 +157,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-${{ matrix.engine }}-${{ matrix.theme }}
+          name: ui-${{ matrix.engine }}-${{ matrix.theme }}${{ matrix.ui && format('-{0}', matrix.ui) || '' }}
           path: ${{ env.INSTALLKIT_UI_OUT }}
           if-no-files-found: warn
 

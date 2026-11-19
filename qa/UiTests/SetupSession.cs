@@ -43,6 +43,10 @@ public sealed class SetupSession : IDisposable
     }
 
     public const string BundleVariable = "INSTALLKIT_UI_BUNDLE";
+    public const string FlatVariable = "INSTALLKIT_UI_FLAT";
+
+    /// <summary>The MSI has the flat WPF dialogs instead of the native ones (set by CI for that variant).</summary>
+    public static bool IsFlat => Environment.GetEnvironmentVariable(FlatVariable) == "1";
 
     public static string? MsiPath => Environment.GetEnvironmentVariable(MsiVariable);
 

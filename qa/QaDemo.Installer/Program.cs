@@ -20,7 +20,12 @@ return InstallerHost.Run(args, plan =>
         .Feature("Worker", "A second service, installed on request", f => f.Payload("QaDemo", "worker"), installedByDefault: false)
         .Appearance(a =>
         {
-            a.Modern(chooseInstallDir: true).AccentColor("#6A1B9A");
+            // CI also builds the flat WPF UI (qa/UiTests/FlatTourTests.cs photographs it).
+            if (Environment.GetEnvironmentVariable("QA_UI") == "flat")
+                a.Flat();
+            else
+                a.Modern(chooseInstallDir: true);
+            a.AccentColor("#6A1B9A");
 
             // CI also builds the light theme, so both can be looked at (qa/UiTests/TourTests.cs takes the screenshots).
             if (Environment.GetEnvironmentVariable("QA_THEME") == "light")
