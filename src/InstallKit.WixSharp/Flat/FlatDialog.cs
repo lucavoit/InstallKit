@@ -73,8 +73,9 @@ namespace InstallKit.WixSharp.Flat
 
             Loaded += (sender, args) => StyleWindow();
 
-            // The window and its caption are set up again once the page is on screen: the first page is created before the shell
-            // window exists in its final form.
+            // WixSharp calls Init once the page is already on screen, so Loaded may have passed: set the window up from here as
+            // well, after the page has been laid out (and again whenever it becomes visible).
+            Dispatcher.BeginInvoke(new System.Action(StyleWindow), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             IsVisibleChanged += (sender, args) =>
             {
                 if (IsVisible)
