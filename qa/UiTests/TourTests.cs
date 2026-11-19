@@ -146,7 +146,11 @@ public class TourTests
 
         setup.Click("Cancel");
         setup.WaitForPage("bundle install page again", p => p.HasButton("Install"));
+        // Closing the window asks first, as the MSI pages do.
         setup.Click("Close");
+        setup.WaitForPage("bundle cancel question", p => p.HasButton("Yes"));
+        setup.Show("bundle-3-cancel-prompt");
+        setup.Click("Yes");
         setup.WaitForExit(TimeSpan.FromSeconds(60));
     }
 }
