@@ -103,7 +103,7 @@ namespace InstallKit.WixSharp
                 E("TextStyle", A("Id", "WixUI_Font_Bigger"), A("FaceName", "Segoe UI"), A("Size", 12)),
                 E("TextStyle", A("Id", "WixUI_Font_Title"), A("FaceName", "Segoe UI Semibold"), A("Size", 9)),
                 // Our own pages sit on the generated page background; the reused dialogs keep the stock (light) body.
-                E("TextStyle", A("Id", "InstallKit_Font_Hero"), A("FaceName", "Segoe UI Semibold"), A("Size", 22), Colour(options.Palette.Text)),
+                E("TextStyle", A("Id", "InstallKit_Font_Hero"), A("FaceName", "Segoe UI"), A("Size", 20), A("Bold", "yes"), Colour(options.Palette.Text)),
                 E("TextStyle", A("Id", "InstallKit_Font_Body"), A("FaceName", "Segoe UI"), A("Size", 9), Colour(options.Palette.Text.Mix(options.Palette.Background, 0.12))),
                 E("TextStyle", A("Id", "InstallKit_Font_Muted"), A("FaceName", "Segoe UI"), A("Size", 9), Colour(options.Palette.Muted)),
                 E("Property", A("Id", "DefaultUIFont"), A("Value", "WixUI_Font_Normal")),

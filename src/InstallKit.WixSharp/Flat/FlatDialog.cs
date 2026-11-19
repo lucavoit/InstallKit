@@ -66,13 +66,20 @@ namespace InstallKit.WixSharp.Flat
                 NullIfEmpty(session.Property(FlatKeys.Background)), NullIfEmpty(session.Property(FlatKeys.Text)));
             Resources.MergedDictionaries.Add(FlatTheme.Create(Look));
 
-            Width = 640;
-            Height = 460;
+            // The content stretches to whatever size the window has: the shell window is sized below, not by this control.
             Background = Paint("Bg");
             Content = BuildFrame();
             Build();
 
             Loaded += (sender, args) => StyleWindow();
+
+            // The window and its caption are set up again once the page is on screen: the first page is created before the shell
+            // window exists in its final form.
+            IsVisibleChanged += (sender, args) =>
+            {
+                if (IsVisible)
+                    Dispatcher.BeginInvoke(new System.Action(StyleWindow), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            };
         }
 
         /// <summary>Fills in the heading, the body and the buttons.</summary>
@@ -199,18 +206,28 @@ namespace InstallKit.WixSharp.Flat
             }
         }
 
-        // The window is Windows' own frame; on Windows 10 and 11 its caption can follow the page colours, so the page looks borderless.
+        const int WindowWidth = 680;
+        const int WindowHeight = 540;
+
+        // The window is Windows' own frame, so this makes it big enough for the page and, on Windows 10 and 11, lets its caption
+        // follow the page colours: the page then looks borderless.
         void StyleWindow()
         {
             try
             {
-                var source = PresentationSource.FromVisual(this) as HwndSource;
-                if (source == null)
-                    return;
-
-                var window = GetAncestor(source.Handle, 2 /* GA_ROOT */);
+                var window = ShellWindow();
                 if (window == IntPtr.Zero)
                     return;
+
+                // Once: a window the user has moved or resized is left alone on later pages.
+                if (!sized)
+                {
+                    sized = true;
+                    var area = System.Windows.Forms.Screen.FromHandle(window).WorkingArea;
+                    var width = Math.Min(WindowWidth, area.Width);
+                    var height = Math.Min(WindowHeight, area.Height);
+                    SetWindowPos(window, IntPtr.Zero, area.Left + (area.Width - width) / 2, area.Top + (area.Height - height) / 2, width, height, 0x0004 /* SWP_NOZORDER */ | 0x0010 /* SWP_NOACTIVATE */);
+                }
 
                 Set(window, 20 /* USE_IMMERSIVE_DARK_MODE */, Look.IsDark ? 1 : 0);
                 Set(window, 35 /* CAPTION_COLOR */, ColorRef(Look.Background));
@@ -223,6 +240,21 @@ namespace InstallKit.WixSharp.Flat
             }
         }
 
+        static bool sized;
+
+        // The setup window is a WinForms form that hosts the pages; it is the open form that is visible.
+        IntPtr ShellWindow()
+        {
+            foreach (System.Windows.Forms.Form form in System.Windows.Forms.Application.OpenForms)
+            {
+                if (form.Visible && form.Handle != IntPtr.Zero)
+                    return form.Handle;
+            }
+
+            var source = PresentationSource.FromVisual(this) as HwndSource;
+            return source == null ? IntPtr.Zero : GetAncestor(source.Handle, 2 /* GA_ROOT */);
+        }
+
         static int ColorRef(Rgb color) => color.R | (color.G << 8) | (color.B << 16);
 
         static void Set(IntPtr window, int attribute, int value) => DwmSetWindowAttribute(window, attribute, ref value, sizeof(int));
@@ -232,5 +264,8 @@ namespace InstallKit.WixSharp.Flat
 
         [DllImport("user32.dll")]
         static extern IntPtr GetAncestor(IntPtr window, uint flags);
+
+        [DllImport("user32.dll")]
+        static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
     }
 }
