@@ -31,16 +31,40 @@ public sealed class SetupSession : IDisposable
     readonly ITestOutputHelper output;
     readonly UIA3Automation automation = new UIA3Automation();
     readonly Process process;
+    readonly string? processName;
     int dumps;
 
-    SetupSession(Process process, string outDir, ITestOutputHelper output)
+    SetupSession(Process process, string outDir, ITestOutputHelper output, string? processName = null)
     {
         this.process = process;
+        this.processName = processName;
         OutDir = outDir;
         this.output = output;
     }
 
+    public const string BundleVariable = "INSTALLKIT_UI_BUNDLE";
+
     public static string? MsiPath => Environment.GetEnvironmentVariable(MsiVariable);
+
+    public static string? BundlePath => Environment.GetEnvironmentVariable(BundleVariable);
+
+    /// <summary>
+    /// Starts the setup .exe of a bundle with its window. Burn runs the window from a copy of itself in a temporary
+    /// folder and waits for it, so the windows are found by the name of the program, not by the process we started.
+    /// </summary>
+    public static SetupSession StartBundle(ITestOutputHelper output, string name)
+    {
+        var exe = Path.GetFullPath(BundlePath ?? throw new InvalidOperationException($"{BundleVariable} is not set."));
+        var outDir = Environment.GetEnvironmentVariable(OutVariable);
+        outDir = Path.GetFullPath(string.IsNullOrWhiteSpace(outDir) ? Path.Combine(Path.GetTempPath(), "installkit-ui") : outDir);
+        Directory.CreateDirectory(outDir);
+
+        var log = Path.Combine(outDir, name + ".bundle.log");
+        var info = new ProcessStartInfo(exe, $"/log \"{log}\"") { UseShellExecute = false };
+        var process = Process.Start(info) ?? throw new InvalidOperationException("The bundle did not start.");
+        output.WriteLine($"started {exe} ({process.Id})");
+        return new SetupSession(process, outDir, output, Path.GetFileNameWithoutExtension(exe));
+    }
 
     public string OutDir { get; }
 
@@ -222,6 +246,53 @@ public sealed class SetupSession : IDisposable
         return process.ExitCode;
     }
 
+    /// <summary>
+    /// Takes the screenshot of a page that is meant to be looked at, once a page that satisfies <paramref name="isTheRightPage"/> is
+    /// on screen: the screen, and a picture of each window of the setup on its own. Never fails the test, because it is
+    /// for people (the pages that flash by, such as progress, may be gone before they are caught).
+    /// </summary>
+    public bool TryShow(string name, Func<Page, bool> isTheRightPage, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
+        while (DateTime.UtcNow < deadline && !process.HasExited)
+        {
+            var page = Snapshot();
+            if (page != null && isTheRightPage(page))
+            {
+                Show(name);
+                return true;
+            }
+
+            Thread.Sleep(100);
+        }
+
+        output.WriteLine($"page '{name}' was not on screen to photograph");
+        return false;
+    }
+
+    /// <summary>A screenshot of the screen and of each setup window, named like the pages of a tour: <c>03-welcome.png</c>.</summary>
+    public void Show(string name)
+    {
+        var stem = Path.Combine(OutDir, $"{++dumps:00}-{name}");
+        try
+        {
+            Capture.Screen().ToFile(stem + ".png");
+            var index = 0;
+            foreach (var window in Windows())
+            {
+                if (window.BoundingRectangle.IsEmpty)
+                    continue;
+                window.Capture().ToFile($"{stem}.window{++index}.png");
+            }
+
+            output.WriteLine($"screenshot '{name}'");
+        }
+        catch (Exception e)
+        {
+            output.WriteLine($"could not take a screenshot of '{name}': {e.Message}");
+        }
+    }
+
     /// <summary>Writes the UI Automation tree of every window of the setup and a screenshot.</summary>
     public void Dump(string name)
     {
@@ -272,12 +343,30 @@ public sealed class SetupSession : IDisposable
         try
         {
             return automation.GetDesktop().FindAllChildren()
-                .Where(w => w.Properties.ProcessId.ValueOrDefault == process.Id)
+                .Where(w => BelongsToSetup(w.Properties.ProcessId.ValueOrDefault))
                 .ToList();
         }
         catch (Exception)
         {
             return Array.Empty<AutomationElement>();
+        }
+    }
+
+    bool BelongsToSetup(int processId)
+    {
+        if (processId == process.Id)
+            return true;
+        if (processName == null)
+            return false;
+
+        try
+        {
+            using var other = Process.GetProcessById(processId);
+            return string.Equals(other.ProcessName, processName, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 

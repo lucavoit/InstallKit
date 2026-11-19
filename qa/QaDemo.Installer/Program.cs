@@ -1,3 +1,4 @@
+using System;
 using InstallKit;
 
 // The QA demo installer: uses as many InstallKit features as possible, each with an effect that
@@ -17,9 +18,14 @@ return InstallerHost.Run(args, plan =>
         .Feature("Samples", "Sample files, not installed unless asked for", f => f.Directory(@"..\content\samples", "samples"), installedByDefault: false)
         // A service that only exists when its feature is installed (the Service entry below).
         .Feature("Worker", "A second service, installed on request", f => f.Payload("QaDemo", "worker"), installedByDefault: false)
-        .Appearance(a => a
-            .Modern(chooseInstallDir: true)
-            .AccentColor("#6A1B9A"))
+        .Appearance(a =>
+        {
+            a.Modern(chooseInstallDir: true).AccentColor("#6A1B9A");
+
+            // CI also builds the light theme, so both can be looked at (qa/UiTests/TourTests.cs takes the screenshots).
+            if (Environment.GetEnvironmentVariable("QA_THEME") == "light")
+                a.Theme(InstallerTheme.Light);
+        })
         .Shell(s => s
             .StartMenuShortcut()
             .DesktopShortcut()
@@ -91,6 +97,12 @@ return InstallerHost.Run(args, plan =>
         .WithManufacturer("InstallKit")
         .WithUpgradeCode("e1a64b07-53c9-4f2d-9e8a-6b0d17c4f2a3")
         .WithOutputFileName("QaDemoSetup")
+        .Appearance(a =>
+        {
+            a.AccentColor("#6A1B9A");
+            if (Environment.GetEnvironmentVariable("QA_THEME") == "light")
+                a.Theme(InstallerTheme.Light);
+        })
         .Prerequisites(p => p.NetFramework(NetFrameworkVersion.NetFx48))
         .Packages(k => k.Msi(msi)));
 });

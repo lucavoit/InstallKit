@@ -47,7 +47,7 @@ namespace InstallKit.WixSharp
                 all.AddRange(new[]
                 {
                     Progress(ns, options), MaintenanceWelcome(ns, options), MaintenanceType(ns, options), VerifyReady(ns, options),
-                    Resume(ns, options), Exit(ns, options, "UserExit", "Setup stopped", "!(loc.UserExitDescription1) !(loc.UserExitDescription2)"),
+                    Resume(ns, options), Exit(ns, options, "UserExit", "Setup interrupted", "!(loc.UserExitDescription1) !(loc.UserExitDescription2)"),
                     Exit(ns, options, "FatalError", "Setup failed", "!(loc.FatalErrorDescription1) !(loc.FatalErrorDescription2)"),
                 });
             }
