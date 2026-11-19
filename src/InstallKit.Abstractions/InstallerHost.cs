@@ -100,6 +100,12 @@ namespace InstallKit
 
             foreach (var msi in plan.Msis)
             {
+                if (msi.Ui == InstallerUi.ModernFlat && !engine.Capabilities.HasFlag(InstallerCapabilities.WpfUi))
+                {
+                    Console.WriteLine($"InstallKit : warning IK200: the {engine.Name} engine has no WPF dialogs; MSI '{msi.Name}' uses the native modern dialogs instead of the flat ones.");
+                    msi.Ui = InstallerUi.ModernInstallDir;
+                }
+
                 if (msi.Ui == InstallerUi.ModernWpf && !engine.Capabilities.HasFlag(InstallerCapabilities.WpfUi))
                 {
                     Console.WriteLine($"InstallKit : warning IK200: the {engine.Name} engine has no WPF dialogs; MSI '{msi.Name}' uses the native modern dialogs.");

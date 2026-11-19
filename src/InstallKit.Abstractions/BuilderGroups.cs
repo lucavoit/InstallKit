@@ -66,6 +66,16 @@ namespace InstallKit
             return this;
         }
 
+        /// <summary>
+        /// Uses the flat, dark WPF dialogs (see <see cref="InstallerUi.ModernFlat"/>): the Advanced-Installer-like look.
+        /// Needs .NET Framework 4.8 on the target machine; engines without WPF show the native modern dialogs instead.
+        /// </summary>
+        public AppearanceBuilder Flat()
+        {
+            _msi.UseFlatUi();
+            return this;
+        }
+
         /// <summary>Uses the WPF dialogs, for custom XAML dialogs (see <see cref="InstallerUi.ModernWpf"/>).</summary>
         public AppearanceBuilder Wpf()
         {

@@ -47,6 +47,14 @@ namespace InstallKit
         /// an engine with <see cref="InstallerCapabilities.WpfUi"/>; others fall back to <see cref="Modern"/>.
         /// </summary>
         ModernWpf,
+
+        /// <summary>
+        /// A flat, borderless-looking dark UI drawn with WPF: one page per step with big titles, flat accent buttons and a
+        /// custom checkbox and path box, in your theme and colours. Shows the license, install folder, prompted values and
+        /// optional features, and repair/remove. Needs .NET Framework 4.8 on the target machine and an engine with
+        /// <see cref="InstallerCapabilities.WpfUi"/>; others fall back to <see cref="ModernInstallDir"/>.
+        /// </summary>
+        ModernFlat,
     }
 
     /// <summary>How a Windows service is started.</summary>

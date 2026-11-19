@@ -57,7 +57,7 @@ namespace InstallKit.WixSharp
             installContents.AddRange(msi.FirewallRules.Select(ToFirewallException));
 
             var installDir = BuildFolder(msi.ResolvedInstallDirectory, installContents.ToArray(), PermissionsFor(msi, null), new Id(InstallDirId));
-            if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir)
+            if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir && msi.Ui != InstallerUi.ModernFlat)
                 Console.WriteLine($"InstallKit : warning IK246: MSI '{msi.Name}' has optional features, which users can only choose in the FeatureTree and Modern UIs or with ADDLOCAL and REMOVE on the command line. Set Ui = InstallerUi.Modern or InstallerUi.FeatureTree to show them.");
             var entities = new List<WixEntity> { installDir };
             entities.AddRange(msi.ResolvedRegistryEntries.Select(ToRegValue));
@@ -70,12 +70,13 @@ namespace InstallKit.WixSharp
 
             var isModern = msi.Ui == InstallerUi.Modern || msi.Ui == InstallerUi.ModernInstallDir;
             var isWpf = msi.Ui == InstallerUi.ModernWpf;
+            var isFlat = msi.Ui == InstallerUi.ModernFlat;
 
 #if INSTALLKIT_CORE
             var project = new Project(msi.Name, entities.ToArray());
 #else
             // ManagedProject (with its embedded UI host) only for the WPF dialogs.
-            var project = isWpf
+            var project = isWpf || isFlat
                 ? new ManagedProject(msi.Name, entities.ToArray())
                 : new Project(msi.Name, entities.ToArray());
 #endif
@@ -93,7 +94,7 @@ namespace InstallKit.WixSharp
             // A property that the user can set in a dialog has to be secure, or the elevated install would ignore the value.
             project.Properties = msi.Properties.Select(p => new Property(p.Key, p.Value))
                 .Concat(msi.PromptedProperties.Select(ToPromptedProperty)).ToArray();
-            if (msi.PromptedProperties.Count > 0 && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir)
+            if (msi.PromptedProperties.Count > 0 && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir && msi.Ui != InstallerUi.ModernFlat)
                 Console.WriteLine($"InstallKit : warning IK285: MSI '{msi.Name}' has prompted properties, which only the modern UIs ask for. With {msi.Ui} they keep their defaults unless given on the command line.");
 
             // WixSharp needs a ProductId per build; a random one is right for major upgrades.
@@ -106,14 +107,19 @@ namespace InstallKit.WixSharp
             if (!string.IsNullOrWhiteSpace(msi.LicenseFile))
                 project.LicenceFile = Path.GetFullPath(msi.LicenseFile);
 
-            var images = ApplyBranding(project, msi, context, isModern || isWpf);
+            var images = ApplyBranding(project, msi, context, isModern || isWpf || isFlat);
 
             if (isModern)
                 ModernDialogs.Apply(project, msi, images.Page, images.Cancel);
 
 #if !INSTALLKIT_CORE
             if (project is ManagedProject managed)
-                managed.ManagedUI = BuildWpfUi(msi);
+            {
+                if (isFlat)
+                    FlatUi.Apply(managed, msi, context);
+                else
+                    managed.ManagedUI = BuildWpfUi(msi);
+            }
             else if (msi.EngineCustomizations.OfType<WpfDialogInsertion>().Any())
                 Console.WriteLine($"InstallKit : warning IK202: MSI '{msi.Name}' adds WPF dialogs, which only show with Ui = ModernWpf.");
 #endif

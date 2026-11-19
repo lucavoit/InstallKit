@@ -223,6 +223,9 @@ namespace InstallKit
         /// <summary>Uses the WPF dialogs, for custom XAML dialogs (see <see cref="InstallerUi.ModernWpf"/>).</summary>
         internal MsiBuilder UseWpfUi() => WithUi(InstallerUi.ModernWpf);
 
+        /// <summary>Uses the flat WPF dialogs (see <see cref="InstallerUi.ModernFlat"/>).</summary>
+        internal MsiBuilder UseFlatUi() => WithUi(InstallerUi.ModernFlat);
+
         internal MsiBuilder SetAccentColor(string hexColor)
         {
             BrandingOf().AccentColor = hexColor;
