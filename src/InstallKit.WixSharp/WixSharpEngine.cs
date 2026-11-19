@@ -116,7 +116,7 @@ namespace InstallKit.WixSharp
             if (project is ManagedProject managed)
             {
                 if (isFlat)
-                    FlatUi.Apply(managed, msi, context);
+                    Flat.FlatUi.Apply(managed, msi, context);
                 else
                     managed.ManagedUI = BuildWpfUi(msi);
             }
