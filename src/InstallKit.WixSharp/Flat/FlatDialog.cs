@@ -95,7 +95,7 @@ namespace InstallKit.WixSharp.Flat
         internal static string NullIfEmpty(string text) => string.IsNullOrWhiteSpace(text) ? null : text;
 
         /// <summary>A button added to the right-hand group. <paramref name="primary"/> draws it in the accent colour.</summary>
-        protected Wpf.Button AddButton(string text, Action click, bool primary = false, bool left = false)
+        protected Wpf.Button AddButton(string text, System.Action click, bool primary = false, bool left = false)
         {
             var button = new Wpf.Button { Content = text, Margin = new Thickness(left ? 0 : 10, 0, 0, 0) };
             if (primary)

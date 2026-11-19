@@ -304,7 +304,7 @@ namespace InstallKit.WixSharp.Flat
             AddButton("Cancel", () => ShellApi.Cancel());
         }
 
-        void Add(StackPanel panel, string text, string description, Action click)
+        void Add(StackPanel panel, string text, string description, System.Action click)
         {
             var button = new Wpf.Button { Content = text, MinWidth = 130, HorizontalAlignment = HorizontalAlignment.Left };
             button.Click += (sender, args) => click();
@@ -384,7 +384,7 @@ namespace InstallKit.WixSharp.Flat
                 {
                     // Field 2 is the text of the action ("Copying new files").
                     var text = messageRecord.FieldCount >= 3 ? messageRecord[2].ToString() : string.Empty;
-                    Dispatcher.BeginInvoke(new Action(() => action.Text = text));
+                    Dispatcher.BeginInvoke(new System.Action(() => action.Text = text));
                 }
                 catch (Exception)
                 {
@@ -396,10 +396,10 @@ namespace InstallKit.WixSharp.Flat
         }
 
         public override void OnProgress(int progressPercentage)
-            => Dispatcher.BeginInvoke(new Action(() => bar.Value = progressPercentage));
+            => Dispatcher.BeginInvoke(new System.Action(() => bar.Value = progressPercentage));
 
         public override void OnExecuteComplete()
-            => Dispatcher.BeginInvoke(new Action(() =>
+            => Dispatcher.BeginInvoke(new System.Action(() =>
             {
                 action.Text = string.Empty;
                 ShellApi.GoNext();
