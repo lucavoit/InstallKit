@@ -293,6 +293,55 @@ public sealed class SetupSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// What a person debugging a missing window would want: every top-level window on the desktop with its process, whether the
+    /// started process is still running, and the end of the log the setup wrote.
+    /// </summary>
+    public string Diagnostics(string? logName = null)
+    {
+        var text = new StringBuilder();
+        text.AppendLine($"started process {process.Id} exited={process.HasExited}" + (process.HasExited ? $" code={process.ExitCode}" : ""));
+        try
+        {
+            foreach (var window in automation.GetDesktop().FindAllChildren())
+            {
+                var pid = window.Properties.ProcessId.ValueOrDefault;
+                string name;
+                try
+                {
+                    using var p = Process.GetProcessById(pid);
+                    name = p.ProcessName;
+                }
+                catch (Exception)
+                {
+                    name = "?";
+                }
+
+                text.AppendLine($"window '{SafeName(window)}' class='{Safe(() => window.ClassName)}' process={pid} ({name})");
+            }
+        }
+        catch (Exception e)
+        {
+            text.AppendLine($"could not list the windows: {e.Message}");
+        }
+
+        try
+        {
+            foreach (var log in Directory.GetFiles(OutDir, (logName ?? "*") + "*.log"))
+            {
+                text.AppendLine($"--- {Path.GetFileName(log)} (last lines)");
+                foreach (var line in File.ReadAllLines(log).TakeLast(60))
+                    text.AppendLine(line);
+            }
+        }
+        catch (Exception e)
+        {
+            text.AppendLine($"could not read the log: {e.Message}");
+        }
+
+        return text.ToString();
+    }
+
     /// <summary>Writes the UI Automation tree of every window of the setup and a screenshot.</summary>
     public void Dump(string name)
     {

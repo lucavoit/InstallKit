@@ -128,7 +128,16 @@ public class TourTests
     {
         using var setup = SetupSession.StartBundle(output, "tour-bundle");
 
-        setup.WaitForPage("bundle install page", p => p.HasButton("Install"), TimeSpan.FromSeconds(90));
+        try
+        {
+            setup.WaitForPage("bundle install page", p => p.HasButton("Install"), TimeSpan.FromSeconds(45));
+        }
+        catch (Xunit.Sdk.XunitException)
+        {
+            output.WriteLine(setup.Diagnostics("tour-bundle"));
+            throw;
+        }
+
         setup.Show("bundle-1-install");
 
         setup.Click("Options");
