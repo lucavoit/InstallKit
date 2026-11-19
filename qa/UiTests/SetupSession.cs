@@ -281,6 +281,8 @@ public sealed class SetupSession : IDisposable
     /// <summary>A screenshot of the screen and of each setup window, named like the pages of a tour: <c>03-welcome.png</c>.</summary>
     public void Show(string name)
     {
+        // A page has just appeared: let it finish drawing (and the flat UI style its window) before taking the picture.
+        Thread.Sleep(600);
         var stem = Path.Combine(OutDir, $"{++dumps:00}-{name}");
         try
         {
