@@ -64,8 +64,8 @@ namespace InstallKit.WixSharp
         public const string WelcomeId = "InstallKit_WelcomeDlg";
         public const string FinishId = "InstallKit_FinishDlg";
         public const string OptionsId = "InstallKit_OptionsDlg";
-        public const string PageBitmapId = "InstallKit_Bmp_Page";
-        public const string CancelBitmapId = "InstallKit_Bmp_Cancel";
+        public const string PageBitmapId = "IK_Bmp_Page";
+        public const string CancelBitmapId = "IK_Bmp_Cancel";
 
         // Dialog units. 370x270 is the standard WiX dialog size; the background bitmap covers 370x234.
         internal const int Width = 370;

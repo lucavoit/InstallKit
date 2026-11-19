@@ -282,7 +282,7 @@ public sealed class SetupSession : IDisposable
             {
                 if (window.BoundingRectangle.IsEmpty)
                     continue;
-                window.Capture().ToFile($"{stem}.window{++index}.png");
+                Capture.Element(window).ToFile($"{stem}.window{++index}.png");
             }
 
             output.WriteLine($"screenshot '{name}'");
