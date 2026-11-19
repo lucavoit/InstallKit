@@ -135,7 +135,7 @@ namespace InstallKit.WixSharp.Flat
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var header = new Grid { Margin = new Thickness(36, 30, 36, 12) };
+            var header = new Grid { Margin = new Thickness(36, 22, 36, 8) };
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
@@ -148,7 +148,7 @@ namespace InstallKit.WixSharp.Flat
             var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             TitleBlock = new TextBlock
             {
-                FontSize = 30,
+                FontSize = 28,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Paint("Text"),
                 TextTrimming = TextTrimming.CharacterEllipsis,
@@ -162,11 +162,11 @@ namespace InstallKit.WixSharp.Flat
             Grid.SetRow(header, 0);
             root.Children.Add(header);
 
-            Body = new Grid { Margin = new Thickness(36, 8, 36, 8) };
+            Body = new Grid { Margin = new Thickness(36, 6, 36, 4) };
             Grid.SetRow(Body, 1);
             root.Children.Add(Body);
 
-            var footer = new Grid { Margin = new Thickness(36, 12, 36, 28) };
+            var footer = new Grid { Margin = new Thickness(36, 8, 36, 22) };
             footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             LeftButtons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
@@ -231,6 +231,9 @@ namespace InstallKit.WixSharp.Flat
                     SetWindowPos(window, IntPtr.Zero, area.Left + (area.Width - width) / 2, area.Top + (area.Height - height) / 2, width, height, 0x0004 /* SWP_NOZORDER */ | 0x0010 /* SWP_NOACTIVATE */);
                 }
 
+                // The title of the window (the shell leaves it empty, unlike the native dialogs).
+                SetWindowText(window, ProductName + " Setup");
+
                 Set(window, 20 /* USE_IMMERSIVE_DARK_MODE */, Look.IsDark ? 1 : 0);
                 Set(window, 35 /* CAPTION_COLOR */, ColorRef(Look.Background));
                 Set(window, 34 /* BORDER_COLOR */, ColorRef(Look.Background));
@@ -274,6 +277,9 @@ namespace InstallKit.WixSharp.Flat
 
         [DllImport("user32.dll")]
         static extern IntPtr GetAncestor(IntPtr window, uint flags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        static extern bool SetWindowText(IntPtr window, string text);
 
         [DllImport("user32.dll")]
         static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);

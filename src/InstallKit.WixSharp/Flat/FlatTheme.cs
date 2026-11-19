@@ -161,6 +161,52 @@ namespace InstallKit.WixSharp.Flat
     </Setter>
   </Style>
 
+  <Style x:Key='ScrollPage' TargetType='RepeatButton'>
+    <Setter Property='Focusable' Value='False'/>
+    <Setter Property='IsTabStop' Value='False'/>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='RepeatButton'>
+          <Border Background='Transparent'/>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key='ScrollThumb' TargetType='Thumb'>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='Thumb'>
+          <Border Background='{StaticResource Hover}' CornerRadius='3'/>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType='ScrollBar'>
+    <Setter Property='Width' Value='10'/>
+    <Setter Property='Background' Value='Transparent'/>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='ScrollBar'>
+          <Grid Background='Transparent'>
+            <Track x:Name='PART_Track' IsDirectionReversed='True'>
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Style='{StaticResource ScrollPage}' Command='ScrollBar.PageUpCommand'/>
+              </Track.DecreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb Style='{StaticResource ScrollThumb}'/>
+              </Track.Thumb>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Style='{StaticResource ScrollPage}' Command='ScrollBar.PageDownCommand'/>
+              </Track.IncreaseRepeatButton>
+            </Track>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style TargetType='ProgressBar'>
     <Setter Property='Height' Value='6'/>
     <Setter Property='Template'>

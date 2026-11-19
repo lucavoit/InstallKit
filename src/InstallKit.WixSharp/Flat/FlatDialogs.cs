@@ -214,7 +214,7 @@ namespace InstallKit.WixSharp.Flat
                     Content = content,
                     IsChecked = feature.DefaultIsToBeInstalled(),
                     IsEnabled = !feature.DisallowAbsent,
-                    Margin = new Thickness(depth[feature.Name] * 24, 0, 0, 14),
+                    Margin = new Thickness(depth[feature.Name] * 24, 0, 0, 9),
                 };
                 panel.Children.Add(row.Box);
             }
