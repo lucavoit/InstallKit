@@ -34,6 +34,9 @@
     <Compile Include="..\..\src\InstallKit.WixSharp\WixSharpCustomizations.cs" Link="Engine\WixSharpCustomizations.cs" />
     <Compile Include="..\..\src\InstallKit.WixSharp\ModernDialogs.cs" Link="Engine\ModernDialogs.cs" />
     <Compile Include="..\..\src\InstallKit.WixSharp\ModernDialogXml.cs" Link="Engine\ModernDialogXml.cs" />
+    <Compile Include="..\..\src\InstallKit.WixSharp\StockDialogXml.cs" Link="Engine\StockDialogXml.cs" />
+    <Compile Include="..\..\src\InstallKit.WixSharp\Palette.cs" Link="Engine\Palette.cs" />
+    <Compile Include="..\..\src\InstallKit.WixSharp\BundleTheme.cs" Link="Engine\BundleTheme.cs" />
     <Compile Include="..\..\src\InstallKit.WixSharp\IdentifierLimits.cs" Link="Engine\IdentifierLimits.cs" />
   </ItemGroup>
 </Project>
