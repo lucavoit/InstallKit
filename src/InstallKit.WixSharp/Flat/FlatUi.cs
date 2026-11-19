@@ -52,6 +52,10 @@ namespace InstallKit.WixSharp.Flat
 
             project.ManagedUI = new ManagedUI { InstallDialogs = install, ModifyDialogs = modify };
 
+            // The generated background bitmap is for the native dialogs; the flat pages draw their own, so WixSharp's check of the
+            // bitmap against its stock dialog layout does not apply.
+            project.ValidateBackgroundImage = false;
+
             // The dialogs live in this assembly, which the MSI has to carry for its UI host to load them.
             var assembly = typeof(FlatUi).Assembly.Location;
             if (!project.DefaultRefAssemblies.Contains(assembly))
