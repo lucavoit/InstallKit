@@ -9,11 +9,23 @@ Build Windows installers (MSI and setup `.exe` bundles) with plain C# and `dotne
 
 > **Status: early preview (0.1).** The API may still change between releases. Feedback and issues are welcome.
 
+## Contents
+
+- **Start here:** [Why InstallKit](#why-installkit) · [Requirements](#requirements) · [Example](#example) · [Layout](#layout) · [Getting started](#getting-started)
+- **Build:** [Using your own build output](#using-your-own-build-output) · [How it works](#how-it-works) · [Editor checks](#editor-checks) · [Versions side by side](#versions-side-by-side) · [Command line tool](#command-line-tool)
+- **Describe the installer:**
+  - [Custom actions](#custom-actions)
+  - [System settings](#system-settings): [Registry](#registry) · [Environment variables and PATH](#environment-variables-and-path) · [File associations and URL protocols](#file-associations-and-url-protocols) · [Firewall rules](#firewall-rules) · [Values in XML config files](#values-in-xml-config-files) · [Closing running programs](#closing-running-programs) · [Optional features](#optional-features) · [Folder permissions](#folder-permissions) · [Asking for values](#asking-for-values)
+  - [UI and branding](#ui-and-branding): the flat default UI, themes and colours, native and custom dialogs
+  - [Bundles](#bundles) · [Prerequisites](#prerequisites) · [Signing](#signing)
+- **Ship it:** [Azure DevOps](#azure-devops) · [What target machines need](#what-target-machines-need) · [Engines](#engines) · [WiX version and licence](#wix-version-and-licence)
+- **Project:** [Contributing](#contributing) · [QA](#qa) · [Roadmap](#roadmap) · [License](#license)
+
 ## Why InstallKit
 
 - **Installers as code:** describe the product, services, shortcuts and prerequisites in C#, with validation errors that point at the problem before WiX runs.
 - **One command:** `dotnet build` publishes your app, then produces the MSI and, optionally, a single `setup.exe` bundle.
-- **Modern look without extra dependencies:** branded native dialogs that need nothing on the target machine.
+- **Modern look by default:** a flat, dark installer UI in your colours (light, dark or following the Windows setting), with native dialogs that need nothing on the target machine as the alternative.
 - **Install-time code in C#:** run static methods during install or uninstall, with no WixSharp types in your code.
 - **CI included:** Azure DevOps templates that build, sign, smoke-test (install and uninstall) and publish.
 - **Two engines:** WixSharp on .NET Framework 4.8, or a WixSharp.Core preview on .NET 10, with the same installer code.
@@ -64,7 +76,7 @@ The fluent builders are the preferred way to describe installers, and every exam
   | --- | --- |
   | `Content(c => ...)` | `Payload`, `Directory`: files that are always installed |
   | `Feature(name, description, f => ...)` | an optional feature together with its files (`Payload`, `Directory`) |
-  | `Appearance(a => ...)` | `Modern`, `Wpf`, `Classic`, `Theme` (dark by default), `AccentColor`, `BackgroundColor`, `TextColor`, `Logo` |
+  | `Appearance(a => ...)` | `Flat`, `Modern`, `Wpf`, `Classic`, `Theme` (`Dark`, `Light` or `Auto`), `AccentColor`, `BackgroundColor`, `TextColor`, `Logo` |
   | `Machine(m => ...)` | `Registry`, `EnvironmentVariable`, `PathEntry`, `FirewallRule`, `Service`, `FolderPermission`, `XmlValue` |
   | `Shell(s => ...)` | `FileAssociation`, `UrlProtocol`, `StartMenuShortcut`, `DesktopShortcut` |
   | `Lifecycle(l => ...)` | `CloseApplication`, `OnLoad`, `OnBeforeInstall`, `OnAfterInstall`, `RunAfterInstall`, `RunBeforeUninstall` |
@@ -391,14 +403,13 @@ MsiBuilder.Create("My App")
     .Feature("Documentation", "Help files and the user guide", f => f
         .Directory(@"..\docs", "docs"))
     .Feature("Samples", "Example projects", f => f
-        .Directory(@"..\samples", "samples"), installedByDefault: false)
-    .Appearance(a => a.Modern());                                              // lets users tick them (or Classic(InstallerUi.FeatureTree))
+        .Directory(@"..\samples", "samples"), installedByDefault: false);       // the default UI lets users tick them (or Classic(InstallerUi.FeatureTree))
 ```
 
 - **A feature owns its files:** the lambda adds `Payload` and `Directory` entries to that feature, so a feature cannot be declared without its files, or the other way round.
 - **Always-installed files:** everything added with `Content(...)`.
 - **Command line:** `msiexec /i MyApp.msi ADDLOCAL=Samples` adds a feature and `REMOVE=Documentation` removes one. Spaces in a feature name become underscores (`Sample_files`).
-- **Dialogs:** the modern UIs (`Modern`, `ModernInstallDir`) show a feature page after the welcome page and a "ready to install" page after that; running the MSI again on an installed product offers Repair, Remove and Change, and Change opens the same feature page. `InstallerUi.FeatureTree` shows the classic tree. With another UI (`Minimal`, `InstallDir`, `ProgressOnly`, `ModernWpf`) the build prints warning `IK246` and the defaults apply.
+- **Dialogs:** the default UI and the modern UIs (`ModernFlat`, `Modern`, `ModernInstallDir`) show a feature page after the welcome page (the flat UI starts the install from it; the native ones add a "ready to install" page); running the MSI again on an installed product offers Repair, Remove and Change, and Change opens the same feature page. `InstallerUi.FeatureTree` shows the classic tree. With another UI (`Minimal`, `InstallDir`, `ProgressOnly`, `ModernWpf`) the build prints warning `IK246` and the defaults apply.
 - **Services and XML values can live in a feature:** the feature's files come with their service or XML edit, and nothing of it exists when the feature is left out. Add a service for an optional part with `.Feature("Worker", f => f.Payload("Worker", "worker")).Machine(m => m.Service(@"worker\Worker.exe", "MyWorker"))`.
 - **Must always be installed:** the main executable (shortcuts point at it) and the programs used by file associations and firewall rules cannot be in a feature (`IK244`), because they are set up whether or not the feature is.
 - **Checked before WiX runs:** an unusable name (`IK240`), duplicates (`IK241`), files for a feature that was never declared (`IK242`) and a feature with no files (`IK243`).
@@ -424,14 +435,13 @@ MsiBuilder.Create("My App")
 
 ```csharp
 MsiBuilder.Create("My App")
-    .Appearance(a => a.Modern())
     .Settings(s => s
         .Prompt("SERVER", "Server address", defaultValue: "localhost", required: true)
         .Prompt("DB_NAME", "Database name", "myapp"))
     .Machine(m => m.XmlValue("MyApp.exe.config", "/configuration/appSettings/add[@key='Server']/@value", "[SERVER]"));
 ```
 
-The modern UI shows a settings page after the welcome page with a labelled input box for each value (at most three). The default fills the box, a **required** value keeps Next or Install disabled while the box is empty, and the page is followed by the feature page when the product has optional features.
+The default UI (and the other modern UIs) shows a settings page after the welcome page with a labelled input box for each value (at most three). The default fills the box, a **required** value keeps Next or Install disabled while the box is empty, and the page is followed by the feature page when the product has optional features.
 
 - **Silent installs and the command line:** nothing is asked; `SERVER=prod` on the command line wins over the default, otherwise the default is used.
 - **Where the value goes:** it is an ordinary MSI property, so `[SERVER]` works in XML values and run commands, and an install event reads it with `e["SERVER"]` (list it in `OnAfterInstall(handler, "SERVER")`).
@@ -441,32 +451,36 @@ The modern UI shows a settings page after the welcome page with a labelled input
 
 ## UI and branding
 
+With no `Appearance`, an MSI gets **the best UI its engine has**: the flat, dark WPF dialogs with the `WixSharp` engine, the native modern dialogs with the `WixSharpCore` engine. Pin one with `Appearance`:
+
 | `Ui` | Dialogs |
 |---|---|
-| `Minimal` (default) | Classic WiX: welcome/license, progress |
-| `InstallDir`, `FeatureTree`, `ProgressOnly` | Classic WiX variants |
+| `Default` (what you get) | `ModernFlat` with the `WixSharp` engine, `ModernInstallDir` with `WixSharpCore`; no warning, because nothing was chosen |
+| `ModernFlat` | Flat WPF dialogs: big titles, flat accent buttons, custom check box and path box, a caption in the page colour (`Appearance(a => a.Flat())`; `WixSharp` engine only) |
 | `Modern` | Native, branded: one welcome page (license and accept box when set), progress, finish; repair/remove |
 | `ModernInstallDir` | `Modern` with the install folder and a Browse button on the welcome page |
-| `ModernWpf` | WPF dialogs, which allow custom XAML dialogs (`WixSharp` engine only) |
-| `ModernFlat` | Flat, dark WPF dialogs with custom-drawn buttons, check box and path box (`Appearance(a => a.Flat())`; `WixSharp` engine only) |
+| `ModernWpf` | The stock WPF dialogs, which allow custom XAML dialogs (`WixSharp` engine only) |
+| `Minimal` | Classic WiX: welcome/license, progress |
+| `InstallDir`, `FeatureTree`, `ProgressOnly` | Classic WiX variants |
 
 ```csharp
 MsiBuilder.Create("My App")
     .Appearance(a => a
-        .Modern()                  // or Modern(chooseInstallDir: true), or Wpf()
-        .Theme(InstallerTheme.Dark) // the default; InstallerTheme.Light for white pages
+        .Flat()                     // or Modern(chooseInstallDir: true), or Wpf(); leave it out for the default
+        .Theme(InstallerTheme.Auto) // Dark (the default), Light, or Auto: follow the Windows light/dark setting
         .AccentColor("#0067C0")
         .BackgroundColor("#0F1115") // optional: overrides the theme's page colour
         .TextColor("#F3F4F6")       // optional: overrides the theme's text colour
         .Logo("logo.png"));
 ```
 
-- **Colours:** the modern dialogs and the bundle window are dark by default. `Theme` picks dark, light or `Auto`, and `BackgroundColor`, `TextColor` and `AccentColor` (all `#RRGGBB`) override single colours; secondary text and input boxes are derived from them. `InstallerTheme.Auto` follows the Windows app mode of the person running the setup (light or dark, read when the setup starts), but only in the flat UI (`a.Flat()`): the native dialogs and the bundle window draw their colours when they are built, so they use dark and the build prints warning `IK204`. Colours you set yourself (`BackgroundColor`, `TextColor`) always win. Buttons, input frames and progress bars of the native dialogs are drawn by Windows and keep the system look. The stock repair, error and progress dialogs keep a light body so their text stays readable.
-- **Branded images:** InstallKit generates the banner (493×58) and dialog (493×312) bitmaps in your accent colour with your logo, so even the classic dialogs look current. You can supply your own `.bmp` files through the `BannerImage` and `BackgroundImage` settings of `Branding`. Bundles use the logo too.
-- **Modern (native), with optional features:** the feature page is WiX's own feature tree dialog (with its Reset and Disk Usage buttons) in the classic banner style, between the branded welcome page and the "ready to install" page. Add or Remove Programs offers Change for such a product.
-- **Modern (native):** the dialogs are built from MSI's own dialog tables, in Segoe UI on the branded background. The target machine needs nothing extra, and it works the same on both engines. The progress, error and repair/remove pages reuse WiX's dialogs, which pick up the same fonts and banner. Its texts are English for now.
-- **ModernFlat (`a.Flat()`):** the Advanced-Installer-like look. Every page is drawn by WPF in your theme and colours: a big title, flat accent buttons, a custom check box and path box, and a window caption that follows the page colour on Windows 10 and 11. It shows the license (when set), install folder, prompted values and optional features, progress, and repair/remove. It needs .NET Framework 4.8 on the target machine and adds about 1 MB to the MSI. The `WixSharpCore` engine shows the native `ModernInstallDir` dialogs instead (warning `IK200`). The window frame itself is still Windows' own, and the confirmation boxes WixSharp shows (such as cancelling during the install) are standard Windows message boxes.
-- **ModernWpf:** needs .NET Framework 4.8 on the target machine and adds about 1 MB to the MSI. The `WixSharpCore` engine falls back to `Modern` with warning `IK200`.
+- **Colours:** the modern dialogs and the bundle window are dark by default. `Theme` picks `Dark`, `Light` or `Auto`, and `BackgroundColor`, `TextColor` and `AccentColor` (all `#RRGGBB`) override single colours; secondary text and input boxes are derived from them. Colours you set yourself always win over the theme.
+- **`Theme = Auto`:** follows the Windows app mode (Settings, Personalization, Colors) of the person running the setup, read when it starts. Only the flat UI can do that. The native dialogs and the bundle window draw their colours when they are built, so they use dark and the build prints warning `IK204`.
+- **The flat UI (`ModernFlat`):** every page is drawn by WPF in your theme and colours, so it looks the same on every machine: a big title, flat accent buttons, a custom check box and path box, a thin scrollbar, and a window caption that follows the page colour on Windows 11 (older Windows keeps its standard caption). It shows the license (when set), install folder, prompted values and optional features, progress, and repair/remove. It needs .NET Framework 4.8 on the target machine (part of Windows 10 1903+ and Windows 11) and adds about 1 MB to the MSI. The window frame is still Windows' own, and the folder picker that Browse opens is a standard Windows dialog. Its texts are English for now.
+- **Native dialogs (`Modern`, `ModernInstallDir`):** built from MSI's own dialog tables, in Segoe UI on the branded background. The target machine needs nothing extra, and it works the same on both engines. Windows draws their buttons, input boxes and checkboxes, so those keep the system look. The feature page, the folder browser and the error popup are WiX's own light dialogs; the progress, repair/remove, resume, cancel and finish pages are restyled to match. Its texts are English for now.
+- **Branded images:** InstallKit generates the banner (493×58), the dialog (493×312) and page bitmaps in your accent colour with your logo, so even the classic dialogs look current. You can supply your own `.bmp` files through the `BannerImage` and `BackgroundImage` settings of `Branding`. Bundles use the logo too.
+- **Bundles:** the setup window is dark by default and follows `Theme`, `AccentColor`, `BackgroundColor` and `TextColor` (but not `Auto`). Its buttons and progress bar are drawn by Windows.
+- **`ModernWpf`:** needs .NET Framework 4.8 on the target machine and adds about 1 MB to the MSI. The `WixSharpCore` engine falls back to `Modern` with warning `IK200`; an explicit `Flat()` falls back to `ModernInstallDir` the same way.
 - Silent installs (`/qn`) show no UI at all.
 
 **Your own dialog (`ModernWpf`):** write a XAML `UserControl` that derives from `WixSharp.UI.WPF.WpfDialog` and implements `IWpfDialog`, and set `<InstallKitUseWpf>true</InstallKitUseWpf>` in the project. Then add it:
@@ -582,7 +596,8 @@ The installer project only runs on your build machine. A target machine needs:
 | Installer uses | Target machine needs |
 |---|---|
 | Plain MSI (classic UI, services, shortcuts, run commands) | Nothing beyond Windows: Windows Installer is built in |
-| Modern UI (native) | Nothing |
+| Default UI or `ModernFlat`, `WixSharp` engine | .NET Framework 4.8 (see the next row) |
+| Native modern UI (`Modern`, `ModernInstallDir`, and the default with `WixSharpCore`) | Nothing |
 | Install events (`OnAfterInstall`, ...), `WixSharp` engine | .NET Framework 4.8 (included in Windows 10 1903+, Windows 11 and Windows Server 2022+; install it on older systems) |
 | Install events, `WixSharpCore` engine | Nothing: they are compiled to native code |
 | `ModernWpf` UI | .NET Framework 4.8 |
@@ -608,7 +623,8 @@ An installer project uses **one** engine, chosen with a single property. Your in
 | MSIs, services, shortcuts, run commands, branding, bundles, signing | ✓ | ✓ |
 | Install events (`OnAfterInstall`, ...) | ✓ (managed custom actions) | ✓ (compiled to native code; the build machine needs the C++ build tools) |
 | Modern UI (native) | ✓ | ✓ |
-| `ModernWpf`, custom WPF dialogs | ✓ | not yet: falls back to `Modern` (`IK200`) |
+| Default UI | flat WPF dialogs | native modern dialogs |
+| `ModernFlat`, `ModernWpf`, custom WPF dialogs | ✓ | not yet: fall back to the native modern dialogs (`IK200`) |
 
 **Build agent requirements:** either engine needs only Windows and the .NET SDK. The SDK pulls in just the engine package you chose, so the other engine is never restored or built. The .NET Framework 4.8 reference assemblies come from NuGet, so the `WixSharp` engine needs no targeting pack. The pipeline templates are the same for both.
 
@@ -619,7 +635,7 @@ An installer project uses **one** engine, chosen with a single property. Your in
 
 **Core engine notes:**
 - **Native compilation:** WixSharp.Core compiles the installer assembly's custom actions to a native DLL with NativeAOT. That needs the C++ build tools ("Desktop development with C++") on the build machine, which Microsoft-hosted Windows agents have. It also adds roughly 10–60 seconds per build.
-- **Remaining gap:** the WPF dialogs. WixSharp.Core needs them in a separate .NET Framework UI project; the native `Modern` UI covers the default look without it.
+- **Remaining gap:** the WPF dialogs (the flat UI and custom dialogs). WixSharp.Core needs them in a separate .NET Framework UI project; the default UI there is the native modern dialogs.
 
 `samples/HelloService.Installer.Core` builds the same sample with the Core engine. CI builds both.
 
@@ -659,7 +675,7 @@ Issues and pull requests are welcome. Please open an issue first for larger chan
 
 ```bash
 dotnet test tests/InstallKit.Abstractions.Tests -c Release    # model, builders, validation, analyzers
-dotnet test tests/InstallKit.WixSharp.Tests -c Release        # the modern dialogs' XML
+dotnet test tests/InstallKit.WixSharp.Tests -c Release        # the native dialogs' XML, the bundle theme, the palette
 dotnet test tests/InstallKit.WixSharp.Engine.Tests -c Release # the engine: the WiX source it writes for a model
 dotnet test tests/InstallKit.Tool.Tests -c Release            # the installkit tool
 ```
@@ -675,6 +691,8 @@ The `qa` jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) build th
 - **Repair:** a deleted file is restored.
 - **Uninstall:** `RunBeforeUninstall` runs, and the service, files, shortcuts and Add/Remove Programs entry are removed.
 - **Bundle:** `QaDemoSetup.exe` installs and uninstalls the same product.
+
+The `ui` jobs drive the real setup dialogs with UI Automation ([`qa/UiTests`](qa/UiTests), FlaUI): they click through install, repair, remove and cancel, check what each page shows, and **take a screenshot of every page**. They run the native dialogs on both engines, the flat UI in dark, light and `Auto` (with the Windows app mode set to light and to dark), and the bundle window. Open a run in the Actions tab and download the `ui-*` artifacts to look at the pictures, the UI trees and the msiexec logs.
 
 A separate `consumer` job checks the route a user without a monorepo takes. [`qa/consumer/Build-Consumer.ps1`](qa/consumer/Build-Consumer.ps1) creates an installer project outside this repository from the packed NuGet packages and the `dotnet new installkit` template, points it at a folder of prebuilt files, and builds an MSI and a bundle. [`qa/tests/Consumer.Tests.ps1`](qa/tests/Consumer.Tests.ps1) then installs and removes it. This is the test that proves the packages work without this repository.
 

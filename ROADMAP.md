@@ -20,6 +20,9 @@ Not released yet:
 - ICE validation of the built MSIs in CI
 - Modern UI: a settings page that asks for values (`WithPromptedProperty`)
 - Bundle prerequisite helpers for the VC++ redistributable, .NET runtimes and WebView2, from an embedded file or a pinned download
+- Dark themed modern UI: dark native dialogs and bundle window by default, with `Theme` (`Dark`, `Light`, `Auto`) and your own `AccentColor`, `BackgroundColor` and `TextColor`
+- Flat WPF UI (`Appearance.Flat()`), the default with the WixSharp engine: custom-drawn buttons, check box and path box, a caption in the page colour, and `Theme = Auto` following the Windows light/dark setting
+- UI tests that click through install, repair, remove and cancel and take a screenshot of every page of the native dialogs, the flat UI and the bundle window, attached to every CI run
 
 ## Now
 

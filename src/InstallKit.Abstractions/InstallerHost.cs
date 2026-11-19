@@ -91,8 +91,8 @@ namespace InstallKit
         }
 
         /// <summary>
-        /// Adapts the plan to what the engine supports: the modern UI falls back to the classic dialogs
-        /// with a warning; install event handlers without engine support are an error.
+        /// Adapts the plan to what the engine supports: a default UI becomes the best one the engine has, a chosen modern UI
+        /// the engine lacks falls back with a warning; install event handlers without engine support are an error.
         /// </summary>
         static void ApplyCapabilities(InstallerPlan plan, IInstallerEngine engine)
         {
@@ -100,6 +100,14 @@ namespace InstallKit
 
             foreach (var msi in plan.Msis)
             {
+                // Nothing was chosen: the best UI this engine has, without a warning (nobody asked for it).
+                if (msi.Ui == InstallerUi.Default)
+                {
+                    msi.Ui = engine.Capabilities.HasFlag(InstallerCapabilities.WpfUi) ? InstallerUi.ModernFlat
+                        : engine.Capabilities.HasFlag(InstallerCapabilities.ModernUi) ? InstallerUi.ModernInstallDir
+                        : InstallerUi.Minimal;
+                }
+
                 if (msi.Ui == InstallerUi.ModernFlat && !engine.Capabilities.HasFlag(InstallerCapabilities.WpfUi))
                 {
                     Console.WriteLine($"InstallKit : warning IK200: the {engine.Name} engine has no WPF dialogs; MSI '{msi.Name}' uses the native modern dialogs instead of the flat ones.");

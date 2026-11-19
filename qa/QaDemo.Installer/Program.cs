@@ -20,10 +20,12 @@ return InstallerHost.Run(args, plan =>
         .Feature("Worker", "A second service, installed on request", f => f.Payload("QaDemo", "worker"), installedByDefault: false)
         .Appearance(a =>
         {
-            // CI also builds the flat WPF UI (qa/UiTests/FlatTourTests.cs photographs it).
-            if (Environment.GetEnvironmentVariable("QA_UI") == "flat")
+            // CI builds the native dialogs (the default here), the flat WPF UI chosen explicitly, and with "default" no choice at all,
+            // which is the flat UI with the WixSharp engine (qa/UiTests/FlatTourTests.cs photographs both flat variants).
+            var ui = Environment.GetEnvironmentVariable("QA_UI");
+            if (ui == "flat")
                 a.Flat();
-            else
+            else if (ui != "default")
                 a.Modern(chooseInstallDir: true);
             a.AccentColor("#6A1B9A");
 

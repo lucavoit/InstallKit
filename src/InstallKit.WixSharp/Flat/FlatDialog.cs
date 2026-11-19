@@ -82,15 +82,14 @@ namespace InstallKit.WixSharp.Flat
 
             Resources.MergedDictionaries.Add(FlatTheme.Create(Look));
 
-            // The content stretches to whatever size the window has: the shell window is sized below, not by this control.
+            // The content stretches to whatever size the shell window has, and is laid out for the shell's usual size.
             Background = Paint("Bg");
             Content = BuildFrame();
             Build();
 
+            // The caption of the window is styled once the page sits in it. WixSharp calls Init when the page is created, often
+            // before that (the first page of a flow), so this keeps trying every 50 ms for a few seconds as well as on Loaded.
             Loaded += (sender, args) => StyleWindow();
-
-            // The shell window is often not visible yet when a page is created (the first page of every flow), so the window is
-            // styled as soon as it is, trying every 50 ms for a few seconds.
             var attempts = 0;
             var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
             timer.Tick += (sender, args) =>
@@ -99,15 +98,6 @@ namespace InstallKit.WixSharp.Flat
                     timer.Stop();
             };
             timer.Start();
-
-            // WixSharp calls Init once the page is already on screen, so Loaded may have passed: set the window up from here as
-            // well, after the page has been laid out (and again whenever it becomes visible).
-            Dispatcher.BeginInvoke(new System.Action(() => StyleWindow()), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-            IsVisibleChanged += (sender, args) =>
-            {
-                if (IsVisible)
-                    Dispatcher.BeginInvoke(new System.Action(() => StyleWindow()), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-            };
         }
 
         /// <summary>Fills in the heading, the body and the buttons.</summary>
@@ -258,11 +248,9 @@ namespace InstallKit.WixSharp.Flat
             }
         }
 
-        const int WindowWidth = 680;
-        const int WindowHeight = 540;
-
-        // The window is Windows' own frame, so this makes it big enough for the page and, on Windows 10 and 11, lets its caption
-        // follow the page colours: the page then looks borderless.
+        // The window is Windows' own frame. On Windows 11 its caption can follow the page colours, which makes the page look
+        // borderless; the shell leaves the title empty, unlike the native dialogs. Returns false while there is no window yet.
+        // Nothing here may touch the MSI session (see Init).
         bool StyleWindow()
         {
             try
@@ -271,48 +259,25 @@ namespace InstallKit.WixSharp.Flat
                 if (window == IntPtr.Zero)
                     return false;
 
-                // Once: a window the user has moved or resized is left alone on later pages.
-                if (!sized)
-                {
-                    sized = true;
-                    var area = System.Windows.Forms.Screen.FromHandle(window).WorkingArea;
-                    var width = Math.Min(WindowWidth, area.Width);
-                    var height = Math.Min(WindowHeight, area.Height);
-                    SetWindowPos(window, IntPtr.Zero, area.Left + (area.Width - width) / 2, area.Top + (area.Height - height) / 2, width, height, 0x0004 /* SWP_NOZORDER */ | 0x0010 /* SWP_NOACTIVATE */);
-                }
-
-                // The title of the window (the shell leaves it empty, unlike the native dialogs).
                 SetWindowText(window, productName + " Setup");
-
                 Set(window, 20 /* USE_IMMERSIVE_DARK_MODE */, Look.IsDark ? 1 : 0);
                 Set(window, 35 /* CAPTION_COLOR */, ColorRef(Look.Background));
                 Set(window, 34 /* BORDER_COLOR */, ColorRef(Look.Background));
                 Set(window, 36 /* TEXT_COLOR */, ColorRef(Look.Text));
-                return true;
             }
             catch (Exception)
             {
                 // An older Windows without these attributes keeps its standard caption.
-                return true;
             }
+
+            return true;
         }
 
-        static bool sized;
-
-        // The setup window is the top-level window this page sits in. Before the page is hosted there is none; then the first
-        // visible top-level form is the best guess. (A plain "first visible form" picked a helper form on the first page of a flow
-        // and styled that instead.)
+        // The setup window is the top-level window this page sits in: none until the page is hosted.
         IntPtr ShellWindow()
         {
             var source = PresentationSource.FromVisual(this) as HwndSource;
-            if (source != null)
-            {
-                var root = GetAncestor(source.Handle, 2 /* GA_ROOT */);
-                if (root != IntPtr.Zero)
-                    return root;
-            }
-
-            return IntPtr.Zero;
+            return source == null ? IntPtr.Zero : GetAncestor(source.Handle, 2 /* GA_ROOT */);
         }
 
         static int ColorRef(Rgb color) => color.R | (color.G << 8) | (color.B << 16);
@@ -327,8 +292,5 @@ namespace InstallKit.WixSharp.Flat
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         static extern bool SetWindowText(IntPtr window, string text);
-
-        [DllImport("user32.dll")]
-        static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
     }
 }

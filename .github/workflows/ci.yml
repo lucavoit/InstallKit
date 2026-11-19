@@ -114,21 +114,24 @@ jobs:
             ui: flat
             project: qa/QaDemo.Installer/QaDemo.Installer.csproj
           # Theme Auto follows the Windows app mode: the preference is set before the tests, once to light and once to dark.
+          # These two choose no UI at all (qa_ui: default), which is the flat UI with this engine.
           - engine: WixSharp
             theme: auto
             pref: light
             ui: flat
+            qa_ui: default
             project: qa/QaDemo.Installer/QaDemo.Installer.csproj
           - engine: WixSharp
             theme: auto
             pref: dark
             ui: flat
+            qa_ui: default
             project: qa/QaDemo.Installer/QaDemo.Installer.csproj
     env:
       QA_DIR: ${{ github.workspace }}/qa-out
       INSTALLKIT_UI_OUT: ${{ github.workspace }}/ui-out
       QA_THEME: ${{ matrix.theme }}
-      QA_UI: ${{ matrix.ui }}
+      QA_UI: ${{ matrix.qa_ui || matrix.ui }}
     steps:
       - uses: actions/checkout@v4
 
