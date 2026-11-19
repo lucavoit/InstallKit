@@ -89,15 +89,24 @@ namespace InstallKit.WixSharp.Flat
 
             Loaded += (sender, args) => StyleWindow();
 
-            StyleWindow();
+            // The shell window is often not visible yet when a page is created (the first page of every flow), so the window is
+            // styled as soon as it is, trying every 50 ms for a few seconds.
+            var attempts = 0;
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+            timer.Tick += (sender, args) =>
+            {
+                if (StyleWindow() || ++attempts >= 60)
+                    timer.Stop();
+            };
+            timer.Start();
 
             // WixSharp calls Init once the page is already on screen, so Loaded may have passed: set the window up from here as
             // well, after the page has been laid out (and again whenever it becomes visible).
-            Dispatcher.BeginInvoke(new System.Action(StyleWindow), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            Dispatcher.BeginInvoke(new System.Action(() => StyleWindow()), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             IsVisibleChanged += (sender, args) =>
             {
                 if (IsVisible)
-                    Dispatcher.BeginInvoke(new System.Action(StyleWindow), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    Dispatcher.BeginInvoke(new System.Action(() => StyleWindow()), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             };
         }
 
@@ -235,13 +244,13 @@ namespace InstallKit.WixSharp.Flat
 
         // The window is Windows' own frame, so this makes it big enough for the page and, on Windows 10 and 11, lets its caption
         // follow the page colours: the page then looks borderless.
-        void StyleWindow()
+        bool StyleWindow()
         {
             try
             {
                 var window = ShellWindow();
                 if (window == IntPtr.Zero)
-                    return;
+                    return false;
 
                 // Once: a window the user has moved or resized is left alone on later pages.
                 if (!sized)
@@ -260,10 +269,12 @@ namespace InstallKit.WixSharp.Flat
                 Set(window, 35 /* CAPTION_COLOR */, ColorRef(Look.Background));
                 Set(window, 34 /* BORDER_COLOR */, ColorRef(Look.Background));
                 Set(window, 36 /* TEXT_COLOR */, ColorRef(Look.Text));
+                return true;
             }
             catch (Exception)
             {
                 // An older Windows without these attributes keeps its standard caption.
+                return true;
             }
         }
 
