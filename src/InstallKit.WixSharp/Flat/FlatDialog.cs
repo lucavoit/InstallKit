@@ -64,9 +64,22 @@ namespace InstallKit.WixSharp.Flat
             var session = Session;
             // Everything the page needs from the MSI session is read here. Later (the window styling runs on the UI thread at idle
             // time) the session must not be touched: the install runs on another thread, and the two can block each other.
-            productName = session.Property("ProductName");
-            Look = Palette.Create(session.Property(FlatKeys.Light) == "1", NullIfEmpty(session.Property(FlatKeys.Accent)),
-                NullIfEmpty(session.Property(FlatKeys.Background)), NullIfEmpty(session.Property(FlatKeys.Text)));
+            // The last page, after the install, can no longer read the properties: it uses what the first page remembered.
+            var light = session.Property(FlatKeys.Light);
+            if (string.IsNullOrEmpty(light) && rememberedLook != null)
+            {
+                Look = rememberedLook;
+                productName = rememberedProductName;
+            }
+            else
+            {
+                productName = session.Property("ProductName");
+                Look = Palette.Create(light == "1", NullIfEmpty(session.Property(FlatKeys.Accent)),
+                    NullIfEmpty(session.Property(FlatKeys.Background)), NullIfEmpty(session.Property(FlatKeys.Text)));
+                rememberedLook = Look;
+                rememberedProductName = productName;
+            }
+
             Resources.MergedDictionaries.Add(FlatTheme.Create(Look));
 
             // The content stretches to whatever size the window has: the shell window is sized below, not by this control.
@@ -75,6 +88,8 @@ namespace InstallKit.WixSharp.Flat
             Build();
 
             Loaded += (sender, args) => StyleWindow();
+
+            StyleWindow();
 
             // WixSharp calls Init once the page is already on screen, so Loaded may have passed: set the window up from here as
             // well, after the page has been laid out (and again whenever it becomes visible).
@@ -96,6 +111,9 @@ namespace InstallKit.WixSharp.Flat
         internal Brush Paint(string key) => (Brush)Resources.MergedDictionaries[0][key];
 
         string productName;
+
+        static Palette rememberedLook;
+        static string rememberedProductName;
 
         internal string ProductName => productName ?? Session.Property("ProductName");
 

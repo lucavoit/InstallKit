@@ -307,10 +307,19 @@ namespace InstallKit.WixSharp.Flat
 
         void Add(StackPanel panel, string text, string description, System.Action click)
         {
+            // The button and what it does on one row, so three of them fit the page.
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
             var button = new Wpf.Button { Content = text, MinWidth = 130, HorizontalAlignment = HorizontalAlignment.Left };
             button.Click += (sender, args) => click();
-            panel.Children.Add(button);
-            panel.Children.Add(new TextBlock { Text = description, Foreground = Paint("Muted"), Margin = new Thickness(2, 6, 0, 20) });
+            row.Children.Add(button);
+
+            var label = new TextBlock { Text = description, Foreground = Paint("Muted"), Margin = new Thickness(16, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(label, 1);
+            row.Children.Add(label);
+            panel.Children.Add(row);
         }
 
         // Repair and remove skip the pages in between.
