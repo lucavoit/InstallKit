@@ -299,17 +299,20 @@ namespace InstallKit.WixSharp.Flat
 
         static bool sized;
 
-        // The setup window is a WinForms form that hosts the pages; it is the open form that is visible.
+        // The setup window is the top-level window this page sits in. Before the page is hosted there is none; then the first
+        // visible top-level form is the best guess. (A plain "first visible form" picked a helper form on the first page of a flow
+        // and styled that instead.)
         IntPtr ShellWindow()
         {
-            foreach (System.Windows.Forms.Form form in System.Windows.Forms.Application.OpenForms)
+            var source = PresentationSource.FromVisual(this) as HwndSource;
+            if (source != null)
             {
-                if (form.Visible && form.Handle != IntPtr.Zero)
-                    return form.Handle;
+                var root = GetAncestor(source.Handle, 2 /* GA_ROOT */);
+                if (root != IntPtr.Zero)
+                    return root;
             }
 
-            var source = PresentationSource.FromVisual(this) as HwndSource;
-            return source == null ? IntPtr.Zero : GetAncestor(source.Handle, 2 /* GA_ROOT */);
+            return IntPtr.Zero;
         }
 
         static int ColorRef(Rgb color) => color.R | (color.G << 8) | (color.B << 16);
