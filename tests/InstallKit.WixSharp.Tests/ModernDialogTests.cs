@@ -268,4 +268,19 @@ public class ModernDialogTests
 
         Assert.DoesNotContain(Dialogs(fragment), d => (string)d.Attribute("Id")! == ModernDialogXml.OptionsId);
     }
+
+    [Fact]
+    public void Page_background_covers_the_whole_dialog_and_drops_the_footer_line()
+    {
+        var fragment = ModernDialogXml.BuildFragment(Ns, new ModernDialogOptions { Dark = true, PageBackground = @"C:\obj\app.page.bmp" });
+
+        var binary = fragment.Element(Ns + "Binary")!;
+        Assert.Equal(ModernDialogXml.PageBitmapId, (string)binary.Attribute("Id")!);
+
+        var welcome = Dialogs(fragment).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.WelcomeId);
+        var background = welcome.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Background");
+        Assert.Equal("270", (string)background.Attribute("Height")!);
+        Assert.Equal(ModernDialogXml.PageBitmapId, (string)background.Attribute("Text")!);
+        Assert.DoesNotContain(welcome.Elements(Ns + "Control"), c => (string)c.Attribute("Id")! == "BottomLine");
+    }
 }

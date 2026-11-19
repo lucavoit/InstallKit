@@ -229,6 +229,12 @@ namespace InstallKit
             return this;
         }
 
+        internal MsiBuilder SetTheme(InstallerTheme theme)
+        {
+            BrandingOf().Theme = theme;
+            return this;
+        }
+
         internal MsiBuilder SetLogo(string logoFile)
         {
             BrandingOf().LogoFile = logoFile;

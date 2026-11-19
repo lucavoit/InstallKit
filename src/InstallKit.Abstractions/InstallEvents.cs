@@ -136,9 +136,22 @@ namespace InstallKit
         public bool CheckExitCode { get; set; } = true;
     }
 
+    /// <summary>Colour scheme of the native modern dialogs (<see cref="InstallerUi.Modern"/>).</summary>
+    public enum InstallerTheme
+    {
+        /// <summary>Dark pages with a soft accent glow. The default.</summary>
+        Dark = 0,
+
+        /// <summary>White pages with an accent side panel.</summary>
+        Light = 1,
+    }
+
     /// <summary>Look of the installer UI. Applies to classic and modern dialogs and the bundle.</summary>
     public sealed class Branding
     {
+        /// <summary>Colour scheme of the modern dialogs. Defaults to <see cref="InstallerTheme.Dark"/>.</summary>
+        public InstallerTheme Theme { get; set; }
+
         /// <summary>Accent colour as <c>#RRGGBB</c>. Defaults to a neutral blue.</summary>
         public string? AccentColor { get; set; }
 

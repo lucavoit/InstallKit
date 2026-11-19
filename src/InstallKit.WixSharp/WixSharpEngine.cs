@@ -106,10 +106,10 @@ namespace InstallKit.WixSharp
             if (!string.IsNullOrWhiteSpace(msi.LicenseFile))
                 project.LicenceFile = Path.GetFullPath(msi.LicenseFile);
 
-            ApplyBranding(project, msi, context, isModern || isWpf);
+            var hero = ApplyBranding(project, msi, context, isModern || isWpf);
 
             if (isModern)
-                ModernDialogs.Apply(project, msi);
+                ModernDialogs.Apply(project, msi, hero);
 
 #if !INSTALLKIT_CORE
             if (project is ManagedProject managed)
@@ -269,17 +269,19 @@ namespace InstallKit.WixSharp
                 throw new InvalidOperationException($"'wix {arguments}' failed with exit code {process.ExitCode}.");
         }
 
-        static void ApplyBranding(Project project, MsiDefinition msi, InstallerContext context, bool isModern)
+        /// <summary>Sets the dialog images; returns the full-page background of the modern pages, or <c>null</c>.</summary>
+        static string? ApplyBranding(Project project, MsiDefinition msi, InstallerContext context, bool isModern)
         {
             var branding = msi.Branding ?? new Branding();
 
             // Classic dialogs keep WiX's stock images unless branding is set; the modern UI is always branded.
             if (branding.IsEmpty && !isModern)
-                return;
+                return null;
 
             var generated = BrandingImages.Generate(msi.Name, branding, context.IntermediateDirectory, msi.ResolvedOutputFileName);
             project.BannerImage = string.IsNullOrWhiteSpace(branding.BannerImage) ? generated.Banner : Path.GetFullPath(branding.BannerImage);
             project.BackgroundImage = string.IsNullOrWhiteSpace(branding.BackgroundImage) ? generated.Background : Path.GetFullPath(branding.BackgroundImage);
+            return string.IsNullOrWhiteSpace(branding.BackgroundImage) ? generated.Page : null;
         }
 
 #if !INSTALLKIT_CORE

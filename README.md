@@ -64,7 +64,7 @@ The fluent builders are the preferred way to describe installers, and every exam
   | --- | --- |
   | `Content(c => ...)` | `Payload`, `Directory`: files that are always installed |
   | `Feature(name, description, f => ...)` | an optional feature together with its files (`Payload`, `Directory`) |
-  | `Appearance(a => ...)` | `Modern`, `Wpf`, `Classic`, `AccentColor`, `Logo` |
+  | `Appearance(a => ...)` | `Modern`, `Wpf`, `Classic`, `Theme` (dark by default), `AccentColor`, `Logo` |
   | `Machine(m => ...)` | `Registry`, `EnvironmentVariable`, `PathEntry`, `FirewallRule`, `Service`, `FolderPermission`, `XmlValue` |
   | `Shell(s => ...)` | `FileAssociation`, `UrlProtocol`, `StartMenuShortcut`, `DesktopShortcut` |
   | `Lifecycle(l => ...)` | `CloseApplication`, `OnLoad`, `OnBeforeInstall`, `OnAfterInstall`, `RunAfterInstall`, `RunBeforeUninstall` |

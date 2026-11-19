@@ -87,6 +87,13 @@ namespace InstallKit
             return this;
         }
 
+        /// <summary>Dark (the default) or light pages in the native modern dialogs.</summary>
+        public AppearanceBuilder Theme(InstallerTheme theme)
+        {
+            _msi.SetTheme(theme);
+            return this;
+        }
+
         /// <summary>The logo shown in the dialogs.</summary>
         public AppearanceBuilder Logo(string logoFile)
         {

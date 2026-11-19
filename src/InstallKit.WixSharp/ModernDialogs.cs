@@ -22,13 +22,15 @@ namespace InstallKit.WixSharp
     /// </summary>
     internal static class ModernDialogs
     {
-        public static void Apply(Project project, MsiDefinition msi)
+        public static void Apply(Project project, MsiDefinition msi, string? pageBackground = null)
         {
             var options = new ModernDialogOptions
             {
                 LicenseFile = string.IsNullOrWhiteSpace(msi.LicenseFile) ? null : Path.GetFullPath(msi.LicenseFile),
                 ChooseInstallDir = msi.Ui == InstallerUi.ModernInstallDir,
                 HasFeatures = msi.Features.Count > 0,
+                Dark = (msi.Branding?.Theme ?? InstallerTheme.Dark) == InstallerTheme.Dark,
+                PageBackground = pageBackground,
                 Prompts = msi.PromptedProperties.Select(p => new ModernPrompt(p.Name, p.Label, p.Required)).ToList(),
             };
 
