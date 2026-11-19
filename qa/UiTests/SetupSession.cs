@@ -31,13 +31,13 @@ public sealed class SetupSession : IDisposable
     readonly ITestOutputHelper output;
     readonly UIA3Automation automation = new UIA3Automation();
     readonly Process process;
-    readonly string? processName;
+    readonly string[] processNames;
     int dumps;
 
-    SetupSession(Process process, string outDir, ITestOutputHelper output, string? processName = null)
+    SetupSession(Process process, string outDir, ITestOutputHelper output, params string[] processNames)
     {
         this.process = process;
-        this.processName = processName;
+        this.processNames = processNames;
         OutDir = outDir;
         this.output = output;
     }
@@ -63,7 +63,8 @@ public sealed class SetupSession : IDisposable
         var info = new ProcessStartInfo(exe, $"/log \"{log}\"") { UseShellExecute = false };
         var process = Process.Start(info) ?? throw new InvalidOperationException("The bundle did not start.");
         output.WriteLine($"started {exe} ({process.Id})");
-        return new SetupSession(process, outDir, output, Path.GetFileNameWithoutExtension(exe));
+        // Burn shows the window from its standard bootstrapper application host, a process named wixstdba.
+        return new SetupSession(process, outDir, output, Path.GetFileNameWithoutExtension(exe), "wixstdba");
     }
 
     public string OutDir { get; }
@@ -330,8 +331,10 @@ public sealed class SetupSession : IDisposable
             foreach (var log in Directory.GetFiles(OutDir, (logName ?? "*") + "*.log"))
             {
                 text.AppendLine($"--- {Path.GetFileName(log)} (last lines)");
-                foreach (var line in File.ReadAllLines(log).TakeLast(60))
-                    text.AppendLine(line);
+                using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream);
+                foreach (var line in reader.ReadToEnd().Split('\n').TakeLast(60))
+                    text.AppendLine(line.TrimEnd('\r'));
             }
         }
         catch (Exception e)
@@ -405,13 +408,13 @@ public sealed class SetupSession : IDisposable
     {
         if (processId == process.Id)
             return true;
-        if (processName == null)
+        if (processNames.Length == 0)
             return false;
 
         try
         {
             using var other = Process.GetProcessById(processId);
-            return string.Equals(other.ProcessName, processName, StringComparison.OrdinalIgnoreCase);
+            return processNames.Any(n => string.Equals(other.ProcessName, n, StringComparison.OrdinalIgnoreCase));
         }
         catch (Exception)
         {
