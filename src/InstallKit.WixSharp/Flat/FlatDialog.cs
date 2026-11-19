@@ -62,6 +62,9 @@ namespace InstallKit.WixSharp.Flat
         public void Init()
         {
             var session = Session;
+            // Everything the page needs from the MSI session is read here. Later (the window styling runs on the UI thread at idle
+            // time) the session must not be touched: the install runs on another thread, and the two can block each other.
+            productName = session.Property("ProductName");
             Look = Palette.Create(session.Property(FlatKeys.Light) == "1", NullIfEmpty(session.Property(FlatKeys.Accent)),
                 NullIfEmpty(session.Property(FlatKeys.Background)), NullIfEmpty(session.Property(FlatKeys.Text)));
             Resources.MergedDictionaries.Add(FlatTheme.Create(Look));
@@ -92,7 +95,9 @@ namespace InstallKit.WixSharp.Flat
 
         internal Brush Paint(string key) => (Brush)Resources.MergedDictionaries[0][key];
 
-        internal string ProductName => Session.Property("ProductName");
+        string productName;
+
+        internal string ProductName => productName ?? Session.Property("ProductName");
 
         internal string[] PagesAfterWelcome
         {
@@ -217,7 +222,6 @@ namespace InstallKit.WixSharp.Flat
             try
             {
                 var window = ShellWindow();
-                Session.Log("InstallKit flat UI: shell window " + window + ", sized " + sized);
                 if (window == IntPtr.Zero)
                     return;
 
@@ -232,24 +236,16 @@ namespace InstallKit.WixSharp.Flat
                 }
 
                 // The title of the window (the shell leaves it empty, unlike the native dialogs).
-                SetWindowText(window, ProductName + " Setup");
+                SetWindowText(window, productName + " Setup");
 
                 Set(window, 20 /* USE_IMMERSIVE_DARK_MODE */, Look.IsDark ? 1 : 0);
                 Set(window, 35 /* CAPTION_COLOR */, ColorRef(Look.Background));
                 Set(window, 34 /* BORDER_COLOR */, ColorRef(Look.Background));
                 Set(window, 36 /* TEXT_COLOR */, ColorRef(Look.Text));
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 // An older Windows without these attributes keeps its standard caption.
-                try
-                {
-                    Session.Log("InstallKit flat UI: window styling failed: " + e);
-                }
-                catch (Exception)
-                {
-                    // Nothing more to do.
-                }
             }
         }
 
