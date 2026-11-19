@@ -47,20 +47,15 @@ public class FlatTourTests
     }
 
     [FlatUiFact]
-    public void Cancelling_ends_on_the_interrupted_page()
+    public void Cancelling_on_the_first_page_ends_the_setup_without_installing()
     {
         using var product = new InstalledProduct(output);
         using var setup = SetupSession.Start(output, "flat-cancel");
 
         setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Install to"), System.TimeSpan.FromSeconds(90));
         setup.Click("Cancel");
-        setup.WaitForPage("cancel question", p => p.HasButton("Yes"));
-        setup.Show("flat-cancel-1-question");
-        setup.Click("Yes");
-        setup.WaitForPage("interrupted", p => p.HasText("interrupted") && p.HasButton("Finish"));
-        setup.Show("flat-cancel-2-interrupted");
-        setup.Click("Finish");
         Assert.Equal(UserExit, setup.WaitForExit());
+        Assert.False(File.Exists(Path.Combine(InstalledProduct.InstallDir, "QaDemo.exe")), "Cancelling installed nothing.");
     }
 
     [FlatUiFact]

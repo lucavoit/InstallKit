@@ -25,6 +25,7 @@ namespace InstallKit.WixSharp.Flat
             properties.Add(new Property(FlatKeys.Accent, "#" + palette.Accent.Hex));
             properties.Add(new Property(FlatKeys.Background, "#" + palette.Background.Hex));
             properties.Add(new Property(FlatKeys.Text, "#" + palette.Text.Hex));
+            properties.Add(new Property(FlatKeys.License, string.IsNullOrWhiteSpace(msi.LicenseFile) ? "0" : "1"));
             properties.Add(new Property(FlatKeys.Pages, pages.Length > 0 ? pages : "-"));
             if (hasSettings)
             {

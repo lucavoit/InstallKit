@@ -29,6 +29,9 @@ namespace InstallKit.WixSharp.Flat
         /// <summary>The prompted values: <c>PROPERTY|escaped label|required</c>, separated by <c>;</c>.</summary>
         public const string Prompts = "IK_FLAT_PROMPTS";
 
+        /// <summary><c>1</c> when the product has a license of its own (WixSharp carries a placeholder one otherwise).</summary>
+        public const string License = "IK_FLAT_LICENSE";
+
         public const string LogoBinary = "IK_Flat_Logo";
     }
 

@@ -32,7 +32,8 @@ namespace InstallKit.WixSharp.Flat
             string license = null;
             try
             {
-                license = Session.GetResourceString("WixSharp_LicenceFile");
+                if (Session.Property(FlatKeys.License) == "1")
+                    license = Session.GetResourceString("WixSharp_LicenceFile");
             }
             catch (Exception)
             {
