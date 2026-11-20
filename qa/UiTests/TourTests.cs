@@ -26,11 +26,11 @@ public class TourTests
         using var product = new InstalledProduct(output);
         using var setup = SetupSession.Start(output, "tour-install");
 
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Install to"));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"));
         setup.Show("install-1-welcome");
 
         setup.Click("Next");
-        setup.WaitForPage("settings", p => p.HasText("Region"));
+        setup.WaitForPage("settings", p => p.HasText("Region") && p.HasText("Install to"));
         setup.Show("install-2-settings");
 
         setup.Click("Next");
@@ -64,7 +64,7 @@ public class TourTests
         using var product = new InstalledProduct(output);
         using var setup = SetupSession.Start(output, "tour-interrupted");
 
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Install to"));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"));
         setup.Click("Cancel");
         setup.WaitForPage("cancel question", p => p.HasButton("Yes"));
         setup.Click("Yes");

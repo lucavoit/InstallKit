@@ -26,12 +26,13 @@ public class InstallFlowTests
         using var product = new InstalledProduct(output);
         using var setup = SetupSession.Start(output, "install-with-typed-value");
 
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Install to"));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"));
         setup.Click("Next");
 
         // The prompt is required (QA_REGION) and starts with its default; emptying it must stop Next.
-        setup.WaitForPage("settings", p => p.HasText("Region"));
-        var region = setup.Edit();
+        setup.WaitForPage("settings", p => p.HasText("Region") && p.HasText("Install to"));
+        // The install folder is the first input box of the page, the prompted value the last.
+        var region = setup.Edits()[^1];
         Assert.Equal("eu-west", SetupSession.ReadText(region));
 
         setup.SetText(region, "");
@@ -63,12 +64,15 @@ public class InstallFlowTests
     }
 
     [UiFact]
-    public void The_folder_browser_applies_the_chosen_folder_to_the_welcome_page()
+    public void The_folder_browser_applies_the_chosen_folder_to_the_settings_page()
     {
         using var setup = SetupSession.Start(output, "browse-for-the-folder");
         var folder = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "installkit-ui-browse")).FullName;
 
-        setup.WaitForPage("welcome", p => p.HasButton("Browse...") && p.HasText("Install to"));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"));
+        setup.Click("Next");
+
+        setup.WaitForPage("settings", p => p.HasButton("Browse...") && p.HasText("Install to"));
         setup.Click("Browse...");
 
         setup.WaitForPage("folder browser", p => p.HasButton("OK"));
@@ -77,8 +81,8 @@ public class InstallFlowTests
 
         // OK must close the browser and hand the folder back. A button without events (ICE17) leaves the dialog open.
         setup.WaitUntil("the folder browser closes", () => !setup.IsEnabled("OK"));
-        setup.WaitUntil("the welcome page shows the chosen folder",
-            () => Same(SetupSession.ReadText(setup.Edit()), folder));
+        setup.WaitUntil("the settings page shows the chosen folder",
+            () => Same(SetupSession.ReadText(setup.Edits()[0]), folder));
 
         Cancel(setup);
     }

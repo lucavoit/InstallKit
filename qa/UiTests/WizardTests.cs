@@ -23,13 +23,13 @@ public class WizardTests
         using var setup = SetupSession.Start(output, "walk-and-cancel");
 
         // Welcome: the QA demo has features, so this page leads on ("Next") instead of installing ("Install").
-        var welcome = setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Install to"));
+        var welcome = setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"));
         Assert.False(welcome.HasButton("Install"), "With optional features the welcome page must not start the install.");
         setup.Dump("welcome");
 
-        // Settings: the prompted value QA_REGION.
+        // Settings: the install folder and the prompted value QA_REGION.
         setup.Click("Next");
-        setup.WaitForPage("settings", p => p.HasText("Region"));
+        setup.WaitForPage("settings", p => p.HasText("Region") && p.HasText("Install to"));
         setup.Dump("settings");
 
         // The feature page lists the two optional features.
