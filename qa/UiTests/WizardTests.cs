@@ -23,9 +23,13 @@ public class WizardTests
         using var setup = SetupSession.Start(output, "walk-and-cancel");
 
         // Welcome: the QA demo has features, so this page leads on ("Next") instead of installing ("Install").
-        var welcome = setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"));
+        var welcome = setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"));
         Assert.False(welcome.HasButton("Install"), "With optional features the welcome page must not start the install.");
         setup.Dump("welcome");
+
+        // Next waits for the license (the accept box is above its text).
+        Assert.False(setup.IsEnabled("Next"), "Next must wait for the license to be accepted.");
+        setup.Check("accept");
 
         // Settings: the install folder and the prompted value QA_REGION.
         setup.Click("Next");

@@ -25,9 +25,13 @@ public class FlatTourTests
         using var setup = SetupSession.Start(output, "flat-install");
 
         // The QA demo has a settings page (install folder and a value) and features, so the welcome page leads on.
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"), System.TimeSpan.FromSeconds(90));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"), System.TimeSpan.FromSeconds(90));
         setup.Show("flat-install-1-welcome");
 
+        // The QA demo has a license: Next waits for the accept box, which sits above the text.
+        Assert.False(setup.IsEnabled("Next"), "Next must wait for the license to be accepted.");
+        setup.Check("accept");
+        setup.Show("flat-install-1b-license-accepted");
         setup.Click("Next");
         setup.WaitForPage("settings", p => p.HasText("Region") && p.HasText("Install to"));
         setup.Show("flat-install-2-settings");
@@ -52,7 +56,7 @@ public class FlatTourTests
         using var product = new InstalledProduct(output);
         using var setup = SetupSession.Start(output, "flat-cancel");
 
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"), System.TimeSpan.FromSeconds(90));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"), System.TimeSpan.FromSeconds(90));
         setup.Click("Cancel");
         Assert.Equal(UserExit, setup.WaitForExit());
         Assert.False(File.Exists(Path.Combine(InstalledProduct.InstallDir, "QaDemo.exe")), "Cancelling installed nothing.");

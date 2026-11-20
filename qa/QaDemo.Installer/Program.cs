@@ -11,6 +11,8 @@ return InstallerHost.Run(args, plan =>
         .WithDescription("QA demo installer for InstallKit.")
         .WithOutputFileName("QaDemo")
         .WithMainExecutable("QaDemo.exe")
+        // A fake license: the setup shows it on the welcome page and Next waits for the accept box (qa/UiTests accept it).
+        .WithLicenseFile(@"..\content\license.rtf")
         .Content(c => c
             .Payload("QaDemo")
             .Directory(@"..\content\config", "config"))

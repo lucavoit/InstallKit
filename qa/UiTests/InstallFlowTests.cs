@@ -21,12 +21,31 @@ public class InstallFlowTests
     public InstallFlowTests(ITestOutputHelper output) => this.output = output;
 
     [UiFact]
+    public void Next_waits_for_the_license_to_be_accepted()
+    {
+        using var setup = SetupSession.Start(output, "license-gate");
+
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"));
+        setup.WaitUntil("Next is disabled before the license is accepted", () => !setup.IsEnabled("Next"));
+
+        setup.Check("accept");
+        setup.WaitUntil("Next is enabled once the license is accepted", () => setup.IsEnabled("Next"));
+
+        // The accept box and the license text are on the welcome page; the folder is on the page after it.
+        setup.Click("Next");
+        setup.WaitForPage("settings", p => p.HasText("Install to") && !p.HasText("accept"));
+
+        Cancel(setup);
+    }
+
+    [UiFact]
     public void A_required_value_must_be_filled_in_and_reaches_the_installed_config()
     {
         using var product = new InstalledProduct(output);
         using var setup = SetupSession.Start(output, "install-with-typed-value");
 
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"));
+        setup.Check("accept");
         setup.Click("Next");
 
         // The prompt is required (QA_REGION) and starts with its default; emptying it must stop Next.
@@ -69,7 +88,8 @@ public class InstallFlowTests
         using var setup = SetupSession.Start(output, "browse-for-the-folder");
         var folder = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "installkit-ui-browse")).FullName;
 
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install"));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"));
+        setup.Check("accept");
         setup.Click("Next");
 
         setup.WaitForPage("settings", p => p.HasButton("Browse...") && p.HasText("Install to"));
