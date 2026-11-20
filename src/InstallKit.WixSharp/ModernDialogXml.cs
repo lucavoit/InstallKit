@@ -198,7 +198,7 @@ namespace InstallKit.WixSharp
                 dialog.Add(
                     Text(ns, "Intro", 82, 28, intro),
                     E("Control", A("Id", "Accept"), A("Type", "CheckBox"), A("X", ContentX), A("Y", 114), A("Width", ContentWidth), A("Height", 14),
-                      A("Property", "InstallKitLicenseAccepted"), A("CheckBoxValue", "1"), A("Transparent", "yes"),
+                      A("Property", "InstallKitLicenseAccepted"), A("CheckBoxValue", "1"),
                       A("Text", "{\\InstallKit_Font_Body}I accept the license terms")),
                     E("Control", A("Id", "License"), A("Type", "ScrollableText"), A("X", ContentX), A("Y", 134), A("Width", ContentWidth),
                       A("Height", 92), A("Sunken", "yes"), A("TabSkip", "no"),

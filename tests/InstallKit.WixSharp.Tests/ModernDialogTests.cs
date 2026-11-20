@@ -201,6 +201,15 @@ public class ModernDialogTests
     }
 
     [Fact]
+    public void The_accept_box_has_no_transparent_attribute_which_wix_rejects_on_a_check_box()
+    {
+        var welcome = Dialogs(Build(license: "license.rtf")).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.WelcomeId);
+        var accept = welcome.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Accept");
+
+        Assert.Null(accept.Attribute("Transparent"));
+    }
+
+    [Fact]
     public void Without_a_license_the_next_button_is_not_gated()
     {
         var welcome = Dialogs(Build(chooseDir: true)).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.WelcomeId);
