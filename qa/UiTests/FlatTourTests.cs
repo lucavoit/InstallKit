@@ -54,6 +54,73 @@ public class FlatTourTests
         Assert.True(File.Exists(Path.Combine(InstalledProduct.InstallDir, "QaDemo.exe")), "The tour installed the product.");
     }
 
+    // The license is written next to the other temp files before it is handed to whatever opens .rtf files, so the file is what
+    // is checked: the runner may have no program for it at all (the button must not fail then).
+    [FlatUiFact]
+    public void Open_license_writes_the_license_and_hands_it_to_the_rtf_program()
+    {
+        var file = Path.Combine(Path.GetTempPath(), "InstallKit QA Demo license.rtf");
+        if (File.Exists(file))
+            File.Delete(file);
+
+        using var product = new InstalledProduct(output);
+        using var setup = SetupSession.Start(output, "flat-open-license");
+
+        setup.WaitForPage("welcome", p => p.HasButton("Open license") && p.HasText("accept"), System.TimeSpan.FromSeconds(90));
+        setup.Click("Open license");
+        setup.WaitUntil("the license file is written", () => File.Exists(file), System.TimeSpan.FromSeconds(20));
+
+        var text = File.ReadAllText(file);
+        Assert.StartsWith("{\\rtf1", text);
+        Assert.Contains("Fake License Agreement", text);
+        output.WriteLine($"the license was written to {file} ({text.Length} characters)");
+
+        // A viewer may have opened on the runner: close it so it cannot cover the setup window.
+        foreach (var name in new[] { "wordpad", "winword", "write" })
+        {
+            foreach (var viewer in System.Diagnostics.Process.GetProcessesByName(name))
+            {
+                try { viewer.Kill(); } catch (System.Exception) { }
+            }
+        }
+
+        // The page is still usable after the button: the accept box gates Next as before.
+        Assert.False(setup.IsEnabled("Next"), "Opening the license does not accept it.");
+        setup.Click("Cancel");
+        Assert.Equal(UserExit, setup.WaitForExit());
+        File.Delete(file);
+    }
+
+    [FlatUiFact]
+    public void Save_a_copy_saves_the_license_to_the_chosen_file()
+    {
+        var target = Path.Combine(Path.GetTempPath(), "installkit-ui-license-copy.rtf");
+        if (File.Exists(target))
+            File.Delete(target);
+
+        using var product = new InstalledProduct(output);
+        using var setup = SetupSession.Start(output, "flat-save-license");
+
+        setup.WaitForPage("welcome", p => p.HasButton("Save a copy") && p.HasText("accept"), System.TimeSpan.FromSeconds(90));
+        setup.Click("Save a copy");
+        setup.WaitForPage("save as", p => p.HasButton("Save") && p.HasButton("Cancel") && p.HasText("File name"));
+        setup.Show("flat-save-license-1-dialog");
+
+        setup.SaveFileAs(target);
+        setup.WaitUntil("the copy is saved", () => File.Exists(target), System.TimeSpan.FromSeconds(20));
+
+        var text = File.ReadAllText(target);
+        Assert.StartsWith("{\\rtf1", text);
+        Assert.Contains("Fake License Agreement", text);
+
+        // Back on the welcome page: saving a copy does not accept the license either.
+        setup.WaitForPage("welcome again", p => p.HasButton("Save a copy") && p.HasText("accept"));
+        Assert.False(setup.IsEnabled("Next"), "Saving a copy does not accept the license.");
+        setup.Click("Cancel");
+        Assert.Equal(UserExit, setup.WaitForExit());
+        File.Delete(target);
+    }
+
     [FlatUiFact]
     public void Cancelling_on_the_first_page_ends_the_setup_without_installing()
     {

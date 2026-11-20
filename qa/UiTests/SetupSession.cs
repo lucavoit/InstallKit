@@ -175,6 +175,25 @@ public sealed class SetupSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// Fills in the "File name" box of the Windows Save As dialog that is open and presses Save. The box is a combo box with an Edit
+    /// inside it, which <see cref="Edits"/> leaves out, so it is found by its name.
+    /// </summary>
+    public void SaveFileAs(string path)
+    {
+        var edit = Retry(() => Windows().SelectMany(w => w.FindAllDescendants())
+            .FirstOrDefault(e => SafeControlType(e) == ControlType.Edit && Same(SafeName(e), "File name")),
+            TimeSpan.FromSeconds(20));
+        if (edit == null)
+        {
+            Dump("missing-save-as-file-name");
+            throw new Xunit.Sdk.XunitException($"No 'File name' box on the setup windows (is the Save As dialog open?). The UI tree and a screenshot are in {OutDir}.");
+        }
+
+        SetText(edit, path);
+        Click("Save");
+    }
+
     /// <summary>Waits until <paramref name="condition"/> holds; dumps the screen and fails with <paramref name="what"/> if it does not.</summary>
     public void WaitUntil(string what, Func<bool> condition, TimeSpan? timeout = null)
     {
