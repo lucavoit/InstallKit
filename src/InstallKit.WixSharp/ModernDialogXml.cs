@@ -251,7 +251,7 @@ namespace InstallKit.WixSharp
                 Bitmap(ns, options),
                 Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}" + (folder && !prompts ? "Install location" : "Settings")),
                 Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}" + (folder
-                    ? "Choose where to install, and tell setup a little about this installation."
+                    ? "Choose where to install and your settings."
                     : "Tell setup a little about this installation.")));
 
             var y = 82;
