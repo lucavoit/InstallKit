@@ -17,10 +17,10 @@ namespace InstallKit.WixSharp.Flat
             var palette = Palette.Create(branding.Theme == InstallerTheme.Light, branding.AccentColor, branding.BackgroundColor, branding.TextColor);
             var auto = branding.Theme == InstallerTheme.Auto;
 
-            var hasLicense = !string.IsNullOrWhiteSpace(msi.LicenseFile);
-            var hasSettings = msi.PromptedProperties.Count > 0;
+            var hasPrompts = msi.PromptedProperties.Count > 0;
             var hasFeatures = msi.Features.Count > 0;
-            var pages = string.Join(";", new[] { hasLicense ? "license" : null, hasSettings ? "settings" : null, hasFeatures ? "features" : null }.Where(p => p != null));
+            // The install folder (always offered) and the prompted values share the settings page after the welcome page.
+            var pages = string.Join(";", new[] { "settings", hasFeatures ? "features" : null }.Where(p => p != null));
 
             var properties = project.Properties.ToList();
             // "auto" is resolved when the setup starts. The page and text colours are only written when the user chose them: otherwise
@@ -29,9 +29,9 @@ namespace InstallKit.WixSharp.Flat
             properties.Add(new Property(FlatKeys.Accent, "#" + palette.Accent.Hex));
             properties.Add(new Property(FlatKeys.Background, string.IsNullOrWhiteSpace(branding.BackgroundColor) ? "-" : branding.BackgroundColor));
             properties.Add(new Property(FlatKeys.Text, string.IsNullOrWhiteSpace(branding.TextColor) ? "-" : branding.TextColor));
-            properties.Add(new Property(FlatKeys.License, hasLicense ? "1" : "0"));
+            properties.Add(new Property(FlatKeys.License, string.IsNullOrWhiteSpace(msi.LicenseFile) ? "0" : "1"));
             properties.Add(new Property(FlatKeys.Pages, pages.Length > 0 ? pages : "-"));
-            if (hasSettings)
+            if (hasPrompts)
             {
                 properties.Add(new Property(FlatKeys.Prompts, string.Join(";",
                     msi.PromptedProperties.Select(p => p.Name + "|" + Uri.EscapeDataString(p.Label) + "|" + (p.Required ? "1" : "0")))));
@@ -44,10 +44,7 @@ namespace InstallKit.WixSharp.Flat
                 project.Binaries = project.Binaries.Concat(new[] { new Binary(new Id(FlatKeys.LogoBinary), logo) }).ToArray();
 
             var install = new ManagedDialogs().Add<FlatWelcomeDialog>();
-            if (hasLicense)
-                install.Add<FlatLicenseDialog>();
-            if (hasSettings)
-                install.Add<FlatSettingsDialog>();
+            install.Add<FlatSettingsDialog>();
             if (hasFeatures)
                 install.Add<FlatFeaturesDialog>();
             install.Add<FlatProgressDialog>().Add<FlatExitDialog>();

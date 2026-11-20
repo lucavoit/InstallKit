@@ -24,7 +24,7 @@ namespace InstallKit.WixSharp.Flat
         public const string Text = "IK_FLAT_TEXT";
         public const string Light = "IK_FLAT_LIGHT";
 
-        /// <summary>The pages after the welcome page of an install: <c>license</c>, <c>settings</c> and/or <c>features</c>.</summary>
+        /// <summary>The pages after the welcome page of an install: <c>settings</c> (install folder and prompted values) and/or <c>features</c>.</summary>
         public const string Pages = "IK_FLAT_PAGES";
 
         /// <summary>The prompted values: <c>PROPERTY|escaped label|required</c>, separated by <c>;</c>.</summary>
