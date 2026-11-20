@@ -51,9 +51,22 @@ namespace InstallKit.WixSharp.Flat
 
             if (!string.IsNullOrWhiteSpace(license))
             {
-                accept = new CheckBox { Content = "I accept the license terms", Margin = new Thickness(0, 0, 0, 12) };
-                DockPanel.SetDock(accept, Dock.Top);
-                panel.Children.Add(accept);
+                // The accept box on the left; on the right two buttons to read the license in a program of the user's choice or keep a copy.
+                accept = new CheckBox { Content = "I accept the license terms", VerticalAlignment = VerticalAlignment.Center };
+                var open = new Wpf.Button { Content = "Open license", Padding = new Thickness(10, 2, 10, 2) };
+                var save = new Wpf.Button { Content = "Save a copy...", Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(8, 0, 0, 0) };
+                open.Click += (sender, args) => OpenLicense(license);
+                save.Click += (sender, args) => SaveLicense(license);
+
+                var row = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
+                var actions = new StackPanel { Orientation = Orientation.Horizontal };
+                actions.Children.Add(open);
+                actions.Children.Add(save);
+                DockPanel.SetDock(actions, Dock.Right);
+                row.Children.Add(actions);
+                row.Children.Add(accept);
+                DockPanel.SetDock(row, Dock.Top);
+                panel.Children.Add(row);
 
                 // The license is rich text with its own colours: show it on a light card in every theme. It takes the rest of the page.
                 var box = new RichTextBox
@@ -78,6 +91,37 @@ namespace InstallKit.WixSharp.Flat
                 go.IsEnabled = false;
                 accept.Checked += (sender, args) => go.IsEnabled = true;
                 accept.Unchecked += (sender, args) => go.IsEnabled = false;
+            }
+        }
+
+        string LicenseFileName => string.Join("_", (ProductName + " license").Split(Path.GetInvalidFileNameChars())) + ".rtf";
+
+        // Opens the license in whatever the user has for .rtf files (WordPad, Word): to read it larger, search it or print it.
+        void OpenLicense(string rtf)
+        {
+            try
+            {
+                var path = Path.Combine(Path.GetTempPath(), LicenseFileName);
+                File.WriteAllBytes(path, Encoding.UTF8.GetBytes(rtf));
+                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            }
+            catch (Exception)
+            {
+                // No program for .rtf files: the license is still readable (and can be saved) on this page.
+            }
+        }
+
+        void SaveLicense(string rtf)
+        {
+            try
+            {
+                var dialog = new Microsoft.Win32.SaveFileDialog { FileName = LicenseFileName, DefaultExt = ".rtf", Filter = "Rich Text Format (*.rtf)|*.rtf" };
+                if (dialog.ShowDialog() == true)
+                    File.WriteAllBytes(dialog.FileName, Encoding.UTF8.GetBytes(rtf));
+            }
+            catch (Exception)
+            {
+                // The folder cannot be written to: nothing is lost, the user can pick another one.
             }
         }
 

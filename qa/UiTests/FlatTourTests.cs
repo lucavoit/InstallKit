@@ -25,8 +25,12 @@ public class FlatTourTests
         using var setup = SetupSession.Start(output, "flat-install");
 
         // The QA demo has a settings page (install folder and a value) and features, so the welcome page leads on.
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"), System.TimeSpan.FromSeconds(90));
+        var welcome = setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"), System.TimeSpan.FromSeconds(90));
         setup.Show("flat-install-1-welcome");
+
+        // The license can be read in another program or saved (not clicked here: that would start WordPad or a file dialog).
+        Assert.True(welcome.HasButton("Open license"), "The welcome page offers to open the license.");
+        Assert.True(welcome.HasButton("Save a copy"), "The welcome page offers to save a copy of the license.");
 
         // The QA demo has a license: Next waits for the accept box, which sits above the text.
         Assert.False(setup.IsEnabled("Next"), "Next must wait for the license to be accepted.");
