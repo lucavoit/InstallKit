@@ -102,7 +102,7 @@ namespace InstallKit.WixSharp.Flat
             try
             {
                 var path = Path.Combine(Path.GetTempPath(), LicenseFileName);
-                File.WriteAllBytes(path, Encoding.UTF8.GetBytes(rtf));
+                System.IO.File.WriteAllBytes(path, Encoding.UTF8.GetBytes(rtf));
                 Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             }
             catch (Exception)
@@ -117,7 +117,7 @@ namespace InstallKit.WixSharp.Flat
             {
                 var dialog = new Microsoft.Win32.SaveFileDialog { FileName = LicenseFileName, DefaultExt = ".rtf", Filter = "Rich Text Format (*.rtf)|*.rtf" };
                 if (dialog.ShowDialog() == true)
-                    File.WriteAllBytes(dialog.FileName, Encoding.UTF8.GetBytes(rtf));
+                    System.IO.File.WriteAllBytes(dialog.FileName, Encoding.UTF8.GetBytes(rtf));
             }
             catch (Exception)
             {
