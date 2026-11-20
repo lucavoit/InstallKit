@@ -59,7 +59,7 @@ namespace InstallKit
         internal AppearanceBuilder(MsiBuilder msi) => _msi = msi;
 
         /// <summary>Uses the native modern dialogs (see <see cref="InstallerUi.Modern"/>).</summary>
-        /// <param name="chooseInstallDir">Show the install folder and a Browse button on the welcome page.</param>
+        /// <param name="chooseInstallDir">Show the install folder and a Browse button on the page after the welcome page.</param>
         public AppearanceBuilder Modern(bool chooseInstallDir = false)
         {
             _msi.UseModernUi(chooseInstallDir);

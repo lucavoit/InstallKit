@@ -7,10 +7,10 @@ namespace InstallKit.WixSharp
     /// <summary>What the modern dialogs need to know about the product. Plain data, so the XML builder has no WixSharp dependency.</summary>
     internal sealed class ModernDialogOptions
     {
-        /// <summary>Full path of an RTF license shown on the welcome page, or <c>null</c>.</summary>
+        /// <summary>Full path of an RTF license shown on the welcome page (accept box above it), or <c>null</c>.</summary>
         public string? LicenseFile { get; set; }
 
-        /// <summary>Show the install folder and a Browse button on the welcome page.</summary>
+        /// <summary>Show the install folder and a Browse button, on the page after the welcome page (above any prompted values).</summary>
         public bool ChooseInstallDir { get; set; }
 
         /// <summary>
@@ -33,7 +33,7 @@ namespace InstallKit.WixSharp
         /// </summary>
         public string? CancelBackground { get; set; }
 
-        /// <summary>Values to ask for on a page of their own after the welcome page (at most three fit).</summary>
+        /// <summary>Values to ask for on the page after the welcome page, below the install folder (at most three fit with the folder).</summary>
         public IReadOnlyList<ModernPrompt> Prompts { get; set; } = new ModernPrompt[0];
     }
 
@@ -79,10 +79,10 @@ namespace InstallKit.WixSharp
             XAttribute A(string name, object value) => new XAttribute(name, value);
 
             var features = options.HasFeatures;
-            var prompts = options.Prompts.Count > 0;
             string D(string wixId) => StockDialogXml.Id(options, wixId);
-            // The page before the feature page when installing: the settings page, or the welcome page.
-            var beforeFeatures = prompts ? OptionsId : WelcomeId;
+            var hasOptions = HasOptionsPage(options);
+            // The page before the feature page when installing: the install folder / settings page, or the welcome page.
+            var beforeFeatures = hasOptions ? OptionsId : WelcomeId;
 
             // With a page background the pages of the install and repair flows are our own (see StockDialogXml); the
             // rest, popups and the folder and feature pages, stay WiX's.
@@ -147,7 +147,7 @@ namespace InstallKit.WixSharp
 
                 skin.Count > 0 ? StockDialogXml.Dialogs(ns, options) : null,
                 Welcome(ns, options),
-                prompts ? Options(ns, options) : null,
+                hasOptions ? Options(ns, options) : null,
                 Finish(ns, options),
 
                 E("InstallUISequence",
@@ -171,73 +171,59 @@ namespace InstallKit.WixSharp
         static XAttribute[] Colour(Rgb c) =>
             new[] { new XAttribute("Red", c.R), new XAttribute("Green", c.G), new XAttribute("Blue", c.B) };
 
+        /// <summary>The install folder and the prompted values share one page after the welcome page.</summary>
+        static bool HasOptionsPage(ModernDialogOptions options) => options.ChooseInstallDir || options.Prompts.Count > 0;
+
         static XElement Welcome(XNamespace ns, ModernDialogOptions options)
         {
             XElement E(string name, params object?[] content) => new XElement(ns + name, content);
             XAttribute A(string name, object value) => new XAttribute(name, value);
 
             var license = options.LicenseFile;
-            var chooseFolder = options.ChooseInstallDir;
-            var features = options.HasFeatures;
             // The page this one leads to, or null when its button starts the install.
-            var next = options.Prompts.Count > 0 ? OptionsId : features ? "CustomizeDlg" : null;
+            var next = HasOptionsPage(options) ? OptionsId : options.HasFeatures ? "CustomizeDlg" : null;
 
             var dialog = E("Dialog", A("Id", WelcomeId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
                 Bitmap(ns, options),
                 Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}[ProductName]"),
                 Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}Version [ProductVersion]  -  [Manufacturer]"));
 
-            var y = 82;
+            var intro = next != null
+                ? "Setup will install [ProductName] on this computer. Click Next to continue."
+                : "Setup will install [ProductName] on this computer. Click Install to continue.";
 
             if (license != null)
             {
+                // The intro, then the accept box above the license text, which fills the rest of the page.
                 dialog.Add(
-                    E("Control", A("Id", "License"), A("Type", "ScrollableText"), A("X", ContentX), A("Y", y), A("Width", ContentWidth),
-                      A("Height", chooseFolder ? 70 : 100), A("Sunken", "yes"), A("TabSkip", "no"),
+                    Text(ns, "Intro", 82, 28, intro),
+                    E("Control", A("Id", "Accept"), A("Type", "CheckBox"), A("X", ContentX), A("Y", 114), A("Width", ContentWidth), A("Height", 14),
+                      A("Property", "InstallKitLicenseAccepted"), A("CheckBoxValue", "1"),
+                      A("Text", "{\\InstallKit_Font_Body}I accept the license terms")),
+                    E("Control", A("Id", "License"), A("Type", "ScrollableText"), A("X", ContentX), A("Y", 134), A("Width", ContentWidth),
+                      A("Height", 92), A("Sunken", "yes"), A("TabSkip", "no"),
                       E("Text", A("SourceFile", license))));
-                y += chooseFolder ? 74 : 104;
-
-                dialog.Add(
-                    E("Control", A("Id", "Accept"), A("Type", "CheckBox"), A("X", ContentX), A("Y", y), A("Width", ContentWidth), A("Height", 14),
-                      A("Property", "InstallKitLicenseAccepted"), A("CheckBoxValue", "1"), A("Transparent", "yes"),
-                      A("Text", "{\\InstallKit_Font_Body}I accept the license terms")));
-                y += 20;
             }
             else
             {
-                dialog.Add(Text(ns, "Intro", y, 40, next != null
-                    ? "Setup will install [ProductName] on this computer. Click Next to continue."
-                    : "Setup will install [ProductName] on this computer. Click Install to continue."));
-                y += 46;
+                dialog.Add(Text(ns, "Intro", 82, 40, intro));
             }
 
-            if (chooseFolder)
-            {
-                dialog.Add(
-                    Text(ns, "FolderLabel", y, 12, "Install to:"),
-                    E("Control", A("Id", "Folder"), A("Type", "PathEdit"), A("X", ContentX), A("Y", y + 14), A("Width", ContentWidth - 62), A("Height", 17),
-                      A("Property", "INSTALLDIR"), A("Indirect", "no")),
-                    E("Control", A("Id", "Browse"), A("Type", "PushButton"), A("X", ContentX + ContentWidth - 56), A("Y", y + 14), A("Width", 56), A("Height", 17),
-                      A("Text", "Browse..."),
-                      E("Publish", A("Property", "_BrowseProperty"), A("Value", "INSTALLDIR"), A("Order", 1)),
-                      E("Publish", A("Event", "SpawnDialog"), A("Value", "BrowseDlg"), A("Order", 2))));
-            }
-
-            // Without features this button starts the install. With features it leads to the feature page, and the
-            // "Ready to install" page after it (which has the elevation shield and the disk space check) starts it.
+            // Without features or a page after this one the button starts the install. Otherwise it leads on, and the "Ready to
+            // install" page after the feature page (which has the elevation shield and the disk space check) starts it.
             var install = E("Control", A("Id", "Install"), A("Type", "PushButton"), A("X", 236), A("Y", 243), A("Width", 56), A("Height", 17),
                 A("Default", "yes"), next != null ? null : A("ElevationShield", "yes"), A("Text", next != null ? "Next" : "Install"),
-                chooseFolder ? E("Publish", A("Event", "SetTargetPath"), A("Value", "INSTALLDIR"), A("Order", 1)) : null,
                 next != null
-                    ? new[] { E("Publish", A("Event", "NewDialog"), A("Value", next), A("Order", 2)) }
+                    ? new[] { E("Publish", A("Event", "NewDialog"), A("Value", next), A("Order", 1)) }
                     : new[]
                     {
-                        E("Publish", A("Event", "SpawnDialog"), A("Value", "OutOfDiskDlg"), A("Order", 2), A("Condition", "OutOfDiskSpace = 1")),
-                        E("Publish", A("Event", "EndDialog"), A("Value", "Return"), A("Order", 3), A("Condition", "OutOfDiskSpace <> 1")),
+                        E("Publish", A("Event", "SpawnDialog"), A("Value", "OutOfDiskDlg"), A("Order", 1), A("Condition", "OutOfDiskSpace = 1")),
+                        E("Publish", A("Event", "EndDialog"), A("Value", "Return"), A("Order", 2), A("Condition", "OutOfDiskSpace <> 1")),
                     });
 
             if (license != null)
             {
+                // Windows Installer never undoes a condition, so the button needs the matching enable condition as well.
                 install.Add(A("DisableCondition", "InstallKitLicenseAccepted <> \"1\""), A("EnableCondition", "InstallKitLicenseAccepted = \"1\""));
             }
 
@@ -251,20 +237,37 @@ namespace InstallKit.WixSharp
             return dialog;
         }
 
-        /// <summary>The page with the prompted values: one label and input box each, then Back and Next (or Install).</summary>
+        /// <summary>The install folder (when chosen) and the prompted values, then Back and Next (or Install).</summary>
         static XElement Options(XNamespace ns, ModernDialogOptions options)
         {
             XElement E(string name, params object?[] content) => new XElement(ns + name, content);
             XAttribute A(string name, object value) => new XAttribute(name, value);
 
             var features = options.HasFeatures;
+            var folder = options.ChooseInstallDir;
+            var prompts = options.Prompts.Count > 0;
 
             var dialog = E("Dialog", A("Id", OptionsId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
                 Bitmap(ns, options),
-                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}Settings"),
-                Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}Tell setup a little about this installation."));
+                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}" + (folder && !prompts ? "Install location" : "Settings")),
+                Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}" + (folder
+                    ? "Choose where to install and your settings."
+                    : "Tell setup a little about this installation.")));
 
             var y = 82;
+            if (folder)
+            {
+                dialog.Add(
+                    Text(ns, "FolderLabel", y, 12, "Install to:"),
+                    E("Control", A("Id", "Folder"), A("Type", "PathEdit"), A("X", ContentX), A("Y", y + 14), A("Width", ContentWidth - 62), A("Height", 17),
+                      A("Property", "INSTALLDIR"), A("Indirect", "no")),
+                    E("Control", A("Id", "Browse"), A("Type", "PushButton"), A("X", ContentX + ContentWidth - 56), A("Y", y + 14), A("Width", 56), A("Height", 17),
+                      A("Text", "Browse..."),
+                      E("Publish", A("Property", "_BrowseProperty"), A("Value", "INSTALLDIR"), A("Order", 1)),
+                      E("Publish", A("Event", "SpawnDialog"), A("Value", "BrowseDlg"), A("Order", 2))));
+                y += 40;
+            }
+
             for (var i = 0; i < options.Prompts.Count; i++)
             {
                 var prompt = options.Prompts[i];
@@ -276,14 +279,17 @@ namespace InstallKit.WixSharp
             }
 
             var required = options.Prompts.Where(p => p.Required).Select(p => $"{p.Property} = \"\"").ToList();
+            // The chosen folder has to be applied before the page is left.
+            var order = 1;
             var forward = E("Control", A("Id", "Next"), A("Type", "PushButton"), A("X", 236), A("Y", 243), A("Width", 56), A("Height", 17),
                 A("Default", "yes"), features ? null : A("ElevationShield", "yes"), A("Text", features ? "Next" : "Install"),
+                folder ? E("Publish", A("Event", "SetTargetPath"), A("Value", "INSTALLDIR"), A("Order", order++)) : null,
                 features
-                    ? new[] { E("Publish", A("Event", "NewDialog"), A("Value", "CustomizeDlg"), A("Order", 1)) }
+                    ? new[] { E("Publish", A("Event", "NewDialog"), A("Value", "CustomizeDlg"), A("Order", order)) }
                     : new[]
                     {
-                        E("Publish", A("Event", "SpawnDialog"), A("Value", "OutOfDiskDlg"), A("Order", 1), A("Condition", "OutOfDiskSpace = 1")),
-                        E("Publish", A("Event", "EndDialog"), A("Value", "Return"), A("Order", 2), A("Condition", "OutOfDiskSpace <> 1")),
+                        E("Publish", A("Event", "SpawnDialog"), A("Value", "OutOfDiskDlg"), A("Order", order), A("Condition", "OutOfDiskSpace = 1")),
+                        E("Publish", A("Event", "EndDialog"), A("Value", "Return"), A("Order", order + 1), A("Condition", "OutOfDiskSpace <> 1")),
                     });
             if (required.Count > 0)
             {

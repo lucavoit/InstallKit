@@ -39,7 +39,7 @@ namespace InstallKit
         /// </summary>
         Modern,
 
-        /// <summary><see cref="Modern"/> with the install folder (and a Browse button) on the welcome page.</summary>
+        /// <summary><see cref="Modern"/> with the install folder (and a Browse button) on the page after the welcome page.</summary>
         ModernInstallDir,
 
         /// <summary>
