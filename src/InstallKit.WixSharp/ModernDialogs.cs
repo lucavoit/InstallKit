@@ -9,8 +9,9 @@ namespace InstallKit.WixSharp
     /// The native modern dialog set (<see cref="InstallerUi.Modern"/>): built from MSI's own dialog tables, so it
     /// needs nothing on the target machine and works the same on every engine.
     /// <list type="bullet">
-    /// <item>One welcome page on the branded background: product name, version, optional license with an
-    /// accept box, optional install folder with Browse, and an Install button.</item>
+    /// <item>One welcome page on the branded background: product name, version, optional install folder
+    /// with Browse, and an Install (or Next) button.</item>
+    /// <item>An optional license page after it, with an accept box that Next waits for.</item>
     /// <item>With optional features the welcome page leads to the feature page and a "ready to install" page; the repair
     /// dialog then also offers Change.</item>
     /// <item>Prompted properties get a settings page of their own (a label and an input box each) after the welcome page.</item>

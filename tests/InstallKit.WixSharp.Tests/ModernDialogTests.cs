@@ -188,13 +188,63 @@ public class ModernDialogTests
         var welcome = Dialogs(fragment).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.WelcomeId);
         var controls = welcome.Elements(Ns + "Control").Select(c => (string)c.Attribute("Id")!).ToList();
 
-        Assert.Contains("License", controls);
-        Assert.Contains("Accept", controls);
+        // The license has a page of its own, so it cannot push the folder off the welcome page.
+        Assert.DoesNotContain("License", controls);
+        Assert.DoesNotContain("Accept", controls);
         Assert.Contains("Folder", controls);
         Assert.Contains("Browse", controls);
         var install = welcome.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Install");
-        Assert.Contains("InstallKitLicenseAccepted", (string)install.Attribute("DisableCondition")!);
+        Assert.Equal("Next", (string)install.Attribute("Text")!);
+        Assert.Null(install.Attribute("DisableCondition"));
         Assert.Contains(Publishes(fragment), p => p.Control == "Install" && p.Event == "SetTargetPath" && p.Value == "INSTALLDIR");
+    }
+
+    [Fact]
+    public void The_license_gets_a_page_after_the_welcome_page_and_next_waits_for_the_accept_box()
+    {
+        var fragment = Build(features: true, chooseDir: true, license: "license.rtf");
+        var publishes = Publishes(fragment).ToList();
+
+        var license = Dialogs(fragment).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.LicenseId);
+        var controls = license.Elements(Ns + "Control").Select(c => (string)c.Attribute("Id")!).ToList();
+        Assert.Contains("License", controls);
+        Assert.Contains("Accept", controls);
+
+        var next = license.Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Next");
+        Assert.Contains("InstallKitLicenseAccepted", (string)next.Attribute("DisableCondition")!);
+        Assert.Contains("InstallKitLicenseAccepted", (string)next.Attribute("EnableCondition")!);
+
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.WelcomeId && p.Control == "Install" && p.Event == "NewDialog" && p.Value == ModernDialogXml.LicenseId);
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.LicenseId && p.Control == "Back" && p.Value == ModernDialogXml.WelcomeId);
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.LicenseId && p.Control == "Next" && p.Value == "CustomizeDlg");
+        Assert.Contains(publishes, p => p.Dialog == "CustomizeDlg" && p.Control == "Back" && p.Value == ModernDialogXml.LicenseId);
+    }
+
+    [Fact]
+    public void Without_features_or_prompts_the_license_page_starts_the_install()
+    {
+        var fragment = Build(license: "license.rtf");
+        var publishes = Publishes(fragment).ToList();
+
+        var next = Dialogs(fragment).Single(d => (string)d.Attribute("Id")! == ModernDialogXml.LicenseId)
+            .Elements(Ns + "Control").Single(c => (string)c.Attribute("Id")! == "Next");
+        Assert.Equal("Install", (string)next.Attribute("Text")!);
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.LicenseId && p.Control == "Next" && p.Event == "EndDialog" && p.Value == "Return");
+    }
+
+    [Fact]
+    public void With_prompts_the_license_page_leads_to_the_settings_page_and_back_returns_to_it()
+    {
+        var publishes = Publishes(Build(license: "license.rtf", prompts: true)).ToList();
+
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.LicenseId && p.Control == "Next" && p.Value == ModernDialogXml.OptionsId);
+        Assert.Contains(publishes, p => p.Dialog == ModernDialogXml.OptionsId && p.Control == "Back" && p.Value == ModernDialogXml.LicenseId);
+    }
+
+    [Fact]
+    public void Without_a_license_there_is_no_license_page()
+    {
+        Assert.DoesNotContain(Dialogs(Build()), d => (string)d.Attribute("Id")! == ModernDialogXml.LicenseId);
     }
 
     [Fact]

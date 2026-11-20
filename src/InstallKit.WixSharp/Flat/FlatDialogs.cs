@@ -17,7 +17,7 @@ using Wpf = System.Windows.Controls;
 
 namespace InstallKit.WixSharp.Flat
 {
-    /// <summary>The first page: product, license (when set), install folder, and the button that starts the install or goes on.</summary>
+    /// <summary>The first page: product, install folder, and the button that starts the install or goes on.</summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     public class FlatWelcomeDialog : FlatDialog
     {
@@ -27,44 +27,10 @@ namespace InstallKit.WixSharp.Flat
             SubtitleBlock.Text = "Version " + Session.Property("ProductVersion") + "  -  " + Session.Property("Manufacturer");
 
             var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
-            CheckBox accept = null;
 
-            string license = null;
-            try
-            {
-                if (Session.Property(FlatKeys.License) == "1")
-                    license = Session.GetResourceString("WixSharp_LicenceFile");
-            }
-            catch (Exception)
-            {
-                // No license in this MSI.
-            }
-
-            if (string.IsNullOrWhiteSpace(license))
-            {
-                var intro = Label("Setup will install " + ProductName + " on this computer.");
-                intro.Margin = new Thickness(0, 0, 0, 18);
-                panel.Children.Add(intro);
-            }
-            else
-            {
-                // The license is rich text with its own colours: show it on a light card in every theme.
-                var box = new RichTextBox
-                {
-                    IsReadOnly = true,
-                    Height = 120,
-                    Background = new SolidColorBrush(Color.FromRgb(0xF4, 0xF4, 0xF5)),
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1B)),
-                    BorderBrush = Paint("Line"),
-                    Padding = new Thickness(8),
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                };
-                ShowRtf(box, license);
-                panel.Children.Add(box);
-
-                accept = new CheckBox { Content = "I accept the license terms", Margin = new Thickness(0, 14, 0, 18) };
-                panel.Children.Add(accept);
-            }
+            var intro = Label("Setup will install " + ProductName + " on this computer.");
+            intro.Margin = new Thickness(0, 0, 0, 18);
+            panel.Children.Add(intro);
 
             var dirProperty = Session.Property("WixSharp_UI_INSTALLDIR");
             if (!string.IsNullOrEmpty(dirProperty))
@@ -73,13 +39,7 @@ namespace InstallKit.WixSharp.Flat
             Body.Children.Add(panel);
 
             AddButton("Cancel", () => ShellApi.Cancel());
-            var go = AddButton(PagesAfterWelcome.Length > 0 ? "Next" : "Install", () => ShellApi.GoNext(), primary: true);
-            if (accept != null)
-            {
-                go.IsEnabled = false;
-                accept.Checked += (sender, args) => go.IsEnabled = true;
-                accept.Unchecked += (sender, args) => go.IsEnabled = false;
-            }
+            AddButton(PagesAfterWelcome.Length > 0 ? "Next" : "Install", () => ShellApi.GoNext(), primary: true);
         }
 
         void AddFolder(StackPanel panel, string dirProperty)
@@ -113,6 +73,57 @@ namespace InstallKit.WixSharp.Flat
 
             var directory = Session.GetDirectoryPath(dirProperty);
             return directory == "ABSOLUTEPATH" ? Session.Property("INSTALLDIR_ABSOLUTEPATH") : directory;
+        }
+    }
+
+    /// <summary>The license (rich text) with an accept box; Next waits for it. A page of its own, so it never crowds out the install folder.</summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public class FlatLicenseDialog : FlatDialog
+    {
+        protected override void Build()
+        {
+            TitleBlock.Text = "License";
+            SubtitleBlock.Text = "Please read and accept the terms to continue.";
+
+            string license = null;
+            try
+            {
+                if (Session.Property(FlatKeys.License) == "1")
+                    license = Session.GetResourceString("WixSharp_LicenceFile");
+            }
+            catch (Exception)
+            {
+                // No license in this MSI.
+            }
+
+            var accept = new CheckBox { Content = "I accept the license terms", Margin = new Thickness(0, 14, 0, 0) };
+            DockPanel.SetDock(accept, Dock.Bottom);
+
+            var panel = new DockPanel();
+            panel.Children.Add(accept);
+
+            // The license is rich text with its own colours: show it on a light card in every theme.
+            var box = new RichTextBox
+            {
+                IsReadOnly = true,
+                Background = new SolidColorBrush(Color.FromRgb(0xF4, 0xF4, 0xF5)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1B)),
+                BorderBrush = Paint("Line"),
+                Padding = new Thickness(8),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            };
+            if (!string.IsNullOrWhiteSpace(license))
+                ShowRtf(box, license);
+            panel.Children.Add(box);
+            Body.Children.Add(panel);
+
+            AddButton("Back", () => ShellApi.GoPrev());
+            AddButton("Cancel", () => ShellApi.Cancel());
+            var more = PagesAfterWelcome.Any(page => page != "license");
+            var go = AddButton(more ? "Next" : "Install", () => ShellApi.GoNext(), primary: true);
+            go.IsEnabled = false;
+            accept.Checked += (sender, args) => go.IsEnabled = true;
+            accept.Unchecked += (sender, args) => go.IsEnabled = false;
         }
 
         static void ShowRtf(RichTextBox box, string rtf)

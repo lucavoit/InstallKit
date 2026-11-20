@@ -7,7 +7,7 @@ namespace InstallKit.WixSharp
     /// <summary>What the modern dialogs need to know about the product. Plain data, so the XML builder has no WixSharp dependency.</summary>
     internal sealed class ModernDialogOptions
     {
-        /// <summary>Full path of an RTF license shown on the welcome page, or <c>null</c>.</summary>
+        /// <summary>Full path of an RTF license shown on a page of its own after the welcome page, or <c>null</c>.</summary>
         public string? LicenseFile { get; set; }
 
         /// <summary>Show the install folder and a Browse button on the welcome page.</summary>
@@ -64,6 +64,7 @@ namespace InstallKit.WixSharp
         public const string WelcomeId = "InstallKit_WelcomeDlg";
         public const string FinishId = "InstallKit_FinishDlg";
         public const string OptionsId = "InstallKit_OptionsDlg";
+        public const string LicenseId = "InstallKit_LicenseDlg";
         public const string PageBitmapId = "IK_Bmp_Page";
         public const string CancelBitmapId = "IK_Bmp_Cancel";
 
@@ -81,8 +82,9 @@ namespace InstallKit.WixSharp
             var features = options.HasFeatures;
             var prompts = options.Prompts.Count > 0;
             string D(string wixId) => StockDialogXml.Id(options, wixId);
-            // The page before the feature page when installing: the settings page, or the welcome page.
-            var beforeFeatures = prompts ? OptionsId : WelcomeId;
+            var license = options.LicenseFile != null;
+            // The page before the feature page when installing: the settings page, the license page or the welcome page.
+            var beforeFeatures = prompts ? OptionsId : license ? LicenseId : WelcomeId;
 
             // With a page background the pages of the install and repair flows are our own (see StockDialogXml); the
             // rest, popups and the folder and feature pages, stay WiX's.
@@ -147,6 +149,7 @@ namespace InstallKit.WixSharp
 
                 skin.Count > 0 ? StockDialogXml.Dialogs(ns, options) : null,
                 Welcome(ns, options),
+                license ? License(ns, options) : null,
                 prompts ? Options(ns, options) : null,
                 Finish(ns, options),
 
@@ -176,11 +179,10 @@ namespace InstallKit.WixSharp
             XElement E(string name, params object?[] content) => new XElement(ns + name, content);
             XAttribute A(string name, object value) => new XAttribute(name, value);
 
-            var license = options.LicenseFile;
             var chooseFolder = options.ChooseInstallDir;
-            var features = options.HasFeatures;
-            // The page this one leads to, or null when its button starts the install.
-            var next = options.Prompts.Count > 0 ? OptionsId : features ? "CustomizeDlg" : null;
+            // The page this one leads to, or null when its button starts the install. The license has a page of its own, so the
+            // install folder is never squeezed out by it.
+            var next = NextAfterWelcome(options);
 
             var dialog = E("Dialog", A("Id", WelcomeId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
                 Bitmap(ns, options),
@@ -189,27 +191,10 @@ namespace InstallKit.WixSharp
 
             var y = 82;
 
-            if (license != null)
-            {
-                dialog.Add(
-                    E("Control", A("Id", "License"), A("Type", "ScrollableText"), A("X", ContentX), A("Y", y), A("Width", ContentWidth),
-                      A("Height", chooseFolder ? 70 : 100), A("Sunken", "yes"), A("TabSkip", "no"),
-                      E("Text", A("SourceFile", license))));
-                y += chooseFolder ? 74 : 104;
-
-                dialog.Add(
-                    E("Control", A("Id", "Accept"), A("Type", "CheckBox"), A("X", ContentX), A("Y", y), A("Width", ContentWidth), A("Height", 14),
-                      A("Property", "InstallKitLicenseAccepted"), A("CheckBoxValue", "1"), A("Transparent", "yes"),
-                      A("Text", "{\\InstallKit_Font_Body}I accept the license terms")));
-                y += 20;
-            }
-            else
-            {
-                dialog.Add(Text(ns, "Intro", y, 40, next != null
-                    ? "Setup will install [ProductName] on this computer. Click Next to continue."
-                    : "Setup will install [ProductName] on this computer. Click Install to continue."));
-                y += 46;
-            }
+            dialog.Add(Text(ns, "Intro", y, 40, next != null
+                ? "Setup will install [ProductName] on this computer. Click Next to continue."
+                : "Setup will install [ProductName] on this computer. Click Install to continue."));
+            y += 46;
 
             if (chooseFolder)
             {
@@ -236,14 +221,59 @@ namespace InstallKit.WixSharp
                         E("Publish", A("Event", "EndDialog"), A("Value", "Return"), A("Order", 3), A("Condition", "OutOfDiskSpace <> 1")),
                     });
 
-            if (license != null)
-            {
-                install.Add(A("DisableCondition", "InstallKitLicenseAccepted <> \"1\""), A("EnableCondition", "InstallKitLicenseAccepted = \"1\""));
-            }
-
             dialog.Add(
                 options.PageBackground == null ? E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)) : null,
                 install,
+                E("Control", A("Id", "Cancel"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
+                  A("Cancel", "yes"), A("Text", "Cancel"),
+                  E("Publish", A("Event", "SpawnDialog"), A("Value", StockDialogXml.Id(options, "CancelDlg")))));
+
+            return dialog;
+        }
+
+        /// <summary>The page after the welcome page that follows it: license, settings, features, or none (the button installs).</summary>
+        static string? NextAfterWelcome(ModernDialogOptions options) =>
+            options.LicenseFile != null ? LicenseId : NextAfterLicense(options);
+
+        static string? NextAfterLicense(ModernDialogOptions options) =>
+            options.Prompts.Count > 0 ? OptionsId : options.HasFeatures ? "CustomizeDlg" : null;
+
+        /// <summary>The license on a page of its own: the text, an accept box, then Back and Next (or Install) once it is accepted.</summary>
+        static XElement License(XNamespace ns, ModernDialogOptions options)
+        {
+            XElement E(string name, params object?[] content) => new XElement(ns + name, content);
+            XAttribute A(string name, object value) => new XAttribute(name, value);
+
+            var next = NextAfterLicense(options);
+
+            var dialog = E("Dialog", A("Id", LicenseId), A("Width", Width), A("Height", Height), A("Title", "[ProductName] Setup"),
+                Bitmap(ns, options),
+                Text(ns, "Title", 20, 36, "{\\InstallKit_Font_Hero}License"),
+                Text(ns, "Subtitle", 58, 14, "{\\InstallKit_Font_Muted}Please read and accept the terms to continue."),
+                E("Control", A("Id", "License"), A("Type", "ScrollableText"), A("X", ContentX), A("Y", 82), A("Width", ContentWidth),
+                  A("Height", 120), A("Sunken", "yes"), A("TabSkip", "no"),
+                  E("Text", A("SourceFile", options.LicenseFile!))),
+                E("Control", A("Id", "Accept"), A("Type", "CheckBox"), A("X", ContentX), A("Y", 208), A("Width", ContentWidth), A("Height", 14),
+                  A("Property", "InstallKitLicenseAccepted"), A("CheckBoxValue", "1"), A("Transparent", "yes"),
+                  A("Text", "{\\InstallKit_Font_Body}I accept the license terms")));
+
+            var forward = E("Control", A("Id", "Next"), A("Type", "PushButton"), A("X", 236), A("Y", 243), A("Width", 56), A("Height", 17),
+                A("Default", "yes"), next != null ? null : A("ElevationShield", "yes"), A("Text", next != null ? "Next" : "Install"),
+                next != null
+                    ? new[] { E("Publish", A("Event", "NewDialog"), A("Value", next), A("Order", 1)) }
+                    : new[]
+                    {
+                        E("Publish", A("Event", "SpawnDialog"), A("Value", "OutOfDiskDlg"), A("Order", 1), A("Condition", "OutOfDiskSpace = 1")),
+                        E("Publish", A("Event", "EndDialog"), A("Value", "Return"), A("Order", 2), A("Condition", "OutOfDiskSpace <> 1")),
+                    },
+                // Windows Installer never undoes a condition, so the button needs the matching enable condition as well.
+                A("DisableCondition", "InstallKitLicenseAccepted <> \"1\""), A("EnableCondition", "InstallKitLicenseAccepted = \"1\""));
+
+            dialog.Add(
+                options.PageBackground == null ? E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)) : null,
+                E("Control", A("Id", "Back"), A("Type", "PushButton"), A("X", 180), A("Y", 243), A("Width", 56), A("Height", 17), A("Text", "Back"),
+                  E("Publish", A("Event", "NewDialog"), A("Value", options.LicenseFile != null ? LicenseId : WelcomeId))),
+                forward,
                 E("Control", A("Id", "Cancel"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
                   A("Cancel", "yes"), A("Text", "Cancel"),
                   E("Publish", A("Event", "SpawnDialog"), A("Value", StockDialogXml.Id(options, "CancelDlg")))));
@@ -297,7 +327,7 @@ namespace InstallKit.WixSharp
             dialog.Add(
                 options.PageBackground == null ? E("Control", A("Id", "BottomLine"), A("Type", "Line"), A("X", 0), A("Y", 234), A("Width", Width), A("Height", 0)) : null,
                 E("Control", A("Id", "Back"), A("Type", "PushButton"), A("X", 180), A("Y", 243), A("Width", 56), A("Height", 17), A("Text", "Back"),
-                  E("Publish", A("Event", "NewDialog"), A("Value", WelcomeId))),
+                  E("Publish", A("Event", "NewDialog"), A("Value", options.LicenseFile != null ? LicenseId : WelcomeId))),
                 forward,
                 E("Control", A("Id", "Cancel"), A("Type", "PushButton"), A("X", 304), A("Y", 243), A("Width", 56), A("Height", 17),
                   A("Cancel", "yes"), A("Text", "Cancel"),
