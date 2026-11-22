@@ -184,6 +184,13 @@ namespace InstallKit
             return this;
         }
 
+        /// <inheritdoc cref="MsiDefinition.AddDataFolder"/>
+        public MachineBuilder DataFolder(Environment.SpecialFolder root, string path, Action<DataFolderBuilder>? configure = null)
+        {
+            _msi.AddDataFolder(root, path, configure);
+            return this;
+        }
+
         /// <inheritdoc cref="MsiDefinition.AddFolderPermission"/>
         public MachineBuilder FolderPermission(string account, FolderRights rights, string? folder = null)
         {

@@ -107,6 +107,9 @@ namespace InstallKit
         /// <summary>Access granted to accounts on folders of the product. See <see cref="AddFolderPermission"/>.</summary>
         public IList<FolderPermission> FolderPermissions { get; set; } = new List<FolderPermission>();
 
+        /// <summary>Machine-wide data folders the MSI creates. See <see cref="AddDataFolder"/>.</summary>
+        public IList<DataFolder> DataFolders { get; set; } = new List<DataFolder>();
+
         /// <summary>Values the modern setup dialogs ask the user for. See <see cref="AddPromptedProperty"/>.</summary>
         public IList<PromptedProperty> PromptedProperties { get; set; } = new List<PromptedProperty>();
 
@@ -301,6 +304,21 @@ namespace InstallKit
         public MsiDefinition AddXmlValue(string file, string xpath, string value)
         {
             XmlValues.Add(new XmlValue(file, xpath, value));
+            return this;
+        }
+
+        /// <summary>
+        /// Creates a machine-wide folder outside the install directory (for example below <c>%ProgramData%</c>) with the given access.
+        /// The folder is created by the MSI, before any install event handler or service runs.
+        /// </summary>
+        /// <param name="root">The well-known folder the path is below: <see cref="Environment.SpecialFolder.CommonApplicationData"/>.</param>
+        /// <param name="path">The folder below <paramref name="root"/>, for example <c>Contoso\My App</c>.</param>
+        /// <param name="configure">Who gets which access.</param>
+        public MsiDefinition AddDataFolder(Environment.SpecialFolder root, string path, Action<DataFolderBuilder>? configure = null)
+        {
+            var folder = new DataFolder(root, path);
+            configure?.Invoke(new DataFolderBuilder(folder));
+            DataFolders.Add(folder);
             return this;
         }
 

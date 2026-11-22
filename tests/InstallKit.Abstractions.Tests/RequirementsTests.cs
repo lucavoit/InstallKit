@@ -76,4 +76,28 @@ public class RequirementsTests
         Assert.Empty(PlatformChecks.Warnings(unknown));
         Assert.Null(PlatformChecks.DetectRuntimeIdentifier("/does/not/exist"));
     }
+
+    [Fact]
+    public void Data_folders_are_validated()
+    {
+        var (plan, builder) = NewPlan();
+        plan.Msi(builder.Machine(m => m
+            .DataFolder(System.Environment.SpecialFolder.CommonApplicationData, @"Contoso\App", f => f.Allow("SYSTEM", FolderRights.FullControl).Allow("system", FolderRights.Read))
+            .DataFolder(System.Environment.SpecialFolder.CommonApplicationData, @"..\Escape", f => f.Allow("Users", FolderRights.Read))
+            .DataFolder(System.Environment.SpecialFolder.ApplicationData, @"Contoso\Other", f => f.Allow("Users", FolderRights.Read))
+            .DataFolder(System.Environment.SpecialFolder.CommonApplicationData, @"Contoso\Empty")));
+
+        Assert.Equal(new[] { "IK334", "IK331", "IK330", "IK332" }, Codes(plan));
+    }
+
+    [Fact]
+    public void A_valid_data_folder_passes()
+    {
+        var (plan, builder) = NewPlan();
+        plan.Msi(builder.Machine(m => m.DataFolder(System.Environment.SpecialFolder.CommonApplicationData, "Contoso/App", f => f
+            .Allow("SYSTEM", FolderRights.FullControl).Allow("Users", FolderRights.Read))));
+
+        Assert.Empty(Codes(plan));
+        Assert.Equal(@"Contoso\App", plan.Msis[0].DataFolders[0].Path);
+    }
 }

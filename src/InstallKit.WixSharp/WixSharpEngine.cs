@@ -61,6 +61,7 @@ namespace InstallKit.WixSharp
             if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir && msi.Ui != InstallerUi.ModernFlat)
                 Console.WriteLine($"InstallKit : warning IK246: MSI '{msi.Name}' has optional features, which users can only choose in the FeatureTree and Modern UIs or with ADDLOCAL and REMOVE on the command line. Set Ui = InstallerUi.Modern or InstallerUi.FeatureTree to show them.");
             var entities = new List<WixEntity> { installDir };
+            entities.AddRange(msi.DataFolders.Select(f => BuildFolder($@"%{f.RootDirectoryId}%\{f.Path}", new WixEntity[0], f.Access.Select(ToDirPermission).ToArray())));
             entities.AddRange(msi.ResolvedRegistryEntries.Select(ToRegValue));
             entities.AddRange(msi.CloseApplications.Select(ToCloseApplication));
             entities.AddRange(BuildShortcutDirs(msi));

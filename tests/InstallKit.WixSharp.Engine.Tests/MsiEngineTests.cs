@@ -386,4 +386,24 @@ public class MsiEngineTests
         var search = wxs.All("RegistrySearch").Single(r => A(r, "Key")!.EndsWith(@"NDP\v4\Full"));
         Assert.Equal("Release", A(search, "Name"));
     }
+
+    [Fact]
+    public void A_data_folder_is_created_below_program_data_with_its_access()
+    {
+        var workspace = new Wxs.Workspace();
+
+        var wxs = Wxs.Msi(workspace, workspace.App().Appearance(a => a.Classic(InstallerUi.Minimal))
+            .Machine(m => m.DataFolder(System.Environment.SpecialFolder.CommonApplicationData, @"Contoso\My App", f => f
+                .Allow("SYSTEM", FolderRights.FullControl)
+                .Allow("Administrators", FolderRights.FullControl)
+                .Allow("Users", FolderRights.Read))));
+
+        var root = wxs.All("StandardDirectory").Single(d => A(d, "Id") == "CommonAppDataFolder");
+        var vendor = root.Elements().Single(d => A(d, "Name") == "Contoso");
+        var leaf = vendor.Elements().Single(d => A(d, "Name") == "My App");
+        var permissions = leaf.Descendants().Where(e => e.Name.LocalName == "PermissionEx").ToList();
+        Assert.Equal(new[] { "SYSTEM", "Administrators", "Users" }, permissions.Select(p => A(p, "User")));
+        Assert.Equal("yes", A(permissions[0], "GenericAll"));
+        Assert.Equal(("yes", "yes", null), (A(permissions[2], "GenericRead"), A(permissions[2], "GenericExecute"), A(permissions[2], "GenericAll")));
+    }
 }
