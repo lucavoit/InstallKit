@@ -32,6 +32,12 @@ namespace InstallKit
         /// <summary>The generated class holding the entry points.</summary>
         public const string ActionsType = "InstallKit.Generated.InstallKitActions";
 
+        /// <summary>
+        /// The generated immediate action that records which optional features are installed before and after the install
+        /// (for <see cref="InstallEvent.IsFeatureSelected"/>). Engines schedule it after <c>CostFinalize</c> when any handler runs after the install.
+        /// </summary>
+        public const string CaptureFeaturesAction = "InstallKit_CaptureFeatures";
+
         /// <summary>The runtime key of a handler method, matching what the generator records.</summary>
         public static string KeyOf(MethodInfo method) => method.DeclaringType!.FullName + "." + method.Name;
 

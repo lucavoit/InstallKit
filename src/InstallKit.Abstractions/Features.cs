@@ -22,17 +22,17 @@ namespace InstallKit
         public bool InstalledByDefault { get; }
 
         /// <summary>The name as an MSI identifier: letters, digits and underscores, starting with a letter or underscore.</summary>
-        public string Id
+        public string Id => IdOf(Name);
+
+        /// <summary>The MSI identifier of a feature name (spaces and other characters become underscores).</summary>
+        public static string IdOf(string name)
         {
-            get
-            {
-                var id = new System.Text.StringBuilder();
-                foreach (var c in Name)
-                    id.Append(char.IsLetterOrDigit(c) && c < 128 || c == '_' ? c : '_');
-                if (id.Length == 0 || char.IsDigit(id[0]))
-                    id.Insert(0, '_');
-                return id.ToString();
-            }
+            var id = new System.Text.StringBuilder();
+            foreach (var c in name)
+                id.Append(char.IsLetterOrDigit(c) && c < 128 || c == '_' ? c : '_');
+            if (id.Length == 0 || char.IsDigit(id[0]))
+                id.Insert(0, '_');
+            return id.ToString();
         }
     }
 }

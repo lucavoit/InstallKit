@@ -70,7 +70,7 @@ namespace InstallKit
         /// <summary>Accent colour, logo and dialog images.</summary>
         public Branding Branding { get; set; } = new Branding();
 
-        /// <summary>Code that runs on the target machine during the install. See <see cref="OnAfterInstall"/>.</summary>
+        /// <summary>Code that runs on the target machine during the install. See <see cref="OnAfterInstall(Action{InstallEvent}, string[])"/>.</summary>
         public IList<InstallEventHandler> EventHandlers { get; set; } = new List<InstallEventHandler>();
 
         /// <summary>Programs run during the install. See <see cref="RunAfterInstall"/>.</summary>
@@ -161,6 +161,18 @@ namespace InstallKit
         /// <param name="usesProperties">MSI properties the handler reads; only these are available at this stage.</param>
         public MsiDefinition OnAfterInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
             On(InstallStage.AfterInstall, handler, usesProperties);
+
+        /// <summary>
+        /// Runs after files are copied, elevated, like <see cref="OnAfterInstall(Action{InstallEvent}, string[])"/>, with a choice of what a failure does.
+        /// </summary>
+        /// <param name="handler">A static method passed as a method group; it runs on the target machine.</param>
+        /// <param name="failureMode"><see cref="InstallFailureMode.Rollback"/> (default) fails the install; <see cref="InstallFailureMode.Warn"/> only logs.</param>
+        /// <param name="usesProperties">MSI properties the handler reads; only these are available at this stage.</param>
+        public MsiDefinition OnAfterInstall(Action<InstallEvent> handler, InstallFailureMode failureMode, params string[] usesProperties)
+        {
+            EventHandlers.Add(new InstallEventHandler(InstallStage.AfterInstall, handler, usesProperties, failureMode));
+            return this;
+        }
 
         /// <summary>Runs a program after files are installed (fresh install or upgrade).</summary>
         /// <param name="path">Relative to the install directory, or an MSI formatted path.</param>

@@ -278,9 +278,16 @@ namespace InstallKit
         internal MsiBuilder AddOnBeforeInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
             AddHandler(InstallStage.BeforeInstall, handler, usesProperties);
 
-        /// <inheritdoc cref="MsiDefinition.OnAfterInstall"/>
+        /// <inheritdoc cref="MsiDefinition.OnAfterInstall(Action{InstallEvent}, string[])"/>
         internal MsiBuilder AddOnAfterInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
             AddHandler(InstallStage.AfterInstall, handler, usesProperties);
+
+        /// <inheritdoc cref="MsiDefinition.OnAfterInstall(Action{InstallEvent}, InstallFailureMode, string[])"/>
+        internal MsiBuilder AddOnAfterInstall(Action<InstallEvent> handler, InstallFailureMode failureMode, params string[] usesProperties)
+        {
+            ListOf(EventHandlers, WithEventHandlers).Add(new InstallEventHandler(InstallStage.AfterInstall, handler, usesProperties, failureMode));
+            return this;
+        }
 
         /// <inheritdoc cref="MsiDefinition.RunAfterInstall"/>
         internal MsiBuilder AddRunAfterInstall(string path, string? arguments = null, Action<RunCommand>? configure = null) =>

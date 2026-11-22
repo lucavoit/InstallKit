@@ -22,7 +22,8 @@ namespace InstallKit.WixSharp
         const string InstallDirId = "INSTALLDIR";
 
         /// <summary>Properties every elevated (deferred) handler can read, on top of the ones it lists.</summary>
-        const string DeferredBaseProperties = "INSTALLDIR,UILevel,Installed,REMOVE,REINSTALL,UPGRADINGPRODUCTCODE,WIX_UPGRADE_DETECTED";
+        // What InstallEvent reads in the deferred (elevated) handler: the install state, the version, the installing user and the feature states.
+        const string DeferredBaseProperties = "INSTALLDIR,UILevel,Installed,REMOVE,REINSTALL,UPGRADINGPRODUCTCODE,WIX_UPGRADE_DETECTED,ProductVersion,LogonUser,UserSID,INSTALLKIT_FEATURES";
 
 #if INSTALLKIT_CORE
         public string Name => "WixSharp.Core";
@@ -389,7 +390,7 @@ namespace InstallKit.WixSharp
                 ManagedAction action = elevated ? new ElevatedManagedAction(generated.ActionName) : new ManagedAction(generated.ActionName);
 
                 action.ActionAssembly = generated.Assembly.Location;
-                action.Return = Return.check;
+                action.Return = handler.FailureMode == InstallFailureMode.Warn ? Return.ignore : Return.check;
                 action.Condition = Condition.Always;
 
                 switch (handler.Stage)
@@ -410,6 +411,21 @@ namespace InstallKit.WixSharp
                 }
 
                 yield return (action, generated.Assembly.Location);
+            }
+
+            // The deferred handlers cannot ask Windows Installer about features, so an immediate action records their states.
+            var afterInstall = msi.EventHandlers.FirstOrDefault(h => h.Stage == InstallStage.AfterInstall);
+            if (afterInstall != null)
+            {
+                var generated = GeneratedInstallActions.Find(afterInstall)!.Value;
+                yield return (new ManagedAction(GeneratedInstallActions.CaptureFeaturesAction)
+                {
+                    ActionAssembly = generated.Assembly.Location,
+                    Return = Return.ignore,
+                    When = When.After,
+                    Step = Step.CostFinalize,
+                    Condition = Condition.Always,
+                }, generated.Assembly.Location);
             }
         }
 

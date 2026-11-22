@@ -17,14 +17,31 @@ public class GeneratorTests
         {
             public enum ActionResult { Success, Failure }
             public enum InstallRunMode { Scheduled }
+            public enum InstallState { NotUsed = -7, Unknown = -1, Absent = 2, Local = 3 }
+            public enum InstallMessage { Error = 0x01000000 }
+            public sealed class Record : System.IDisposable
+            {
+                public Record(int fieldCount) { }
+                public string FormatString { get; set; } = "";
+                public string this[int field] { set { } }
+                public void Dispose() { }
+            }
+            public sealed class FeatureInfo
+            {
+                public string Name { get; } = "";
+                public InstallState CurrentState { get; }
+                public InstallState RequestState { get; }
+            }
             public sealed class CustomActionAttribute : System.Attribute { }
             public sealed class CustomActionData : System.Collections.Generic.Dictionary<string, string> { }
             public class Session
             {
-                public string this[string name] => "";
+                public string this[string name] { get => ""; set { } }
                 public CustomActionData CustomActionData { get; } = new CustomActionData();
                 public bool GetMode(InstallRunMode mode) => false;
                 public void Log(string message) { }
+                public System.Collections.Generic.IEnumerable<FeatureInfo> Features => new FeatureInfo[0];
+                public void Message(InstallMessage kind, Record record) { }
             }
         }
         """;

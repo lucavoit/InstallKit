@@ -266,10 +266,17 @@ namespace InstallKit
             return this;
         }
 
-        /// <inheritdoc cref="MsiDefinition.OnAfterInstall"/>
+        /// <inheritdoc cref="MsiDefinition.OnAfterInstall(Action{InstallEvent}, string[])"/>
         public LifecycleBuilder OnAfterInstall(Action<InstallEvent> handler, params string[] usesProperties)
         {
             _msi.AddOnAfterInstall(handler, usesProperties);
+            return this;
+        }
+
+        /// <inheritdoc cref="MsiDefinition.OnAfterInstall(Action{InstallEvent}, InstallFailureMode, string[])"/>
+        public LifecycleBuilder OnAfterInstall(Action<InstallEvent> handler, InstallFailureMode failureMode, params string[] usesProperties)
+        {
+            _msi.AddOnAfterInstall(handler, failureMode, usesProperties);
             return this;
         }
 
