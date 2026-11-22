@@ -17,8 +17,8 @@ A separate `consumer` job checks the route a user without a monorepo takes. [`qa
 The tests change the machine, so only run them on a disposable one. Locally, from an elevated PowerShell:
 
 ```powershell
-dotnet build qa/QaDemo.Installer -c Release -p:InstallKitVersion=1.0.0 -p:InstallKitOutputDir=$PWD/out/1.0.0/
-dotnet build qa/QaDemo.Installer -c Release -p:InstallKitVersion=1.1.0 -p:InstallKitOutputDir=$PWD/out/1.1.0/
+dotnet build qa/QaDemo.Installer -c Release -p:InstallKitBuildOnBuild=true -p:InstallKitVersion=1.0.0 -p:InstallKitOutputDir=$PWD/out/1.0.0/
+dotnet build qa/QaDemo.Installer -c Release -p:InstallKitBuildOnBuild=true -p:InstallKitVersion=1.1.0 -p:InstallKitOutputDir=$PWD/out/1.1.0/
 ./qa/tests/Invoke-Qa.ps1 -V1 out/1.0.0 -V2 out/1.1.0
 ```
 

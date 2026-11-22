@@ -3,7 +3,7 @@
 ← [Using your own build output](own-build-output.md) · [Docs index](README.md) · [Custom actions](custom-actions.md) →
 
 1. `dotnet build` compiles the installer project as a small .NET Framework console app.
-2. The SDK runs `dotnet tool restore` so the `wix` version in `.config/dotnet-tools.json` is used. WiX extensions are pinned to that same version, so newer extensions on NuGet can't silently break the build.
+2. The SDK reads the pinned `wix` version from the tool manifest (`.config/dotnet-tools.json`, or the file in `InstallKitToolManifest`) and runs `dotnet tool restore` when the manifest changed. WiX extensions are pinned to that same version, so newer extensions on NuGet can't silently break the build.
 3. Each `<InstallerPayload>` project is published into `obj/installkit/payload/<Name>/`, starting from an empty folder each time.
 4. The SDK runs the program. `InstallerHost` validates the plan before WiX runs, then builds every MSI, then every bundle.
 5. The built files end up in `@(InstallerOutput)`, and the generated `.wxs` is kept in `obj/installkit/` for review.
@@ -22,8 +22,10 @@ Validation errors use MSBuild's format (`error IK101: ...`), so they appear in V
 |---|---|---|
 | `Version` / `InstallKitVersion` | `1.0.0` | Prerelease and `+metadata` suffixes are dropped. |
 | `InstallKitOutputDir` | `bin/installer/$(Configuration)/` | |
-| `InstallKitBuildOnBuild` | `true` | Set to `false` for fast inner-loop builds. |
-| `InstallKitRestoreTools` | `true` | Runs `dotnet tool restore`. |
+| `InstallKitBuildOnBuild` | `false` | Opt in with `true` (in the project, or `-p:InstallKitBuildOnBuild=true` in the pipeline) to publish the payloads and build the MSI on every `dotnet build`. Off by default, so building a solution does not publish payloads or need Windows. |
+| `InstallKitToolManifest` | empty | Path of the tool manifest that pins `wix`. By default `.config/dotnet-tools.json`, or a `dotnet-tools.json` in a parent folder. |
+| `InstallKitSuppressWixNotice` | `false` | Hides the information about the WiX 6 Open Source Maintenance Fee EULA. |
+| `InstallKitRestoreTools` | `true` | Runs `dotnet tool restore` when the manifest changed (skipped while `obj/installkit/toolrestore.stamp` is newer than it). |
 | `InstallKitEmitSource` | `true` | Keeps the generated `.wxs`. |
 | `InstallKitSignCommand` | empty | See [Signing](signing.md). |
 | `InstallKitAcceptWixEula` | empty | `wix7` accepts the WiX 7 EULA. See [WiX version and licence](wix-licence.md). |

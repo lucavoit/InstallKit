@@ -13,10 +13,10 @@ dotnet new tool-manifest
 # InstallKit needs the manifest at .config/dotnet-tools.json. The .NET 10 SDK creates dotnet-tools.json
 # in the root instead, so if that happens, move it: create a .config folder and move the file into it.
 dotnet tool install wix --version 6.0.2
-dotnet build MyApp.Installer -p:Version=1.0.0
+dotnet build MyApp.Installer -p:Version=1.0.0 -p:InstallKitBuildOnBuild=true
 ```
 
-Building the MSI requires **Windows** (WiX and the .NET Framework engine). On other OSes the build stops with `IK003`. You can set `InstallKitBuildOnBuild=false` there, which still compiles the project.
+Building the MSI requires **Windows** (WiX and the .NET Framework engine) and is opt-in: pass `-p:InstallKitBuildOnBuild=true` (or set the property in the project). Without it a normal `dotnet build` only compiles the installer program, so it also works on other OSes and in a solution build. If you opt in off Windows, the build stops with `IK003`.
 
 ## Requirements
 

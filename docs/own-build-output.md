@@ -28,7 +28,7 @@ return InstallerHost.Run(args, plan =>
 ```
 
 ```bash
-APP_PUBLISH_DIR=/path/to/publish dotnet build MyApp.Installer -p:Version=1.2.3
+APP_PUBLISH_DIR=/path/to/publish dotnet build MyApp.Installer -p:Version=1.2.3 -p:InstallKitBuildOnBuild=true
 ```
 
 - **Any path works:** absolute or relative, on any drive. A relative path is relative to the installer project folder, so prefer absolute paths from a pipeline.

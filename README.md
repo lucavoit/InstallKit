@@ -12,7 +12,7 @@ Build Windows installers (MSI and setup `.exe` bundles) with plain C# and `dotne
 ## Why InstallKit
 
 - **Installers as code:** describe the product, services, shortcuts and prerequisites in C#, with validation errors that point at the problem before WiX runs.
-- **One command:** `dotnet build` publishes your app, then produces the MSI and, optionally, a single `setup.exe` bundle.
+- **One command:** `dotnet build` (with `-p:InstallKitBuildOnBuild=true`) publishes your app, then produces the MSI and, optionally, a single `setup.exe` bundle.
 - **Modern look by default:** a flat, dark installer UI in your colours (light, dark or following the Windows setting), with native dialogs that need nothing on the target machine as the alternative.
 - **Install-time code in C#:** run static methods during install or uninstall, with no WixSharp types in your code.
 - **CI included:** Azure DevOps templates that build, sign, smoke-test (install and uninstall) and publish.
@@ -53,7 +53,7 @@ return InstallerHost.Run(args, plan =>
 </Project>
 ```
 
-`dotnet build -p:Version=1.2.3` publishes `MyApp`, then writes `bin/installer/Release/MyApp.msi` and `MyAppSetup.exe`.
+`dotnet build -p:Version=1.2.3 -p:InstallKitBuildOnBuild=true` publishes `MyApp`, then writes `bin/installer/Release/MyApp.msi` and `MyAppSetup.exe`.
 
 Next: [Getting started](docs/getting-started.md).
 

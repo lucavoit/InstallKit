@@ -32,8 +32,10 @@ namespace InstallKit
             string? wixVersion = null,
             bool emitSource = true,
             IFileSigner? signer = null,
-            string? acceptedWixEula = null)
+            string? acceptedWixEula = null,
+            string? versionSuffix = null)
         {
+            VersionSuffix = versionSuffix;
             Version = version;
             OutputDirectory = outputDirectory;
             IntermediateDirectory = intermediateDirectory;
@@ -48,6 +50,12 @@ namespace InstallKit
 
         /// <summary>The product version, already normalised to a valid MSI version.</summary>
         public Version Version { get; }
+
+        /// <summary>
+        /// The pre-release or build metadata suffix of the build version (<c>-rc1</c>) that is not part of the MSI version,
+        /// or <c>null</c>. MSI cannot store it, so <c>1.2.3-rc1</c> and <c>1.2.3</c> have the same MSI version.
+        /// </summary>
+        public string? VersionSuffix { get; }
 
         /// <summary>Where the .msi and setup .exe files are written.</summary>
         public string OutputDirectory { get; }
@@ -99,6 +107,12 @@ namespace InstallKit
             if (!ProductVersion.TryParse(rawVersion, out var version, out var versionError))
                 throw new InstallerValidationException(new[] { new ValidationError("IK001", versionError!) });
 
+            var versionSuffix = ProductVersion.GetDroppedSuffix(rawVersion);
+            if (versionSuffix != null)
+                Console.WriteLine($"InstallKit : warning IK310: the version '{rawVersion}' has the suffix '{versionSuffix}', which MSI cannot store. " +
+                    $"The MSI gets version {version.ToString(3)}, so Windows sees it as the same version as the release and does not treat one as an upgrade of the other. " +
+                    "Give every build its own major.minor.build number (for example 1.2.4 instead of 1.2.3-rc1).");
+
             var output = Path.GetFullPath(Get("output", OutputDirectoryVariable) ?? Path.Combine("bin", "installer"));
             var intermediate = Path.GetFullPath(Get("intermediate", IntermediateDirectoryVariable) ?? Path.Combine("obj", "installer"));
             var configuration = Get("configuration", ConfigurationVariable) ?? "Release";
@@ -130,7 +144,8 @@ namespace InstallKit
                 Get("wix-version", WixVersionVariable),
                 emitSource: !string.Equals(emit, "false", StringComparison.OrdinalIgnoreCase),
                 signer: string.IsNullOrWhiteSpace(signCommand) ? null : new CommandFileSigner(signCommand!),
-                acceptedWixEula: NullIfEmpty(Get("accept-wix-eula", WixEulaVariable)));
+                acceptedWixEula: NullIfEmpty(Get("accept-wix-eula", WixEulaVariable)),
+                versionSuffix: versionSuffix);
         }
 
         static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
