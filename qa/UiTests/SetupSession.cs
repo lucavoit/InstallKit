@@ -150,6 +150,50 @@ public sealed class SetupSession : IDisposable
         }
     }
 
+    /// <summary>Ticks the check box whose label contains <paramref name="label"/> (the license's accept box) on any window of the setup.</summary>
+    public void Check(string label)
+    {
+        var box = Retry(() => Windows().SelectMany(w => w.FindAllDescendants())
+            .FirstOrDefault(e => SafeControlType(e) == ControlType.CheckBox && SafeName(e).IndexOf(label, StringComparison.OrdinalIgnoreCase) >= 0),
+            TimeSpan.FromSeconds(15));
+        if (box == null)
+        {
+            Dump($"missing-checkbox-{label}");
+            throw new Xunit.Sdk.XunitException($"No check box '{label}' on the setup windows. The UI tree and a screenshot are in {OutDir}.");
+        }
+
+        output.WriteLine($"check '{label}'");
+        try
+        {
+            box.AsCheckBox().IsChecked = true;
+        }
+        catch (Exception e) when (e is not Xunit.Sdk.XunitException)
+        {
+            // Some check boxes do not offer the Toggle pattern: fall back to a real mouse click.
+            output.WriteLine($"toggle failed ({e.GetType().Name}), clicking with the mouse");
+            box.Click();
+        }
+    }
+
+    /// <summary>
+    /// Fills in the "File name" box of the Windows Save As dialog that is open and presses Save. The box is a combo box with an Edit
+    /// inside it, which <see cref="Edits"/> leaves out, so it is found by its name.
+    /// </summary>
+    public void SaveFileAs(string path)
+    {
+        var edit = Retry(() => Windows().SelectMany(w => w.FindAllDescendants())
+            .FirstOrDefault(e => SafeControlType(e) == ControlType.Edit && Same(SafeName(e), "File name")),
+            TimeSpan.FromSeconds(20));
+        if (edit == null)
+        {
+            Dump("missing-save-as-file-name");
+            throw new Xunit.Sdk.XunitException($"No 'File name' box on the setup windows (is the Save As dialog open?). The UI tree and a screenshot are in {OutDir}.");
+        }
+
+        SetText(edit, path);
+        Click("Save");
+    }
+
     /// <summary>Waits until <paramref name="condition"/> holds; dumps the screen and fails with <paramref name="what"/> if it does not.</summary>
     public void WaitUntil(string what, Func<bool> condition, TimeSpan? timeout = null)
     {

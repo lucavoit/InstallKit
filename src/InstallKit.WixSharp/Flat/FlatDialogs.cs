@@ -17,7 +17,10 @@ using Wpf = System.Windows.Controls;
 
 namespace InstallKit.WixSharp.Flat
 {
-    /// <summary>The first page: product, license (when set), install folder, and the button that starts the install or goes on.</summary>
+    /// <summary>
+    /// The first page: product, the license (when set: the accept box above the text, Next waits for it), and the button that
+    /// starts the install or goes on.
+    /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     public class FlatWelcomeDialog : FlatDialog
     {
@@ -26,7 +29,6 @@ namespace InstallKit.WixSharp.Flat
             TitleBlock.Text = ProductName;
             SubtitleBlock.Text = "Version " + Session.Property("ProductVersion") + "  -  " + Session.Property("Manufacturer");
 
-            var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
             CheckBox accept = null;
 
             string license = null;
@@ -40,19 +42,36 @@ namespace InstallKit.WixSharp.Flat
                 // No license in this MSI.
             }
 
-            if (string.IsNullOrWhiteSpace(license))
+            var panel = new DockPanel();
+
+            var intro = Label("Setup will install " + ProductName + " on this computer.");
+            intro.Margin = new Thickness(0, 0, 0, string.IsNullOrWhiteSpace(license) ? 0 : 14);
+            DockPanel.SetDock(intro, Dock.Top);
+            panel.Children.Add(intro);
+
+            if (!string.IsNullOrWhiteSpace(license))
             {
-                var intro = Label("Setup will install " + ProductName + " on this computer.");
-                intro.Margin = new Thickness(0, 0, 0, 18);
-                panel.Children.Add(intro);
-            }
-            else
-            {
-                // The license is rich text with its own colours: show it on a light card in every theme.
+                // The accept box on the left; on the right two buttons to read the license in a program of the user's choice or keep a copy.
+                accept = new CheckBox { Content = "I accept the license terms", VerticalAlignment = VerticalAlignment.Center };
+                var open = new Wpf.Button { Content = "Open license", Padding = new Thickness(10, 2, 10, 2) };
+                var save = new Wpf.Button { Content = "Save a copy...", Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(8, 0, 0, 0) };
+                open.Click += (sender, args) => OpenLicense(license);
+                save.Click += (sender, args) => SaveLicense(license);
+
+                var row = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
+                var actions = new StackPanel { Orientation = Orientation.Horizontal };
+                actions.Children.Add(open);
+                actions.Children.Add(save);
+                DockPanel.SetDock(actions, Dock.Right);
+                row.Children.Add(actions);
+                row.Children.Add(accept);
+                DockPanel.SetDock(row, Dock.Top);
+                panel.Children.Add(row);
+
+                // The license is rich text with its own colours: show it on a light card in every theme. It takes the rest of the page.
                 var box = new RichTextBox
                 {
                     IsReadOnly = true,
-                    Height = 120,
                     Background = new SolidColorBrush(Color.FromRgb(0xF4, 0xF4, 0xF5)),
                     Foreground = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1B)),
                     BorderBrush = Paint("Line"),
@@ -61,14 +80,7 @@ namespace InstallKit.WixSharp.Flat
                 };
                 ShowRtf(box, license);
                 panel.Children.Add(box);
-
-                accept = new CheckBox { Content = "I accept the license terms", Margin = new Thickness(0, 14, 0, 18) };
-                panel.Children.Add(accept);
             }
-
-            var dirProperty = Session.Property("WixSharp_UI_INSTALLDIR");
-            if (!string.IsNullOrEmpty(dirProperty))
-                AddFolder(panel, dirProperty);
 
             Body.Children.Add(panel);
 
@@ -82,11 +94,99 @@ namespace InstallKit.WixSharp.Flat
             }
         }
 
+        string LicenseFileName => string.Join("_", (ProductName + " license").Split(Path.GetInvalidFileNameChars())) + ".rtf";
+
+        // Opens the license in whatever the user has for .rtf files (WordPad, Word): to read it larger, search it or print it.
+        void OpenLicense(string rtf)
+        {
+            try
+            {
+                var path = Path.Combine(Path.GetTempPath(), LicenseFileName);
+                System.IO.File.WriteAllBytes(path, Encoding.UTF8.GetBytes(rtf));
+                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            }
+            catch (Exception)
+            {
+                // No program for .rtf files: the license is still readable (and can be saved) on this page.
+            }
+        }
+
+        void SaveLicense(string rtf)
+        {
+            try
+            {
+                var dialog = new Microsoft.Win32.SaveFileDialog { FileName = LicenseFileName, DefaultExt = ".rtf", Filter = "Rich Text Format (*.rtf)|*.rtf" };
+                if (dialog.ShowDialog() == true)
+                    System.IO.File.WriteAllBytes(dialog.FileName, Encoding.UTF8.GetBytes(rtf));
+            }
+            catch (Exception)
+            {
+                // The folder cannot be written to: nothing is lost, the user can pick another one.
+            }
+        }
+
+        static void ShowRtf(RichTextBox box, string rtf)
+        {
+            using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(rtf)))
+            {
+                box.SelectAll();
+                box.Selection.Load(stream, DataFormats.Rtf);
+            }
+        }
+    }
+
+    /// <summary>The install folder with Browse, and the values the product asks for (prompted properties): a label and a box each.</summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public class FlatSettingsDialog : FlatDialog
+    {
+        protected override void Build()
+        {
+            var dirProperty = Session.Property("WixSharp_UI_INSTALLDIR");
+            var hasFolder = !string.IsNullOrEmpty(dirProperty);
+
+            TitleBlock.Text = "Settings";
+            SubtitleBlock.Text = hasFolder ? "Choose where to install, and tell setup a little about this installation." : "Tell setup a little about this installation.";
+
+            var prompts = (Session.Property(FlatKeys.Prompts) ?? string.Empty)
+                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(entry => entry.Split('|'))
+                .Where(parts => parts.Length == 3)
+                .Select(parts => new { Property = parts[0], Label = Uri.UnescapeDataString(parts[1]), Required = parts[2] == "1" })
+                .ToList();
+
+            var panel = new StackPanel();
+            if (hasFolder)
+                AddFolder(panel, dirProperty);
+
+            var required = new List<TextBox>();
+            foreach (var prompt in prompts)
+            {
+                panel.Children.Add(Label(prompt.Label, muted: true));
+                var box = new TextBox { Text = Session.Property(prompt.Property), Margin = new Thickness(0, 6, 0, 18) };
+                var property = prompt.Property;
+                box.TextChanged += (sender, args) => Session[property] = box.Text;
+                panel.Children.Add(box);
+                if (prompt.Required)
+                    required.Add(box);
+            }
+
+            Body.Children.Add(panel);
+
+            AddButton("Back", () => ShellApi.GoPrev());
+            AddButton("Cancel", () => ShellApi.Cancel());
+            var go = AddButton(PagesAfterWelcome.Contains("features") ? "Next" : "Install", () => ShellApi.GoNext(), primary: true);
+
+            void Refresh() => go.IsEnabled = required.All(box => box.Text.Length > 0);
+            foreach (var box in required)
+                box.TextChanged += (sender, args) => Refresh();
+            Refresh();
+        }
+
         void AddFolder(StackPanel panel, string dirProperty)
         {
             panel.Children.Add(Label("Install to:", muted: true));
 
-            var row = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
+            var row = new DockPanel { Margin = new Thickness(0, 6, 0, 18) };
             var browse = new Wpf.Button { Content = "Browse...", Margin = new Thickness(10, 0, 0, 0), MinWidth = 90 };
             var path = new TextBox { Text = InstallDir(dirProperty) };
             path.TextChanged += (sender, args) => Session[dirProperty] = path.Text;
@@ -113,57 +213,6 @@ namespace InstallKit.WixSharp.Flat
 
             var directory = Session.GetDirectoryPath(dirProperty);
             return directory == "ABSOLUTEPATH" ? Session.Property("INSTALLDIR_ABSOLUTEPATH") : directory;
-        }
-
-        static void ShowRtf(RichTextBox box, string rtf)
-        {
-            using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(rtf)))
-            {
-                box.SelectAll();
-                box.Selection.Load(stream, DataFormats.Rtf);
-            }
-        }
-    }
-
-    /// <summary>The values the product asks for (prompted properties): a label and a box each.</summary>
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public class FlatSettingsDialog : FlatDialog
-    {
-        protected override void Build()
-        {
-            TitleBlock.Text = "Settings";
-            SubtitleBlock.Text = "Tell setup a little about this installation.";
-
-            var prompts = (Session.Property(FlatKeys.Prompts) ?? string.Empty)
-                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(entry => entry.Split('|'))
-                .Where(parts => parts.Length == 3)
-                .Select(parts => new { Property = parts[0], Label = Uri.UnescapeDataString(parts[1]), Required = parts[2] == "1" })
-                .ToList();
-
-            var panel = new StackPanel();
-            var required = new List<TextBox>();
-            foreach (var prompt in prompts)
-            {
-                panel.Children.Add(Label(prompt.Label, muted: true));
-                var box = new TextBox { Text = Session.Property(prompt.Property), Margin = new Thickness(0, 6, 0, 18) };
-                var property = prompt.Property;
-                box.TextChanged += (sender, args) => Session[property] = box.Text;
-                panel.Children.Add(box);
-                if (prompt.Required)
-                    required.Add(box);
-            }
-
-            Body.Children.Add(panel);
-
-            AddButton("Back", () => ShellApi.GoPrev());
-            AddButton("Cancel", () => ShellApi.Cancel());
-            var go = AddButton(PagesAfterWelcome.Contains("features") ? "Next" : "Install", () => ShellApi.GoNext(), primary: true);
-
-            void Refresh() => go.IsEnabled = required.All(box => box.Text.Length > 0);
-            foreach (var box in required)
-                box.TextChanged += (sender, args) => Refresh();
-            Refresh();
         }
     }
 
