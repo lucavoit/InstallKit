@@ -94,6 +94,14 @@ namespace InstallKit.WixSharp
             // A property that the user can set in a dialog has to be secure, or the elevated install would ignore the value.
             project.Properties = msi.Properties.Select(p => new Property(p.Key, p.Value))
                 .Concat(msi.PromptedProperties.Select(ToPromptedProperty)).ToArray();
+#if !INSTALLKIT_CORE
+            // The flat/WPF dialogs and the managed install events run on the .NET Framework of the target machine.
+            if (isWpf || isFlat || installActions.Count > 0)
+                AddNetFrameworkCondition(project, msi);
+#endif
+            foreach (var launch in msi.LaunchConditions)
+                project.LaunchConditions.Add(new global::WixSharp.LaunchCondition(launch.Condition, launch.Message));
+
             if (msi.PromptedProperties.Count > 0 && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir && msi.Ui != InstallerUi.ModernFlat)
                 Console.WriteLine($"InstallKit : warning IK285: MSI '{msi.Name}' has prompted properties, which only the modern UIs ask for. With {msi.Ui} they keep their defaults unless given on the command line.");
 
@@ -759,6 +767,20 @@ namespace InstallKit.WixSharp
             if (!(result is PackageGroupRef))
                 result.Vital = item.Vital;
             return result;
+        }
+
+        /// <summary>Stops the setup with a clear message when .NET Framework 4.8 is missing, instead of failing obscurely.</summary>
+        internal static void AddNetFrameworkCondition(Project project, MsiDefinition msi)
+        {
+            const string property = "INSTALLKIT_NETFX_RELEASE";
+            project.Properties = project.Properties.Concat(new[]
+            {
+                new Property(property, new RegistrySearch(global::WixSharp.RegistryHive.LocalMachine,
+                    @"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full", "Release", RegistrySearchType.raw)),
+            }).ToArray();
+            project.LaunchConditions.Add(new global::WixSharp.LaunchCondition(
+                LaunchConditionDefaults.UnlessInstalled($"{property} >= \"#{LaunchConditionDefaults.NetFramework48Release}\""),
+                LaunchConditionDefaults.NetFramework48Message(msi.Name)));
         }
 
         static void ConfigureToolset(InstallerContext context)

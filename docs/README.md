@@ -26,6 +26,8 @@ Technical documentation, one topic per page. Every page has previous/next links;
 - [Prerequisites](prerequisites.md): Runtimes chained into a bundle.
 - [Signing](signing.md): When and how files get signed.
 - [Versions side by side](side-by-side.md): Install several versions next to each other.
+- [Package platform](platform.md): x64, x86 or Arm64 packages and what they change.
+- [Requirements (launch conditions)](requirements.md): Require Windows versions, 64-bit Windows or a custom condition.
 
 ## Tooling
 

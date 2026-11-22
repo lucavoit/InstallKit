@@ -10,6 +10,7 @@ using System;
 //       .Appearance(a => a.Modern().AccentColor("#3B82F6"))
 //       .Machine(m => m.PathEntry("[INSTALLDIR]bin").Service("App.exe", "App"))
 //       .Shell(s => s.FileAssociation(".app", "App file"))
+//       .Requirements(r => r.Requires64Bit().RequiresWindows(19041))
 //       .Lifecycle(l => l.CloseApplication("App.exe").OnAfterInstall(Setup.Configure))
 //       .Settings(s => s.Property("MODE", "client"));
 //
@@ -283,6 +284,39 @@ namespace InstallKit
         public LifecycleBuilder RunBeforeUninstall(string path, string? arguments = null, Action<RunCommand>? configure = null)
         {
             _msi.AddRunBeforeUninstall(path, arguments, configure);
+            return this;
+        }
+    }
+
+    /// <summary>What the target machine must have. Used by <see cref="MsiBuilder.Requirements"/>.</summary>
+    public sealed class RequirementsBuilder
+    {
+        readonly MsiBuilder _msi;
+
+        internal RequirementsBuilder(MsiBuilder msi) => _msi = msi;
+
+        /// <inheritdoc cref="MsiDefinition.AddLaunchCondition"/>
+        public RequirementsBuilder LaunchCondition(string condition, string message)
+        {
+            _msi.AddLaunchCondition(condition, message);
+            return this;
+        }
+
+        /// <summary>Requires 64-bit Windows. Not checked when the product is already installed, so it can still be removed.</summary>
+        public RequirementsBuilder Requires64Bit(string? message = null)
+        {
+            _msi.AddLaunchCondition(LaunchConditionDefaults.UnlessInstalled("VersionNT64"), message ?? "This product needs a 64-bit version of Windows.");
+            return this;
+        }
+
+        /// <summary>
+        /// Requires at least this Windows build number (for example <c>19041</c> for Windows 10 2004, <c>22000</c> for Windows 11).
+        /// Not checked when the product is already installed, so it can still be removed.
+        /// </summary>
+        public RequirementsBuilder RequiresWindows(int minimumBuild, string? message = null)
+        {
+            _msi.AddLaunchCondition(LaunchConditionDefaults.UnlessInstalled($"WindowsBuild >= {minimumBuild}"),
+                message ?? $"This product needs Windows build {minimumBuild} or later. Update Windows and run the setup again.");
             return this;
         }
     }

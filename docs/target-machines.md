@@ -15,6 +15,7 @@ The installer project only runs on your build machine. A target machine needs:
 | Bundle (setup `.exe`) | Nothing: the bundle engine and its standard UI are native code |
 | Your application itself | Whatever it needs. Publish it self-contained (`SelfContained=true`, as in the sample) or chain its runtime into a bundle |
 
+- **Clear message instead of an obscure failure:** when the MSI needs .NET Framework 4.8, the `WixSharp` engine adds a launch condition that says so (see [Requirements](requirements.md)).
 - **No InstallKit or WixSharp at install time:** neither is installed on the target machine. Custom-action code is embedded in the MSI and runs during installation only.
 
 ---

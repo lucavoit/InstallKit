@@ -1,6 +1,6 @@
 # Versions side by side
 
-← [Signing](signing.md) · [Docs index](README.md) · [Editor checks](editor-checks.md) →
+← [Signing](signing.md) · [Docs index](README.md) · [Package platform](platform.md) →
 
 By default a newer version replaces the installed one (a major upgrade). To keep versions apart, so installing 3.5.6 does not remove 3.1.0, set a side-by-side mode:
 
@@ -34,4 +34,4 @@ Things to know:
 - **Switching an existing product:** a build with a side-by-side mode has new upgrade codes, so it does not upgrade versions that were installed without one. Uninstall those first, or keep the mode `None` for the line you already shipped.
 
 ---
-← [Signing](signing.md) · [Docs index](README.md) · [Editor checks](editor-checks.md) →
+← [Signing](signing.md) · [Docs index](README.md) · [Package platform](platform.md) →

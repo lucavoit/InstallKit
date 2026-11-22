@@ -95,6 +95,9 @@ namespace InstallKit
         /// <summary>Values set in installed XML files. See <see cref="AddXmlValue"/>.</summary>
         public IList<XmlValue> XmlValues { get; set; } = new List<XmlValue>();
 
+        /// <summary>Conditions the target machine must meet. See <see cref="AddLaunchCondition"/>.</summary>
+        public IList<LaunchConditionEntry> LaunchConditions { get; set; } = new List<LaunchConditionEntry>();
+
         /// <summary>Programs that are closed (and optionally ended) while installing. See <see cref="AddCloseApplication"/>.</summary>
         public IList<CloseApplicationRule> CloseApplications { get; set; } = new List<CloseApplicationRule>();
 
@@ -286,6 +289,19 @@ namespace InstallKit
         public MsiDefinition AddXmlValue(string file, string xpath, string value)
         {
             XmlValues.Add(new XmlValue(file, xpath, value));
+            return this;
+        }
+
+        /// <summary>
+        /// Requires a condition of the target machine. When it is false the setup shows <paramref name="message"/> and stops.
+        /// The condition is checked on uninstall and repair too, so combine it with <c>Installed OR (...)</c> when a product that is
+        /// already installed must stay removable.
+        /// </summary>
+        /// <param name="condition">An MSI condition such as <c>VersionNT64</c> or <c>WindowsBuild &gt;= 19041</c>.</param>
+        /// <param name="message">What the user sees when the condition is false.</param>
+        public MsiDefinition AddLaunchCondition(string condition, string message)
+        {
+            LaunchConditions.Add(new LaunchConditionEntry(condition, message));
             return this;
         }
 

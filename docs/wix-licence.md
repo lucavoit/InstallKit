@@ -28,7 +28,19 @@ That is the only change needed: local builds and the pipeline templates both run
 </PropertyGroup>
 ```
 
-Only WiX 6 and 7 are confirmed to work with WixSharp 2.14.2; test 5.0.2 before you rely on it.
+Only WiX 6 and 7 are confirmed to work with WixSharp 2.14.2. **5.0.2 is a best-effort fallback** for people who cannot accept the Open Source Maintenance Fee EULA: it is not part of the regular tests, so build and test your installer with it before you rely on it.
+
+### The WiX 6 notice
+
+The default is WiX 6, whose official binaries come with the Open Source Maintenance Fee EULA. The build does not enforce acceptance for 6.x, so it prints an informational message once per build that names the version and the EULA (`https://wixtoolset.org/osmf/`). Hide it with:
+
+```xml
+<PropertyGroup>
+  <InstallKitSuppressWixNotice>true</InstallKitSuppressWixNotice>
+</PropertyGroup>
+```
+
+Only WiX 7 and later are gated by `IK004`.
 
 ---
 ← [Engines](engines.md) · [Docs index](README.md) · [Project layout](project-layout.md) →

@@ -1,6 +1,6 @@
 # Editor checks
 
-← [Versions side by side](side-by-side.md) · [Docs index](README.md) · [Command line tool](command-line-tool.md) →
+← [Requirements](requirements.md) · [Docs index](README.md) · [Command line tool](command-line-tool.md) →
 
 `InstallKit.Abstractions` ships Roslyn analyzers that flag mistakes while you type, before the installer program runs:
 
@@ -14,4 +14,4 @@
 They check `WithUpgradeCode(...)` and assignments to `UpgradeCode`. Everything else is still checked by the validators when the installer program runs, with the `IK1xx` codes above.
 
 ---
-← [Versions side by side](side-by-side.md) · [Docs index](README.md) · [Command line tool](command-line-tool.md) →
+← [Requirements](requirements.md) · [Docs index](README.md) · [Command line tool](command-line-tool.md) →

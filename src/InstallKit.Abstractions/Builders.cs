@@ -75,6 +75,13 @@ namespace InstallKit
             return this;
         }
 
+        /// <summary>What the target machine must have: Windows version, 64-bit Windows, or any MSI condition.</summary>
+        public MsiBuilder Requirements(Action<RequirementsBuilder> configure)
+        {
+            configure(new RequirementsBuilder(this));
+            return this;
+        }
+
         /// <summary>MSI properties: fixed values, and values the modern dialogs ask the user for.</summary>
         public MsiBuilder Settings(Action<SettingsBuilder> configure)
         {
@@ -166,6 +173,13 @@ namespace InstallKit
         internal MsiBuilder AddCloseApplication(string processName, bool terminate = false, int timeoutSeconds = 5)
         {
             ListOf(CloseApplications, WithCloseApplications).Add(new CloseApplicationRule(processName, terminate, timeoutSeconds));
+            return this;
+        }
+
+        /// <inheritdoc cref="MsiDefinition.AddLaunchCondition"/>
+        internal MsiBuilder AddLaunchCondition(string condition, string message)
+        {
+            ListOf(LaunchConditions, WithLaunchConditions).Add(new LaunchConditionEntry(condition, message));
             return this;
         }
 

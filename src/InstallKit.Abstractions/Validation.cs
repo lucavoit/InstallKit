@@ -91,6 +91,7 @@ namespace InstallKit
                 CheckFirewall(errors, msi, context, label);
                 CheckXmlValues(errors, msi, context, label);
                 CheckCloseApplications(errors, msi, label);
+                CheckLaunchConditions(errors, msi, label);
                 CheckFolderPermissions(errors, msi, label);
                 CheckPrompts(errors, msi, label);
 
@@ -327,6 +328,17 @@ namespace InstallKit
                     errors.Add(new ValidationError("IK221", $"{label}: the XPath '{edit.XPath}' for '{edit.File}' is not valid, for example /configuration/appSettings/add[@key='Server']/@value."));
                 else if (edit.Value == null)
                     errors.Add(new ValidationError("IK223", $"{label}: the {what} has no value."));
+            }
+        }
+
+        static void CheckLaunchConditions(List<ValidationError> errors, MsiDefinition msi, string label)
+        {
+            foreach (var entry in msi.LaunchConditions)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Condition))
+                    errors.Add(new ValidationError("IK320", $"{label}: a launch condition has no condition. Pass an MSI condition such as VersionNT64."));
+                if (string.IsNullOrWhiteSpace(entry.Message))
+                    errors.Add(new ValidationError("IK321", $"{label}: the launch condition '{entry.Condition}' has no message. Tell the user what is missing."));
             }
         }
 

@@ -351,4 +351,39 @@ public class MsiEngineTests
         Assert.DoesNotContain(A(wxs.One("ServiceInstall").Parent!, "Id"), elsewhere);
         Assert.DoesNotContain(A(wxs.One("XmlFile").Parent!, "Id"), elsewhere);
     }
+
+    [Fact]
+    public void Launch_conditions_are_written_with_their_messages()
+    {
+        var workspace = new Wxs.Workspace();
+
+        var wxs = Wxs.Msi(workspace, workspace.App().Appearance(a => a.Classic(InstallerUi.Minimal))
+            .Requirements(r => r.Requires64Bit().RequiresWindows(19041).LaunchCondition("MYPROP = 1", "Set MYPROP.")));
+
+        var launches = wxs.All("Launch").ToList();
+        Assert.Contains(launches, l => A(l, "Condition") == "Installed OR (VersionNT64)");
+        Assert.Contains(launches, l => A(l, "Condition") == "Installed OR (WindowsBuild >= 19041)");
+        Assert.Contains(launches, l => A(l, "Condition") == "MYPROP = 1" && A(l, "Message") == "Set MYPROP.");
+        // The classic UI needs no .NET Framework, so nothing is added on its own.
+        Assert.DoesNotContain(launches, l => (A(l, "Condition") ?? "").Contains("INSTALLKIT_NETFX_RELEASE"));
+    }
+
+    [Fact]
+    public void The_dotnet_framework_48_condition_checks_the_release_value_and_explains_what_to_do()
+    {
+        var workspace = new Wxs.Workspace();
+        var plan = new InstallerPlan(workspace.Context);
+        var msi = plan.Msi(workspace.App().Appearance(a => a.Classic(InstallerUi.Minimal)));
+        var project = WixSharpEngine.CreateMsiProject(msi, workspace.Context);
+
+        // The engine adds this itself for the flat/WPF dialogs and managed install events (not compiled into this test build).
+        WixSharpEngine.AddNetFrameworkCondition(project, msi);
+        var wxs = System.Xml.Linq.XDocument.Load(project.BuildWxs(global::WixSharp.Compiler.OutputType.MSI, System.IO.Path.Combine(workspace.Root, "netfx.wxs")));
+
+        var launch = wxs.All("Launch").Single(l => (A(l, "Condition") ?? "").Contains("INSTALLKIT_NETFX_RELEASE"));
+        Assert.Equal("Installed OR (INSTALLKIT_NETFX_RELEASE >= \"#528040\")", A(launch, "Condition"));
+        Assert.Contains(".NET Framework 4.8", A(launch, "Message"));
+        var search = wxs.All("RegistrySearch").Single(r => A(r, "Key")!.EndsWith(@"NDP\v4\Full"));
+        Assert.Equal("Release", A(search, "Name"));
+    }
 }

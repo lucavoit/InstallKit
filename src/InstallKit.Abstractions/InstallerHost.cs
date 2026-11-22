@@ -63,6 +63,9 @@ namespace InstallKit
             if (errors.Count > 0)
                 throw new InstallerValidationException(errors);
 
+            foreach (var warning in PlatformChecks.Warnings(plan))
+                Console.WriteLine(warning);
+
             Directory.CreateDirectory(plan.Context.OutputDirectory);
             Directory.CreateDirectory(plan.Context.IntermediateDirectory);
 
