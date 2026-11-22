@@ -48,3 +48,7 @@ Technical documentation, one topic per page. Every page has previous/next links;
 - [QA](qa.md): End-to-end and UI tests.
 
 Also: [Roadmap](../ROADMAP.md) · [AI skill](../skills/installkit/SKILL.md) (for coding agents)
+
+## Using the AI skill
+
+`skills/installkit/` is a skill in the Claude Code format (`SKILL.md` plus `references/`). Copy the folder to `.claude/skills/installkit/` in a repository (or `~/.claude/skills/installkit/` for all your projects) and coding agents that read skills learn how to write InstallKit installers, which rules to keep and what the `IKxxx` messages mean. It links back to these pages instead of repeating them.
