@@ -107,6 +107,26 @@ public class GeneratorTests
         Assert.Contains(InstallActionGenerator.ActionName("Load", "App.Setup.Configure"), generated);
     }
 
+    [Fact]
+    public void The_adapter_exposes_the_install_state_features_and_user_and_shows_failures()
+    {
+        var (output, _) = Run("""
+            using InstallKit;
+            public static class Setup
+            {
+                public static void Configure(InstallEvent e) { }
+                static void Define() => MsiBuilder.Create("App").Lifecycle(l => l.OnAfterInstall(Configure, InstallFailureMode.Warn));
+            }
+            """);
+
+        Assert.Empty(output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        var generated = string.Join("\n", output.SyntaxTrees.Select(t => t.ToString()));
+        foreach (var expected in new[] { "IsChange", "ProductVersion", "InstallingUserSid", "UserSID", "LogonUser", "IsFeatureSelected", "WasFeatureSelected", "INSTALLKIT_FEATURES", "ShowError" })
+            Assert.Contains(expected, generated);
+        // The entry point the engine schedules after CostFinalize.
+        Assert.Contains("public static global::WixToolset.Dtf.WindowsInstaller.ActionResult " + GeneratedInstallActions.CaptureFeaturesAction, generated);
+    }
+
     [Theory]
     [InlineData("e => { }", "IK160")]
     [InlineData("new Holder().Instance", "IK161")]
