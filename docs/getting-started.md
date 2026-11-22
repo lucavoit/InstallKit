@@ -2,11 +2,11 @@
 
 [Docs index](README.md) · [Builders](builders.md) →
 
-The packages are on [nuget.org](https://www.nuget.org/packages?q=InstallKit). While InstallKit is a preview, name the version explicitly (a bare `0.1.0` is not the same version as `0.1.0-preview.1`):
+The packages are on [nuget.org](https://www.nuget.org/packages?q=InstallKit). Use the same version for the SDK and the template:
 
 ```bash
-dotnet new install InstallKit.Templates::0.1.0-preview.1
-dotnet new installkit -n MyApp.Installer --sdkVersion 0.1.0-preview.1 --product "My App" --manufacturer Contoso --payload ../MyApp/MyApp.csproj --bundle
+dotnet new install InstallKit.Templates::1.0.0
+dotnet new installkit -n MyApp.Installer --sdkVersion 1.0.0 --product "My App" --manufacturer Contoso --payload ../MyApp/MyApp.csproj --bundle
 # add --engine WixSharpCore for the .NET 10 preview engine
 # once per repository: pin the WiX toolset
 dotnet new tool-manifest

@@ -7,7 +7,7 @@
 
 Build Windows installers (MSI and setup `.exe` bundles) with plain C# and `dotnet build`. InstallKit sits on top of [WixSharp](https://github.com/oleg-shilo/wixsharp) and the [WiX Toolset](https://wixtoolset.org/), and adds a fluent API, an MSBuild SDK, a native modern installer UI, install-time C# handlers and ready-made Azure DevOps pipeline templates.
 
-> **Status: early preview (0.1).** The API may still change between releases. Feedback and issues are welcome.
+> **Version 1.0.** Feedback and issues are welcome.
 
 ## Why InstallKit
 
@@ -46,7 +46,7 @@ return InstallerHost.Run(args, plan =>
 ```
 
 ```xml
-<Project Sdk="InstallKit.Sdk/0.1.0-preview.1">
+<Project Sdk="InstallKit.Sdk/1.0.0">
   <ItemGroup>
     <InstallerPayload Include="..\MyApp\MyApp.csproj" PublishProperties="RuntimeIdentifier=win-x64;SelfContained=true" />
   </ItemGroup>

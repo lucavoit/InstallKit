@@ -21,7 +21,7 @@ resources:
       type: github
       name: lucavoit/InstallKit
       endpoint: github
-      ref: refs/tags/installkit-v0.1.0
+      ref: refs/tags/installkit-v1.0.0
 
 stages:
   - template: pipelines/stages/installer.yml@installkit

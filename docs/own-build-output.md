@@ -22,7 +22,7 @@ return InstallerHost.Run(args, plan =>
 ```
 
 ```xml
-<Project Sdk="InstallKit.Sdk/0.1.0-preview.1">
+<Project Sdk="InstallKit.Sdk/1.0.0">
   <!-- No InstallerPayload: the files come from outside this repository. -->
 </Project>
 ```

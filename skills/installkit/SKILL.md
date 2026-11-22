@@ -39,7 +39,7 @@ return InstallerHost.Run(args, plan =>
 ```
 
 ```xml
-<Project Sdk="InstallKit.Sdk/0.1.0-preview.1">
+<Project Sdk="InstallKit.Sdk/1.0.0">
   <ItemGroup>
     <InstallerPayload Include="..\MyApp\MyApp.csproj" PublishProperties="RuntimeIdentifier=win-x64;SelfContained=true" />
   </ItemGroup>
