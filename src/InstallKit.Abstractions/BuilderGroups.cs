@@ -316,6 +316,30 @@ namespace InstallKit
             return this;
         }
 
+        /// <summary>
+        /// Requires a .NET Framework 4.x version (read from the registry). Not checked when the product is already installed.
+        /// </summary>
+        public RequirementsBuilder RequiresNetFramework(NetFrameworkVersion version, string? message = null)
+        {
+            _msi.AddPropertySearch(RequirementConditions.NetFrameworkSearch());
+            _msi.AddLaunchCondition(RequirementConditions.NetFrameworkCondition(version),
+                message ?? LaunchConditionDefaults.NetFrameworkMessage(RequirementConditions.NetFrameworkName(version), _msi.Name.Value));
+            return this;
+        }
+
+        /// <summary>
+        /// Requires the Microsoft Edge WebView2 Runtime, installed for the machine or for the user. Not checked when the product is already installed.
+        /// To install it with the product, chain it in a bundle with <c>Prerequisites(p => p.WebView2(...))</c>.
+        /// </summary>
+        public RequirementsBuilder RequiresWebView2(string? message = null)
+        {
+            foreach (var search in RequirementConditions.WebView2Searches())
+                _msi.AddPropertySearch(search);
+            _msi.AddLaunchCondition(RequirementConditions.WebView2Condition(),
+                message ?? $"{_msi.Name.Value} needs the Microsoft Edge WebView2 Runtime. Install it from https://developer.microsoft.com/microsoft-edge/webview2 and run the setup again.");
+            return this;
+        }
+
         /// <summary>Requires 64-bit Windows. Not checked when the product is already installed, so it can still be removed.</summary>
         public RequirementsBuilder Requires64Bit(string? message = null)
         {

@@ -101,6 +101,8 @@ namespace InstallKit.WixSharp
             if (isWpf || isFlat || installActions.Count > 0)
                 AddNetFrameworkCondition(project, msi);
 #endif
+            foreach (var search in msi.PropertySearches)
+                AddRegistryPropertySearch(project, search);
             foreach (var launch in msi.LaunchConditions)
                 project.LaunchConditions.Add(new global::WixSharp.LaunchCondition(launch.Condition, launch.Message));
 
@@ -789,15 +791,23 @@ namespace InstallKit.WixSharp
         /// <summary>Stops the setup with a clear message when .NET Framework 4.8 is missing, instead of failing obscurely.</summary>
         internal static void AddNetFrameworkCondition(Project project, MsiDefinition msi)
         {
-            const string property = "INSTALLKIT_NETFX_RELEASE";
+            AddRegistryPropertySearch(project, RequirementConditions.NetFrameworkSearch());
+            project.LaunchConditions.Add(new global::WixSharp.LaunchCondition(
+                RequirementConditions.NetFrameworkCondition(NetFrameworkVersion.NetFx48),
+                LaunchConditionDefaults.NetFramework48Message(msi.Name)));
+        }
+
+        /// <summary>Reads a registry value into a property for a launch condition. A property that is already searched is left alone.</summary>
+        internal static void AddRegistryPropertySearch(Project project, RegistryPropertySearch search)
+        {
+            if (project.Properties.Any(p => p.Name == search.Property))
+                return;
+
+            var hive = search.Hive == InstallKit.RegistryHive.CurrentUser ? global::WixSharp.RegistryHive.CurrentUser : global::WixSharp.RegistryHive.LocalMachine;
             project.Properties = project.Properties.Concat(new[]
             {
-                new Property(property, new RegistrySearch(global::WixSharp.RegistryHive.LocalMachine,
-                    @"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full", "Release", RegistrySearchType.raw)),
+                new Property(search.Property, new RegistrySearch(hive, search.Key, search.ValueName, RegistrySearchType.raw) { Win64 = search.Win64 }),
             }).ToArray();
-            project.LaunchConditions.Add(new global::WixSharp.LaunchCondition(
-                LaunchConditionDefaults.UnlessInstalled($"{property} >= \"#{LaunchConditionDefaults.NetFramework48Release}\""),
-                LaunchConditionDefaults.NetFramework48Message(msi.Name)));
         }
 
         static void ConfigureToolset(InstallerContext context)

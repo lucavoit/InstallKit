@@ -107,6 +107,9 @@ namespace InstallKit
         /// <summary>Access granted to accounts on folders of the product. See <see cref="AddFolderPermission"/>.</summary>
         public IList<FolderPermission> FolderPermissions { get; set; } = new List<FolderPermission>();
 
+        /// <summary>Registry values read into properties for launch conditions. Filled by the <see cref="RequirementsBuilder"/> helpers.</summary>
+        public IList<RegistryPropertySearch> PropertySearches { get; set; } = new List<RegistryPropertySearch>();
+
         /// <summary>Machine-wide data folders the MSI creates. See <see cref="AddDataFolder"/>.</summary>
         public IList<DataFolder> DataFolders { get; set; } = new List<DataFolder>();
 

@@ -183,6 +183,14 @@ namespace InstallKit
             return this;
         }
 
+        internal MsiBuilder AddPropertySearch(RegistryPropertySearch search)
+        {
+            var searches = ListOf(PropertySearches, WithPropertySearches);
+            if (!System.Linq.Enumerable.Any(searches, s => s.Property == search.Property))
+                searches.Add(search);
+            return this;
+        }
+
         /// <inheritdoc cref="MsiDefinition.AddDataFolder"/>
         internal MsiBuilder AddDataFolder(Environment.SpecialFolder root, string path, Action<DataFolderBuilder>? configure = null)
         {

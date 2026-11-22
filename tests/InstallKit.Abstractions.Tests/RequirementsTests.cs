@@ -100,4 +100,44 @@ public class RequirementsTests
         Assert.Empty(Codes(plan));
         Assert.Equal(@"Contoso\App", plan.Msis[0].DataFolders[0].Path);
     }
+
+    [Theory]
+    [InlineData(NetFrameworkVersion.NetFx462, 394802)]
+    [InlineData(NetFrameworkVersion.NetFx472, 461808)]
+    [InlineData(NetFrameworkVersion.NetFx48, 528040)]
+    [InlineData(NetFrameworkVersion.NetFx481, 533320)]
+    public void The_dotnet_framework_helper_compares_the_release_number(NetFrameworkVersion version, int release)
+    {
+        var msi = MsiBuilder.Create("App").Requirements(r => r.RequiresNetFramework(version)).Build();
+
+        var condition = Assert.Single(msi.LaunchConditions);
+        Assert.Equal($"Installed OR (INSTALLKIT_NETFX_RELEASE >= \"#{release}\")", condition.Condition);
+        Assert.Contains("App", condition.Message);
+        var search = Assert.Single(msi.PropertySearches);
+        Assert.Equal(("INSTALLKIT_NETFX_RELEASE", "Release", true), (search.Property, search.ValueName, search.Win64));
+    }
+
+    [Fact]
+    public void The_webview2_helper_checks_the_machine_and_the_user()
+    {
+        var msi = MsiBuilder.Create("App").Requirements(r => r.RequiresWebView2("Install WebView2.")).Build();
+
+        Assert.Equal(new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser }, msi.PropertySearches.Select(s => s.Hive));
+        Assert.All(msi.PropertySearches, s => Assert.False(s.Win64));
+        var condition = Assert.Single(msi.LaunchConditions);
+        Assert.Equal("Install WebView2.", condition.Message);
+        Assert.StartsWith("Installed OR (", condition.Condition);
+        Assert.Contains("INSTALLKIT_WEBVIEW2_USER <> \"0.0.0.0\"", condition.Condition);
+    }
+
+    [Fact]
+    public void Asking_twice_searches_the_registry_once()
+    {
+        var msi = MsiBuilder.Create("App")
+            .Requirements(r => r.RequiresNetFramework(NetFrameworkVersion.NetFx472).RequiresNetFramework(NetFrameworkVersion.NetFx48))
+            .Build();
+
+        Assert.Single(msi.PropertySearches);
+        Assert.Equal(2, msi.LaunchConditions.Count);
+    }
 }

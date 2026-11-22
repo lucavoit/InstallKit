@@ -9,10 +9,13 @@ MsiBuilder.Create("My App")
     .Requirements(r => r
         .Requires64Bit()                       // 64-bit Windows
         .RequiresWindows(19041)                // Windows 10 2004 or later (build number)
+        .RequiresNetFramework(NetFrameworkVersion.NetFx48)   // .NET Framework 4.6.2, 4.7.2, 4.8 or 4.8.1
+        .RequiresWebView2()                    // the Edge WebView2 Runtime, for the machine or the user
         .LaunchCondition("MYPROP = 1", "Set MYPROP=1 on the command line."));
 ```
 
 - **`Requires64Bit()` and `RequiresWindows(build)`** are written as `Installed OR (...)`, so a product that is already installed can still be repaired and removed on a machine that no longer meets them. A condition passed to `LaunchCondition(condition, message)` is used exactly as written: add `Installed OR (...)` yourself when that matters.
+- **`RequiresNetFramework(version)`** reads the `Release` value of the .NET Framework 4.x key into a property and compares it with the first release of that version. **`RequiresWebView2()`** checks the WebView2 `pv` value for the machine and for the current user. Both are skipped when the product is already installed. To *install* these with the product instead of only requiring them, chain them in a bundle ([Prerequisites](prerequisites.md)).
 - **Messages:** every helper takes an optional message; the default tells the user what is missing. A custom condition needs a condition and a message (`IK320`, `IK321`).
 - **Windows builds:** `19041` is Windows 10 2004, `19045` Windows 10 22H2, `22000` Windows 11.
 

@@ -406,4 +406,24 @@ public class MsiEngineTests
         Assert.Equal("yes", A(permissions[0], "GenericAll"));
         Assert.Equal(("yes", "yes", null), (A(permissions[2], "GenericRead"), A(permissions[2], "GenericExecute"), A(permissions[2], "GenericAll")));
     }
+
+    [Fact]
+    public void The_requirement_helpers_search_the_registry_once_and_add_their_conditions()
+    {
+        var workspace = new Wxs.Workspace();
+
+        var wxs = Wxs.Msi(workspace, workspace.App().Appearance(a => a.Classic(InstallerUi.Minimal))
+            .Requirements(r => r.RequiresNetFramework(NetFrameworkVersion.NetFx472).RequiresNetFramework(NetFrameworkVersion.NetFx48).RequiresWebView2()));
+
+        var searches = wxs.All("RegistrySearch").ToList();
+        Assert.Equal(1, searches.Count(s => A(s, "Name") == "Release"));
+        var machine = searches.Single(s => A(s, "Root") == "HKLM" && A(s, "Name") == "pv");
+        Assert.Contains("F3017226-FE2A-4295-8BDF-00C3A9A7E4C5", A(machine, "Key"));
+        Assert.Contains(searches, s => A(s, "Root") == "HKCU" && A(s, "Name") == "pv");
+
+        var conditions = wxs.All("Launch").Select(l => A(l, "Condition")!).ToList();
+        Assert.Contains(conditions, c => c.Contains("#461808"));
+        Assert.Contains(conditions, c => c.Contains("#528040"));
+        Assert.Contains(conditions, c => c.Contains("INSTALLKIT_WEBVIEW2 <>"));
+    }
 }
