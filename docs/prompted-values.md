@@ -10,7 +10,7 @@ MsiBuilder.Create("My App")
     .Machine(m => m.XmlValue("MyApp.exe.config", "/configuration/appSettings/add[@key='Server']/@value", "[SERVER]"));
 ```
 
-The default UI (and the other modern UIs) shows a settings page after the welcome page with a labelled input box for each value (at most three). The default fills the box, a **required** value keeps Next or Install disabled while the box is empty, and the page is followed by the feature page when the product has optional features.
+The default UI (and the other modern UIs) shows a settings page after the welcome page with the install folder (when the UI offers it) and a labelled input box for each value (at most three). The default fills the box, a **required** value keeps Next or Install disabled while the box is empty, and the page is followed by the feature page when the product has optional features.
 
 - **Silent installs and the command line:** nothing is asked; `SERVER=prod` on the command line wins over the default, otherwise the default is used.
 - **Where the value goes:** it is an ordinary MSI property, so `[SERVER]` works in XML values and run commands, and an install event reads it with `e["SERVER"]` (list it in `OnAfterInstall(handler, "SERVER")`).

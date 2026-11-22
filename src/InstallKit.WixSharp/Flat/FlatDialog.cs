@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,7 +24,7 @@ namespace InstallKit.WixSharp.Flat
         public const string Text = "IK_FLAT_TEXT";
         public const string Light = "IK_FLAT_LIGHT";
 
-        /// <summary>The pages after the welcome page of an install: <c>settings</c> and/or <c>features</c>.</summary>
+        /// <summary>The pages after the welcome page of an install: <c>settings</c> (install folder and prompted values) and/or <c>features</c>.</summary>
         public const string Pages = "IK_FLAT_PAGES";
 
         /// <summary>The prompted values: <c>PROPERTY|escaped label|required</c>, separated by <c>;</c>.</summary>
@@ -121,7 +122,8 @@ namespace InstallKit.WixSharp.Flat
             get
             {
                 var pages = Session.Property(FlatKeys.Pages);
-                return string.IsNullOrEmpty(pages) ? new string[0] : pages.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+                // "-" means none (an MSI property cannot be empty).
+                return string.IsNullOrEmpty(pages) ? new string[0] : pages.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Where(page => page != "-").ToArray();
             }
         }
 

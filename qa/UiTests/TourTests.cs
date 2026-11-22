@@ -26,11 +26,15 @@ public class TourTests
         using var product = new InstalledProduct(output);
         using var setup = SetupSession.Start(output, "tour-install");
 
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Install to"));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"));
         setup.Show("install-1-welcome");
 
+        // The QA demo has a license: Next waits for the accept box, which sits above the text.
+        Assert.False(setup.IsEnabled("Next"), "Next must wait for the license to be accepted.");
+        setup.Check("accept");
+        setup.Show("install-1b-license-accepted");
         setup.Click("Next");
-        setup.WaitForPage("settings", p => p.HasText("Region"));
+        setup.WaitForPage("settings", p => p.HasText("Region") && p.HasText("Install to"));
         setup.Show("install-2-settings");
 
         setup.Click("Next");
@@ -64,7 +68,7 @@ public class TourTests
         using var product = new InstalledProduct(output);
         using var setup = SetupSession.Start(output, "tour-interrupted");
 
-        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Install to"));
+        setup.WaitForPage("welcome", p => p.HasButton("Next") && p.HasText("Setup will install") && p.HasText("accept"));
         setup.Click("Cancel");
         setup.WaitForPage("cancel question", p => p.HasButton("Yes"));
         setup.Click("Yes");
