@@ -71,7 +71,7 @@ AI coding agents: see the [InstallKit skill](skills/installkit/SKILL.md).
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for what is planned now, later and in the future, and what is not planned.
+Planned work is tracked in the [open issues](https://github.com/lucavoit/InstallKit/issues) and their milestones.
 
 ## License
 

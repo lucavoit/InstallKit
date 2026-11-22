@@ -47,7 +47,7 @@ Technical documentation, one topic per page. Every page has previous/next links;
 - [Contributing](contributing.md): Issues, pull requests and unit tests.
 - [QA](qa.md): End-to-end and UI tests.
 
-Also: [Roadmap](../ROADMAP.md) · [AI skill](../skills/installkit/SKILL.md) (for coding agents)
+Also: [Open issues](https://github.com/lucavoit/InstallKit/issues) · [AI skill](../skills/installkit/SKILL.md) (for coding agents)
 
 ## Using the AI skill
 
