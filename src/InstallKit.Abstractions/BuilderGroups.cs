@@ -10,6 +10,7 @@ using System;
 //       .Appearance(a => a.Modern().AccentColor("#3B82F6"))
 //       .Machine(m => m.PathEntry("[INSTALLDIR]bin").Service("App.exe", "App"))
 //       .Shell(s => s.FileAssociation(".app", "App file"))
+//       .Requirements(r => r.Requires64Bit().RequiresWindows(19041))
 //       .Lifecycle(l => l.CloseApplication("App.exe").OnAfterInstall(Setup.Configure))
 //       .Settings(s => s.Property("MODE", "client"));
 //
@@ -183,6 +184,13 @@ namespace InstallKit
             return this;
         }
 
+        /// <inheritdoc cref="MsiDefinition.AddDataFolder"/>
+        public MachineBuilder DataFolder(Environment.SpecialFolder root, string path, Action<DataFolderBuilder>? configure = null)
+        {
+            _msi.AddDataFolder(root, path, configure);
+            return this;
+        }
+
         /// <inheritdoc cref="MsiDefinition.AddFolderPermission"/>
         public MachineBuilder FolderPermission(string account, FolderRights rights, string? folder = null)
         {
@@ -265,10 +273,17 @@ namespace InstallKit
             return this;
         }
 
-        /// <inheritdoc cref="MsiDefinition.OnAfterInstall"/>
+        /// <inheritdoc cref="MsiDefinition.OnAfterInstall(Action{InstallEvent}, string[])"/>
         public LifecycleBuilder OnAfterInstall(Action<InstallEvent> handler, params string[] usesProperties)
         {
             _msi.AddOnAfterInstall(handler, usesProperties);
+            return this;
+        }
+
+        /// <inheritdoc cref="MsiDefinition.OnAfterInstall(Action{InstallEvent}, InstallFailureMode, string[])"/>
+        public LifecycleBuilder OnAfterInstall(Action<InstallEvent> handler, InstallFailureMode failureMode, params string[] usesProperties)
+        {
+            _msi.AddOnAfterInstall(handler, failureMode, usesProperties);
             return this;
         }
 
@@ -283,6 +298,63 @@ namespace InstallKit
         public LifecycleBuilder RunBeforeUninstall(string path, string? arguments = null, Action<RunCommand>? configure = null)
         {
             _msi.AddRunBeforeUninstall(path, arguments, configure);
+            return this;
+        }
+    }
+
+    /// <summary>What the target machine must have. Used by <see cref="MsiBuilder.Requirements"/>.</summary>
+    public sealed class RequirementsBuilder
+    {
+        readonly MsiBuilder _msi;
+
+        internal RequirementsBuilder(MsiBuilder msi) => _msi = msi;
+
+        /// <inheritdoc cref="MsiDefinition.AddLaunchCondition"/>
+        public RequirementsBuilder LaunchCondition(string condition, string message)
+        {
+            _msi.AddLaunchCondition(condition, message);
+            return this;
+        }
+
+        /// <summary>
+        /// Requires a .NET Framework 4.x version (read from the registry). Not checked when the product is already installed.
+        /// </summary>
+        public RequirementsBuilder RequiresNetFramework(NetFrameworkVersion version, string? message = null)
+        {
+            _msi.AddPropertySearch(RequirementConditions.NetFrameworkSearch());
+            _msi.AddLaunchCondition(RequirementConditions.NetFrameworkCondition(version),
+                message ?? LaunchConditionDefaults.NetFrameworkMessage(RequirementConditions.NetFrameworkName(version), _msi.Name.Value));
+            return this;
+        }
+
+        /// <summary>
+        /// Requires the Microsoft Edge WebView2 Runtime, installed for the machine or for the user. Not checked when the product is already installed.
+        /// To install it with the product, chain it in a bundle with <c>Prerequisites(p => p.WebView2(...))</c>.
+        /// </summary>
+        public RequirementsBuilder RequiresWebView2(string? message = null)
+        {
+            foreach (var search in RequirementConditions.WebView2Searches())
+                _msi.AddPropertySearch(search);
+            _msi.AddLaunchCondition(RequirementConditions.WebView2Condition(),
+                message ?? $"{_msi.Name.Value} needs the Microsoft Edge WebView2 Runtime. Install it from https://developer.microsoft.com/microsoft-edge/webview2 and run the setup again.");
+            return this;
+        }
+
+        /// <summary>Requires 64-bit Windows. Not checked when the product is already installed, so it can still be removed.</summary>
+        public RequirementsBuilder Requires64Bit(string? message = null)
+        {
+            _msi.AddLaunchCondition(LaunchConditionDefaults.UnlessInstalled("VersionNT64"), message ?? "This product needs a 64-bit version of Windows.");
+            return this;
+        }
+
+        /// <summary>
+        /// Requires at least this Windows build number (for example <c>19041</c> for Windows 10 2004, <c>22000</c> for Windows 11).
+        /// Not checked when the product is already installed, so it can still be removed.
+        /// </summary>
+        public RequirementsBuilder RequiresWindows(int minimumBuild, string? message = null)
+        {
+            _msi.AddLaunchCondition(LaunchConditionDefaults.UnlessInstalled($"WindowsBuild >= {minimumBuild}"),
+                message ?? $"This product needs Windows build {minimumBuild} or later. Update Windows and run the setup again.");
             return this;
         }
     }

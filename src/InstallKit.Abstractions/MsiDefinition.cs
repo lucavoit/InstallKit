@@ -70,7 +70,7 @@ namespace InstallKit
         /// <summary>Accent colour, logo and dialog images.</summary>
         public Branding Branding { get; set; } = new Branding();
 
-        /// <summary>Code that runs on the target machine during the install. See <see cref="OnAfterInstall"/>.</summary>
+        /// <summary>Code that runs on the target machine during the install. See <see cref="OnAfterInstall(Action{InstallEvent}, string[])"/>.</summary>
         public IList<InstallEventHandler> EventHandlers { get; set; } = new List<InstallEventHandler>();
 
         /// <summary>Programs run during the install. See <see cref="RunAfterInstall"/>.</summary>
@@ -95,6 +95,9 @@ namespace InstallKit
         /// <summary>Values set in installed XML files. See <see cref="AddXmlValue"/>.</summary>
         public IList<XmlValue> XmlValues { get; set; } = new List<XmlValue>();
 
+        /// <summary>Conditions the target machine must meet. See <see cref="AddLaunchCondition"/>.</summary>
+        public IList<LaunchConditionEntry> LaunchConditions { get; set; } = new List<LaunchConditionEntry>();
+
         /// <summary>Programs that are closed (and optionally ended) while installing. See <see cref="AddCloseApplication"/>.</summary>
         public IList<CloseApplicationRule> CloseApplications { get; set; } = new List<CloseApplicationRule>();
 
@@ -103,6 +106,12 @@ namespace InstallKit
 
         /// <summary>Access granted to accounts on folders of the product. See <see cref="AddFolderPermission"/>.</summary>
         public IList<FolderPermission> FolderPermissions { get; set; } = new List<FolderPermission>();
+
+        /// <summary>Registry values read into properties for launch conditions. Filled by the <see cref="RequirementsBuilder"/> helpers.</summary>
+        public IList<RegistryPropertySearch> PropertySearches { get; set; } = new List<RegistryPropertySearch>();
+
+        /// <summary>Machine-wide data folders the MSI creates. See <see cref="AddDataFolder"/>.</summary>
+        public IList<DataFolder> DataFolders { get; set; } = new List<DataFolder>();
 
         /// <summary>Values the modern setup dialogs ask the user for. See <see cref="AddPromptedProperty"/>.</summary>
         public IList<PromptedProperty> PromptedProperties { get; set; } = new List<PromptedProperty>();
@@ -158,6 +167,18 @@ namespace InstallKit
         /// <param name="usesProperties">MSI properties the handler reads; only these are available at this stage.</param>
         public MsiDefinition OnAfterInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
             On(InstallStage.AfterInstall, handler, usesProperties);
+
+        /// <summary>
+        /// Runs after files are copied, elevated, like <see cref="OnAfterInstall(Action{InstallEvent}, string[])"/>, with a choice of what a failure does.
+        /// </summary>
+        /// <param name="handler">A static method passed as a method group; it runs on the target machine.</param>
+        /// <param name="failureMode"><see cref="InstallFailureMode.Rollback"/> (default) fails the install; <see cref="InstallFailureMode.Warn"/> only logs.</param>
+        /// <param name="usesProperties">MSI properties the handler reads; only these are available at this stage.</param>
+        public MsiDefinition OnAfterInstall(Action<InstallEvent> handler, InstallFailureMode failureMode, params string[] usesProperties)
+        {
+            EventHandlers.Add(new InstallEventHandler(InstallStage.AfterInstall, handler, usesProperties, failureMode));
+            return this;
+        }
 
         /// <summary>Runs a program after files are installed (fresh install or upgrade).</summary>
         /// <param name="path">Relative to the install directory, or an MSI formatted path.</param>
@@ -286,6 +307,34 @@ namespace InstallKit
         public MsiDefinition AddXmlValue(string file, string xpath, string value)
         {
             XmlValues.Add(new XmlValue(file, xpath, value));
+            return this;
+        }
+
+        /// <summary>
+        /// Creates a machine-wide folder outside the install directory (for example below <c>%ProgramData%</c>) with the given access.
+        /// The folder is created by the MSI, before any install event handler or service runs.
+        /// </summary>
+        /// <param name="root">The well-known folder the path is below: <see cref="Environment.SpecialFolder.CommonApplicationData"/>.</param>
+        /// <param name="path">The folder below <paramref name="root"/>, for example <c>Contoso\My App</c>.</param>
+        /// <param name="configure">Who gets which access.</param>
+        public MsiDefinition AddDataFolder(Environment.SpecialFolder root, string path, Action<DataFolderBuilder>? configure = null)
+        {
+            var folder = new DataFolder(root, path);
+            configure?.Invoke(new DataFolderBuilder(folder));
+            DataFolders.Add(folder);
+            return this;
+        }
+
+        /// <summary>
+        /// Requires a condition of the target machine. When it is false the setup shows <paramref name="message"/> and stops.
+        /// The condition is checked on uninstall and repair too, so combine it with <c>Installed OR (...)</c> when a product that is
+        /// already installed must stay removable.
+        /// </summary>
+        /// <param name="condition">An MSI condition such as <c>VersionNT64</c> or <c>WindowsBuild &gt;= 19041</c>.</param>
+        /// <param name="message">What the user sees when the condition is false.</param>
+        public MsiDefinition AddLaunchCondition(string condition, string message)
+        {
+            LaunchConditions.Add(new LaunchConditionEntry(condition, message));
             return this;
         }
 

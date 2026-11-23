@@ -105,7 +105,7 @@ return InstallerHost.Run(args, plan =>
     $env:CONSUMER_PAYLOAD_DIR = $payload
     $out = Join-Path $work 'out'
     Run 'Build the consumer installer' {
-        dotnet build $project -c Release -p:InstallKitVersion=1.2.3 "-p:InstallKitOutputDir=$out\"
+        dotnet build $project -c Release -p:InstallKitBuildOnBuild=true -p:InstallKitVersion=1.2.3 "-p:InstallKitOutputDir=$out\"
     }
 }
 finally {

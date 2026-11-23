@@ -18,6 +18,9 @@ namespace InstallKit.Generators
     [Generator(LanguageNames.CSharp)]
     public sealed class InstallActionGenerator : IIncrementalGenerator
     {
+        /// <summary>Name of the generated immediate action that records the feature states (scheduled by the engines).</summary>
+        internal const string CaptureFeaturesAction = "InstallKit_CaptureFeatures";
+
         internal const string SessionType = "WixToolset.Dtf.WindowsInstaller.Session";
         static readonly string[] Stages = { "OnLoad", "OnBeforeInstall", "OnAfterInstall" };
         static readonly string[] Owners = { "InstallKit.LifecycleBuilder", "InstallKit.MsiDefinition" };
@@ -185,6 +188,11 @@ namespace InstallKit.Generators
                 code.AppendLine();
             }
 
+            code.AppendLine("        /// <summary>Records the feature states for <c>InstallEvent.IsFeatureSelected</c>.</summary>");
+            code.AppendLine("        [global::WixToolset.Dtf.WindowsInstaller.CustomAction]");
+            code.AppendLine("        public static global::WixToolset.Dtf.WindowsInstaller.ActionResult " + CaptureFeaturesAction + "(global::WixToolset.Dtf.WindowsInstaller.Session session)");
+            code.AppendLine("            => global::InstallKit.Generated.SessionInstallEvent.CaptureFeatures(session);");
+            code.AppendLine();
             code.AppendLine("    }");
             code.AppendLine("}");
             return code.ToString();
@@ -222,6 +230,56 @@ namespace InstallKit.Generated
 
         public override bool IsRepairing => Get(""Installed"") != null && Get(""REINSTALL"") == ""ALL"";
 
+        public override bool IsChange => Get(""Installed"") != null && !IsUninstalling && !IsUpgrading && Get(""REINSTALL"") == null;
+
+        public override string? ProductVersion => Get(""ProductVersion"");
+
+        public override string? InstallingUserName => Get(""LogonUser"");
+
+        public override string? InstallingUserSid => Get(""UserSID"");
+
+        public override bool IsFeatureSelected(string feature) => FeatureState(feature, 1);
+
+        public override bool WasFeatureSelected(string feature) => FeatureState(feature, 0);
+
+        // INSTALLKIT_FEATURES is written by the capture action below: ""Id:before:after;..."" with 1 for installed locally.
+        bool FeatureState(string feature, int column)
+        {
+            var id = global::InstallKit.OptionalFeature.IdOf(feature);
+            foreach (var entry in (Get(""INSTALLKIT_FEATURES"") ?? string.Empty).Split(';'))
+            {
+                var parts = entry.Split(':');
+                if (parts.Length == 3 && string.Equals(parts[0], id, global::System.StringComparison.OrdinalIgnoreCase))
+                    return parts[column + 1] == ""1"";
+            }
+
+            return false;
+        }
+
+        /// <summary>Immediate action after CostFinalize: records, for every feature, whether it is installed now and whether it will be.</summary>
+        public static ActionResult CaptureFeatures(Session session)
+        {
+            try
+            {
+                var parts = new global::System.Collections.Generic.List<string>();
+                foreach (var feature in session.Features)
+                {
+                    var before = feature.CurrentState == InstallState.Local;
+                    var request = feature.RequestState;
+                    var after = request == InstallState.Unknown || request == InstallState.NotUsed ? before : request == InstallState.Local;
+                    parts.Add(feature.Name + "":"" + (before ? ""1"" : ""0"") + "":"" + (after ? ""1"" : ""0""));
+                }
+
+                session[""INSTALLKIT_FEATURES""] = string.Join("";"", parts);
+            }
+            catch (global::System.Exception ex)
+            {
+                session.Log(""InstallKit: could not read the feature states: "" + ex.Message);
+            }
+
+            return ActionResult.Success;
+        }
+
         public override bool IsUiSuppressed => int.TryParse(Get(""UILevel""), out var level) && level <= 4;
 
         public override string? InstallDir => Get(""INSTALLDIR"");
@@ -241,6 +299,26 @@ namespace InstallKit.Generated
             return string.IsNullOrEmpty(value) ? null : value;
         }
 
+        static void ShowError(Session session, string? message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+
+            try
+            {
+                using (var record = new Record(1))
+                {
+                    record.FormatString = ""[1]"";
+                    record[1] = message;
+                    session.Message(InstallMessage.Error, record);
+                }
+            }
+            catch (global::System.Exception ex)
+            {
+                session.Log(""InstallKit: could not show the message: "" + ex.Message);
+            }
+        }
+
         public static ActionResult Run(Session session, global::InstallKit.InstallStage stage, global::System.Action<global::InstallKit.InstallEvent> handler)
         {
             var installEvent = new SessionInstallEvent(session, stage);
@@ -251,12 +329,14 @@ namespace InstallKit.Generated
             catch (global::System.Exception ex)
             {
                 session.Log(""InstallKit: "" + stage + "" handler failed: "" + ex);
+                ShowError(session, ""The setup could not finish: "" + ex.Message);
                 return ActionResult.Failure;
             }
 
             if (installEvent.IsCanceled)
             {
-                session.Log(""InstallKit: "" + stage + "" handler cancelled the install: "" + installEvent.CancelReason);
+                session.Log(""InstallKit: "" + stage + "" handler failed the install: "" + installEvent.CancelReason);
+                ShowError(session, installEvent.CancelReason);
                 return ActionResult.Failure;
             }
 

@@ -22,7 +22,8 @@ namespace InstallKit.WixSharp
         const string InstallDirId = "INSTALLDIR";
 
         /// <summary>Properties every elevated (deferred) handler can read, on top of the ones it lists.</summary>
-        const string DeferredBaseProperties = "INSTALLDIR,UILevel,Installed,REMOVE,REINSTALL,UPGRADINGPRODUCTCODE,WIX_UPGRADE_DETECTED";
+        // What InstallEvent reads in the deferred (elevated) handler: the install state, the version, the installing user and the feature states.
+        const string DeferredBaseProperties = "INSTALLDIR,UILevel,Installed,REMOVE,REINSTALL,UPGRADINGPRODUCTCODE,WIX_UPGRADE_DETECTED,ProductVersion,LogonUser,UserSID,INSTALLKIT_FEATURES";
 
 #if INSTALLKIT_CORE
         public string Name => "WixSharp.Core";
@@ -60,6 +61,7 @@ namespace InstallKit.WixSharp
             if (msi.Features.Count > 0 && msi.Ui != InstallerUi.FeatureTree && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir && msi.Ui != InstallerUi.ModernFlat)
                 Console.WriteLine($"InstallKit : warning IK246: MSI '{msi.Name}' has optional features, which users can only choose in the FeatureTree and Modern UIs or with ADDLOCAL and REMOVE on the command line. Set Ui = InstallerUi.Modern or InstallerUi.FeatureTree to show them.");
             var entities = new List<WixEntity> { installDir };
+            entities.AddRange(msi.DataFolders.Select(f => BuildFolder($@"%{f.RootDirectoryId}%\{f.Path}", new WixEntity[0], f.Access.Select(ToDirPermission).ToArray())));
             entities.AddRange(msi.ResolvedRegistryEntries.Select(ToRegValue));
             entities.AddRange(msi.CloseApplications.Select(ToCloseApplication));
             entities.AddRange(BuildShortcutDirs(msi));
@@ -94,6 +96,16 @@ namespace InstallKit.WixSharp
             // A property that the user can set in a dialog has to be secure, or the elevated install would ignore the value.
             project.Properties = msi.Properties.Select(p => new Property(p.Key, p.Value))
                 .Concat(msi.PromptedProperties.Select(ToPromptedProperty)).ToArray();
+#if !INSTALLKIT_CORE
+            // The flat/WPF dialogs and the managed install events run on the .NET Framework of the target machine.
+            if (isWpf || isFlat || installActions.Count > 0)
+                AddNetFrameworkCondition(project, msi);
+#endif
+            foreach (var search in msi.PropertySearches)
+                AddRegistryPropertySearch(project, search);
+            foreach (var launch in msi.LaunchConditions)
+                project.LaunchConditions.Add(new global::WixSharp.LaunchCondition(launch.Condition, launch.Message));
+
             if (msi.PromptedProperties.Count > 0 && msi.Ui != InstallerUi.Modern && msi.Ui != InstallerUi.ModernInstallDir && msi.Ui != InstallerUi.ModernFlat)
                 Console.WriteLine($"InstallKit : warning IK285: MSI '{msi.Name}' has prompted properties, which only the modern UIs ask for. With {msi.Ui} they keep their defaults unless given on the command line.");
 
@@ -381,7 +393,7 @@ namespace InstallKit.WixSharp
                 ManagedAction action = elevated ? new ElevatedManagedAction(generated.ActionName) : new ManagedAction(generated.ActionName);
 
                 action.ActionAssembly = generated.Assembly.Location;
-                action.Return = Return.check;
+                action.Return = handler.FailureMode == InstallFailureMode.Warn ? Return.ignore : Return.check;
                 action.Condition = Condition.Always;
 
                 switch (handler.Stage)
@@ -402,6 +414,21 @@ namespace InstallKit.WixSharp
                 }
 
                 yield return (action, generated.Assembly.Location);
+            }
+
+            // The deferred handlers cannot ask Windows Installer about features, so an immediate action records their states.
+            var afterInstall = msi.EventHandlers.FirstOrDefault(h => h.Stage == InstallStage.AfterInstall);
+            if (afterInstall != null)
+            {
+                var generated = GeneratedInstallActions.Find(afterInstall)!.Value;
+                yield return (new ManagedAction(GeneratedInstallActions.CaptureFeaturesAction)
+                {
+                    ActionAssembly = generated.Assembly.Location,
+                    Return = Return.ignore,
+                    When = When.After,
+                    Step = Step.CostFinalize,
+                    Condition = Condition.Always,
+                }, generated.Assembly.Location);
             }
         }
 
@@ -759,6 +786,28 @@ namespace InstallKit.WixSharp
             if (!(result is PackageGroupRef))
                 result.Vital = item.Vital;
             return result;
+        }
+
+        /// <summary>Stops the setup with a clear message when .NET Framework 4.8 is missing, instead of failing obscurely.</summary>
+        internal static void AddNetFrameworkCondition(Project project, MsiDefinition msi)
+        {
+            AddRegistryPropertySearch(project, RequirementConditions.NetFrameworkSearch());
+            project.LaunchConditions.Add(new global::WixSharp.LaunchCondition(
+                RequirementConditions.NetFrameworkCondition(NetFrameworkVersion.NetFx48),
+                LaunchConditionDefaults.NetFramework48Message(msi.Name)));
+        }
+
+        /// <summary>Reads a registry value into a property for a launch condition. A property that is already searched is left alone.</summary>
+        internal static void AddRegistryPropertySearch(Project project, RegistryPropertySearch search)
+        {
+            if (project.Properties.Any(p => p.Name == search.Property))
+                return;
+
+            var hive = search.Hive == InstallKit.RegistryHive.CurrentUser ? global::WixSharp.RegistryHive.CurrentUser : global::WixSharp.RegistryHive.LocalMachine;
+            project.Properties = project.Properties.Concat(new[]
+            {
+                new Property(search.Property, new RegistrySearch(hive, search.Key, search.ValueName, RegistrySearchType.raw) { Win64 = search.Win64 }),
+            }).ToArray();
         }
 
         static void ConfigureToolset(InstallerContext context)

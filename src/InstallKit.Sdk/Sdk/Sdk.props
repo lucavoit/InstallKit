@@ -14,17 +14,22 @@
     <IsPublishable>false</IsPublishable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
 
-    <!-- Build the installer on every build. Turn off for fast inner-loop builds of the solution. -->
-    <InstallKitBuildOnBuild Condition="'$(InstallKitBuildOnBuild)' == ''">true</InstallKitBuildOnBuild>
+    <!-- Opt in to building the MSI/bundle on every build: set true in the project, or pass -p:InstallKitBuildOnBuild=true in the pipeline.
+         Off by default, so a plain `dotnet build` of a solution does not publish payloads or need Windows. -->
+    <InstallKitBuildOnBuild Condition="'$(InstallKitBuildOnBuild)' == ''">false</InstallKitBuildOnBuild>
+    <!-- Optional: path of the tool manifest that pins wix (default: .config/dotnet-tools.json, or dotnet-tools.json above the project). -->
+    <InstallKitToolManifest Condition="'$(InstallKitToolManifest)' == ''"></InstallKitToolManifest>
+    <!-- Set true to hide the information about the WiX 6 Open Source Maintenance Fee EULA. -->
+    <InstallKitSuppressWixNotice Condition="'$(InstallKitSuppressWixNotice)' == ''">false</InstallKitSuppressWixNotice>
     <!-- Restore the pinned wix tool from .config/dotnet-tools.json before building. -->
     <InstallKitRestoreTools Condition="'$(InstallKitRestoreTools)' == ''">true</InstallKitRestoreTools>
     <!-- Keep the generated WiX source (.wxs) in obj/ for review and debugging. -->
     <InstallKitEmitSource Condition="'$(InstallKitEmitSource)' == ''">true</InstallKitEmitSource>
-    <!-- Optional: command run per file, {file} is the path. See README "Signing". -->
+    <!-- Optional: command run per file, {file} is the path. See docs/signing.md. -->
     <InstallKitSignCommand Condition="'$(InstallKitSignCommand)' == ''"></InstallKitSignCommand>
     <!-- Compile your own WPF dialogs (XAML) for the modern UI. -->
     <InstallKitUseWpf Condition="'$(InstallKitUseWpf)' == ''">false</InstallKitUseWpf>
-    <!-- WiX 7+ only: the EULA you accept, e.g. wix7. Read the README "WiX version and licence" first. -->
+    <!-- WiX 7+ only: the EULA you accept, e.g. wix7. Read docs/wix-licence.md first. -->
     <InstallKitAcceptWixEula Condition="'$(InstallKitAcceptWixEula)' == ''"></InstallKitAcceptWixEula>
   </PropertyGroup>
 </Project>

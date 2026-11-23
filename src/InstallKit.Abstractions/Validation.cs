@@ -91,6 +91,8 @@ namespace InstallKit
                 CheckFirewall(errors, msi, context, label);
                 CheckXmlValues(errors, msi, context, label);
                 CheckCloseApplications(errors, msi, label);
+                CheckLaunchConditions(errors, msi, label);
+                CheckDataFolders(errors, msi, label);
                 CheckFolderPermissions(errors, msi, label);
                 CheckPrompts(errors, msi, label);
 
@@ -327,6 +329,44 @@ namespace InstallKit
                     errors.Add(new ValidationError("IK221", $"{label}: the XPath '{edit.XPath}' for '{edit.File}' is not valid, for example /configuration/appSettings/add[@key='Server']/@value."));
                 else if (edit.Value == null)
                     errors.Add(new ValidationError("IK223", $"{label}: the {what} has no value."));
+            }
+        }
+
+        static void CheckDataFolders(List<ValidationError> errors, MsiDefinition msi, string label)
+        {
+            var seenFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var folder in msi.DataFolders)
+            {
+                if (folder.Root != Environment.SpecialFolder.CommonApplicationData)
+                    errors.Add(new ValidationError("IK330", $"{label}: a data folder below {folder.Root} is not supported. Use SpecialFolder.CommonApplicationData (%ProgramData%)."));
+
+                if (!folder.HasValidPath)
+                    errors.Add(new ValidationError("IK331", $"{label}: '{folder.Path}' is not a folder path below %ProgramData%. Use a relative path such as Contoso\\My App, without '..', a drive, wildcards or MSI properties."));
+                else if (!seenFolders.Add(folder.Path))
+                    errors.Add(new ValidationError("IK335", $"{label} declares the data folder '{folder.Path}' more than once."));
+
+                if (folder.Access.Count == 0)
+                    errors.Add(new ValidationError("IK332", $"{label}: the data folder '{folder.Path}' gives nobody access. Add Allow(\"SYSTEM\", FolderRights.FullControl) and the accounts that need it."));
+
+                var accounts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var access in folder.Access)
+                {
+                    if (string.IsNullOrWhiteSpace(access.Account))
+                        errors.Add(new ValidationError("IK333", $"{label}: an entry of the data folder '{folder.Path}' has no account. Use a name such as Users or a DOMAIN\\name."));
+                    else if (!accounts.Add(access.Account))
+                        errors.Add(new ValidationError("IK334", $"{label} gives '{access.Account}' rights on the data folder '{folder.Path}' more than once."));
+                }
+            }
+        }
+
+        static void CheckLaunchConditions(List<ValidationError> errors, MsiDefinition msi, string label)
+        {
+            foreach (var entry in msi.LaunchConditions)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Condition))
+                    errors.Add(new ValidationError("IK320", $"{label}: a launch condition has no condition. Pass an MSI condition such as VersionNT64."));
+                if (string.IsNullOrWhiteSpace(entry.Message))
+                    errors.Add(new ValidationError("IK321", $"{label}: the launch condition '{entry.Condition}' has no message. Tell the user what is missing."));
             }
         }
 

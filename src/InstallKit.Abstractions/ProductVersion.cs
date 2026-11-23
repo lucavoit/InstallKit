@@ -8,6 +8,20 @@ namespace InstallKit
     public static class ProductVersion
     {
         /// <summary>
+        /// The pre-release or build metadata suffix of a version (<c>-rc1</c>, <c>+sha</c>) that <see cref="TryParse"/> drops,
+        /// or <c>null</c> when there is none.
+        /// </summary>
+        public static string? GetDroppedSuffix(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            var text = value!.Trim();
+            var cut = text.IndexOfAny(new[] { '-', '+' });
+            return cut >= 0 && cut < text.Length - 1 ? text.Substring(cut) : null;
+        }
+
+        /// <summary>
         /// Parses and validates a version. Pre-release and build metadata suffixes are dropped.
         /// MSI only compares the first three fields: major and minor must be at most 255, build at most 65535.
         /// </summary>

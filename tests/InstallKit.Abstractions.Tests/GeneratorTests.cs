@@ -17,14 +17,31 @@ public class GeneratorTests
         {
             public enum ActionResult { Success, Failure }
             public enum InstallRunMode { Scheduled }
+            public enum InstallState { NotUsed = -7, Unknown = -1, Absent = 2, Local = 3 }
+            public enum InstallMessage { Error = 0x01000000 }
+            public sealed class Record : System.IDisposable
+            {
+                public Record(int fieldCount) { }
+                public string FormatString { get; set; } = "";
+                public string this[int field] { set { } }
+                public void Dispose() { }
+            }
+            public sealed class FeatureInfo
+            {
+                public string Name { get; } = "";
+                public InstallState CurrentState { get; }
+                public InstallState RequestState { get; }
+            }
             public sealed class CustomActionAttribute : System.Attribute { }
             public sealed class CustomActionData : System.Collections.Generic.Dictionary<string, string> { }
             public class Session
             {
-                public string this[string name] => "";
+                public string this[string name] { get => ""; set { } }
                 public CustomActionData CustomActionData { get; } = new CustomActionData();
                 public bool GetMode(InstallRunMode mode) => false;
                 public void Log(string message) { }
+                public System.Collections.Generic.IEnumerable<FeatureInfo> Features => new FeatureInfo[0];
+                public void Message(InstallMessage kind, Record record) { }
             }
         }
         """;
@@ -88,6 +105,26 @@ public class GeneratorTests
         Assert.Contains("\"App.Setup+Nested.Check\"", generated);
         Assert.Contains(InstallActionGenerator.ActionName("AfterInstall", "App.Setup.Configure"), generated);
         Assert.Contains(InstallActionGenerator.ActionName("Load", "App.Setup.Configure"), generated);
+    }
+
+    [Fact]
+    public void The_adapter_exposes_the_install_state_features_and_user_and_shows_failures()
+    {
+        var (output, _) = Run("""
+            using InstallKit;
+            public static class Setup
+            {
+                public static void Configure(InstallEvent e) { }
+                static void Define() => MsiBuilder.Create("App").Lifecycle(l => l.OnAfterInstall(Configure, InstallFailureMode.Warn));
+            }
+            """);
+
+        Assert.Empty(output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        var generated = string.Join("\n", output.SyntaxTrees.Select(t => t.ToString()));
+        foreach (var expected in new[] { "IsChange", "ProductVersion", "InstallingUserSid", "UserSID", "LogonUser", "IsFeatureSelected", "WasFeatureSelected", "INSTALLKIT_FEATURES", "ShowError" })
+            Assert.Contains(expected, generated);
+        // The entry point the engine schedules after CostFinalize.
+        Assert.Contains("public static global::WixToolset.Dtf.WindowsInstaller.ActionResult " + GeneratedInstallActions.CaptureFeaturesAction, generated);
     }
 
     [Theory]

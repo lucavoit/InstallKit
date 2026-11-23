@@ -32,12 +32,20 @@
     <InstallKitPayloadManifest>$(InstallKitIntermediateDir)payloads.txt</InstallKitPayloadManifest>
     <InstallKitOutputsFile>$(InstallKitIntermediateDir)outputs.txt</InstallKitOutputsFile>
 
-    <!-- Pinned wix version from the nearest .config/dotnet-tools.json (WixSharp only finds the tool through that layout). -->
-    <_InstallKitToolRoot>$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildProjectDirectory)', '.config\dotnet-tools.json'))</_InstallKitToolRoot>
-    <_InstallKitToolManifest Condition="'$(_InstallKitToolRoot)' != ''">$(_InstallKitToolRoot)\.config\dotnet-tools.json</_InstallKitToolManifest>
+    <!-- The tool manifest that pins wix: InstallKitToolManifest, else the nearest .config/dotnet-tools.json (the layout WixSharp
+         expects), else a dotnet-tools.json in a parent folder (the .NET 10 SDK's default). The version is read in a target
+         (InstallKitResolveWix) with a real JSON parser. -->
+    <_InstallKitToolRoot>$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildProjectDirectory)', '.config/dotnet-tools.json'))</_InstallKitToolRoot>
+    <_InstallKitToolManifest Condition="'$(_InstallKitToolRoot)' != ''">$(_InstallKitToolRoot)/.config/dotnet-tools.json</_InstallKitToolManifest>
     <_InstallKitRootManifestDir>$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildProjectDirectory)', 'dotnet-tools.json'))</_InstallKitRootManifestDir>
-    <InstallKitWixVersion Condition="'$(InstallKitWixVersion)' == '' and '$(_InstallKitToolManifest)' != ''">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(_InstallKitToolManifest)')), '"wix"\s*:\s*\{[^}]*?"version"\s*:\s*"([^"]+)"').Groups[1].Value)</InstallKitWixVersion>
-    <_InstallKitWixMajor Condition="'$(InstallKitWixVersion)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(InstallKitWixVersion)', '^\d+').Value)</_InstallKitWixMajor>
+    <_InstallKitCustomManifest Condition="'$(InstallKitToolManifest)' != ''">$([System.IO.Path]::GetFullPath('$(InstallKitToolManifest)', '$(MSBuildProjectDirectory)'))</_InstallKitCustomManifest>
+    <_InstallKitToolManifest Condition="'$(_InstallKitCustomManifest)' != ''">$(_InstallKitCustomManifest)</_InstallKitToolManifest>
+    <_InstallKitCustomDir Condition="'$(_InstallKitCustomManifest)' != ''">$([System.IO.Path]::GetDirectoryName('$(_InstallKitCustomManifest)'))</_InstallKitCustomDir>
+    <_InstallKitCustomDirName Condition="'$(_InstallKitCustomDir)' != ''">$([System.IO.Path]::GetFileName('$(_InstallKitCustomDir)'))</_InstallKitCustomDirName>
+    <_InstallKitToolRoot Condition="'$(_InstallKitCustomDir)' != '' and '$(_InstallKitCustomDirName)' == '.config'">$([System.IO.Path]::GetDirectoryName('$(_InstallKitCustomDir)'))</_InstallKitToolRoot>
+    <_InstallKitToolRoot Condition="'$(_InstallKitCustomDir)' != '' and '$(_InstallKitCustomDirName)' != '.config'">$(_InstallKitCustomDir)</_InstallKitToolRoot>
+    <_InstallKitToolRoot Condition="'$(_InstallKitToolManifest)' == '' and '$(_InstallKitRootManifestDir)' != ''">$(_InstallKitRootManifestDir)</_InstallKitToolRoot>
+    <_InstallKitToolManifest Condition="'$(_InstallKitToolManifest)' == '' and '$(_InstallKitRootManifestDir)' != ''">$(_InstallKitRootManifestDir)/dotnet-tools.json</_InstallKitToolManifest>
   </PropertyGroup>
 
   <!-- Engine wiring: package (default) or project references when developing InstallKit itself. -->
@@ -75,12 +83,197 @@
     </InstallerPayload>
   </ItemDefinitionGroup>
 
-  <Target Name="InstallKitRestoreTools" Condition="'$(InstallKitRestoreTools)' == 'true'">
-    <Warning Code="IK002" Condition="'$(_InstallKitToolManifest)' == '' and '$(_InstallKitRootManifestDir)' == ''"
-             Text="No .config/dotnet-tools.json with a pinned wix version was found. Run 'dotnet new tool-manifest' and 'dotnet tool install wix --version 6.0.2' at the repository root, and keep the manifest at .config/dotnet-tools.json." />
-    <Warning Code="IK002" Condition="'$(_InstallKitToolManifest)' == '' and '$(_InstallKitRootManifestDir)' != ''"
-             Text="Found '$(_InstallKitRootManifestDir)\dotnet-tools.json' (the .NET 10 SDK's 'dotnet new tool-manifest' puts it in the root), but InstallKit needs the manifest at '.config/dotnet-tools.json'. Move it there." />
-    <Exec Command="dotnet tool restore" WorkingDirectory="$(_InstallKitToolRoot)" Condition="'$(_InstallKitToolManifest)' != ''" StandardOutputImportance="low" />
+  <!-- Reads the pinned version of a tool from a tool manifest with a small JSON reader (any layout and whitespace, comments and trailing
+       commas allowed), instead of a regular expression. It has no dependencies, so it works in `dotnet build` and in Visual Studio. -->
+  <UsingTask TaskName="InstallKitReadToolVersion" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ManifestPath ParameterType="System.String" Required="true" />
+      <ToolName ParameterType="System.String" Required="true" />
+      <ToolVersion ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Class" Language="cs"><![CDATA[
+        using System;
+        using System.Collections.Generic;
+        using System.IO;
+        using System.Text;
+
+        public class InstallKitReadToolVersion : Microsoft.Build.Utilities.Task
+        {
+            public string ManifestPath { get; set; }
+            public string ToolName { get; set; }
+            [Microsoft.Build.Framework.Output]
+            public string ToolVersion { get; set; }
+
+            string text;
+            int pos;
+
+            public override bool Execute()
+            {
+                ToolVersion = "";
+                try
+                {
+                    text = File.ReadAllText(ManifestPath);
+                    pos = 0;
+                    var root = ReadValue() as Dictionary<string, object>;
+                    object tools;
+                    if (root != null && root.TryGetValue("tools", out tools) && tools is Dictionary<string, object>)
+                    {
+                        foreach (var tool in (Dictionary<string, object>)tools)
+                        {
+                            var entry = tool.Value as Dictionary<string, object>;
+                            object version;
+                            if (string.Equals(tool.Key, ToolName, StringComparison.OrdinalIgnoreCase) && entry != null
+                                && entry.TryGetValue("version", out version) && version is string)
+                            {
+                                ToolVersion = (string)version;
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.LogWarning("InstallKit: could not read '" + ManifestPath + "': " + ex.Message);
+                }
+                return true;
+            }
+
+            void Skip()
+            {
+                while (pos < text.Length)
+                {
+                    if (char.IsWhiteSpace(text[pos])) pos++;
+                    else if (text[pos] == '/' && pos + 1 < text.Length && text[pos + 1] == '/')
+                    {
+                        while (pos < text.Length && text[pos] != '\n') pos++;
+                    }
+                    else if (text[pos] == '/' && pos + 1 < text.Length && text[pos + 1] == '*')
+                    {
+                        var end = text.IndexOf("*/", pos + 2, StringComparison.Ordinal);
+                        pos = end < 0 ? text.Length : end + 2;
+                    }
+                    else break;
+                }
+            }
+
+            object ReadValue()
+            {
+                Skip();
+                if (pos >= text.Length) throw new FormatException("unexpected end of file");
+                var c = text[pos];
+                if (c == '{')
+                {
+                    pos++;
+                    var map = new Dictionary<string, object>(StringComparer.Ordinal);
+                    while (true)
+                    {
+                        Skip();
+                        if (pos < text.Length && text[pos] == '}') { pos++; return map; }
+                        var key = ReadString();
+                        Skip();
+                        if (pos >= text.Length || text[pos] != ':') throw new FormatException("expected ':' at position " + pos);
+                        pos++;
+                        map[key] = ReadValue();
+                        Skip();
+                        if (pos < text.Length && text[pos] == ',') pos++;
+                        else if (pos < text.Length && text[pos] == '}') { pos++; return map; }
+                        else throw new FormatException("expected ',' or '}' at position " + pos);
+                    }
+                }
+                if (c == '[')
+                {
+                    pos++;
+                    var list = new List<object>();
+                    while (true)
+                    {
+                        Skip();
+                        if (pos < text.Length && text[pos] == ']') { pos++; return list; }
+                        list.Add(ReadValue());
+                        Skip();
+                        if (pos < text.Length && text[pos] == ',') pos++;
+                        else if (pos < text.Length && text[pos] == ']') { pos++; return list; }
+                        else throw new FormatException("expected ',' or ']' at position " + pos);
+                    }
+                }
+                if (c == '"') return ReadString();
+                var start = pos;
+                while (pos < text.Length && ",}] \t\r\n/".IndexOf(text[pos]) < 0) pos++;
+                return text.Substring(start, pos - start);
+            }
+
+            string ReadString()
+            {
+                Skip();
+                if (pos >= text.Length || text[pos] != '"') throw new FormatException("expected a string at position " + pos);
+                pos++;
+                var sb = new StringBuilder();
+                while (pos < text.Length && text[pos] != '"')
+                {
+                    if (text[pos] == '\\' && pos + 1 < text.Length)
+                    {
+                        pos++;
+                        var e = text[pos];
+                        if (e == 'u' && pos + 4 < text.Length) { sb.Append((char)Convert.ToInt32(text.Substring(pos + 1, 4), 16)); pos += 4; }
+                        else sb.Append(e == 'n' ? '\n' : e == 't' ? '\t' : e == 'r' ? '\r' : e);
+                    }
+                    else sb.Append(text[pos]);
+                    pos++;
+                }
+                if (pos >= text.Length) throw new FormatException("unterminated string");
+                pos++;
+                return sb.ToString();
+            }
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="_InstallKitCheckManifest">
+    <Warning Code="IK002" Condition="'$(_InstallKitToolManifest)' == ''"
+             Text="No tool manifest with a pinned wix version was found. Run 'dotnet new tool-manifest' and 'dotnet tool install wix --version 6.0.2' at the repository root (or set InstallKitToolManifest)." />
+    <Warning Code="IK002" Condition="'$(_InstallKitToolManifest)' != '' and '$(InstallKitToolManifest)' == '' and '$(_InstallKitRootManifestDir)' != '' and !Exists('$(_InstallKitToolRoot)/.config/dotnet-tools.json')"
+             Text="Using '$(_InstallKitToolManifest)' (the .NET 10 SDK's 'dotnet new tool-manifest' puts it in the root). WixSharp finds the wix tool through '.config/dotnet-tools.json', so if the build cannot find wix, move the manifest there or set InstallKitToolManifest." />
+    <Warning Code="IK002" Condition="'$(InstallKitToolManifest)' != '' and !Exists('$(_InstallKitToolManifest)')"
+             Text="InstallKitToolManifest '$(InstallKitToolManifest)' does not exist." />
+  </Target>
+
+  <!-- Finds the pinned wix version. InstallKitWixVersion can also be set directly. -->
+  <Target Name="InstallKitResolveWix" DependsOnTargets="_InstallKitCheckManifest">
+    <InstallKitReadToolVersion ManifestPath="$(_InstallKitToolManifest)" ToolName="wix"
+                               Condition="'$(InstallKitWixVersion)' == '' and '$(_InstallKitToolManifest)' != '' and Exists('$(_InstallKitToolManifest)')">
+      <Output TaskParameter="ToolVersion" PropertyName="InstallKitWixVersion" />
+    </InstallKitReadToolVersion>
+    <PropertyGroup>
+      <_InstallKitWixMajor Condition="'$(InstallKitWixVersion)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(InstallKitWixVersion)', '^\d+').Value)</_InstallKitWixMajor>
+    </PropertyGroup>
+  </Target>
+
+  <!-- Restores the tools once per manifest change: skipped while the stamp file is newer than the manifest. -->
+  <Target Name="_InstallKitRestoreToolsOnce"
+          Inputs="$(_InstallKitToolManifest)"
+          Outputs="$(InstallKitIntermediateDir)toolrestore.stamp"
+          Condition="'$(_InstallKitToolManifest)' != '' and Exists('$(_InstallKitToolManifest)')">
+    <Exec Command="dotnet tool restore" WorkingDirectory="$(_InstallKitToolRoot)" StandardOutputImportance="low" />
+    <MakeDir Directories="$(InstallKitIntermediateDir)" />
+    <Touch Files="$(InstallKitIntermediateDir)toolrestore.stamp" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="InstallKitRestoreTools" Condition="'$(InstallKitRestoreTools)' == 'true'" DependsOnTargets="InstallKitResolveWix;_InstallKitRestoreToolsOnce" />
+
+  <!-- Fails early, before payloads are published, when the version cannot be an MSI version (major, minor up to 255, build up to 65535). -->
+  <Target Name="_InstallKitCheckVersion">
+    <PropertyGroup>
+      <_IkVersionMatch>$([System.Text.RegularExpressions.Regex]::Match('$(InstallKitVersion)', '^v?(\d{1,15})(?:\.(\d{1,15}))?(?:\.(\d{1,15}))?'))</_IkVersionMatch>
+      <_IkMajor Condition="'$(_IkVersionMatch)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(_IkVersionMatch)', '^v?(\d+)').Groups[1].Value)</_IkMajor>
+      <_IkMinor Condition="'$(_IkVersionMatch)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(_IkVersionMatch)', '^v?\d+\.(\d+)').Groups[1].Value)</_IkMinor>
+      <_IkBuild Condition="'$(_IkVersionMatch)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(_IkVersionMatch)', '^v?\d+\.\d+\.(\d+)').Groups[1].Value)</_IkBuild>
+      <_IkMajor Condition="'$(_IkMajor)' == ''">0</_IkMajor>
+      <_IkMinor Condition="'$(_IkMinor)' == ''">0</_IkMinor>
+      <_IkBuild Condition="'$(_IkBuild)' == ''">0</_IkBuild>
+    </PropertyGroup>
+    <Error Code="IK311" Condition="'$(_IkVersionMatch)' != '' and ($(_IkMajor) &gt; 255 or $(_IkMinor) &gt; 255 or $(_IkBuild) &gt; 65535)"
+           Text="The version '$(InstallKitVersion)' does not fit an MSI version: major and minor can be at most 255 and the build number at most 65535 (here $(_IkMajor).$(_IkMinor).$(_IkBuild)). A counter such as a pipeline build id or a date such as 20241114 can exceed that. Keep the counter in the revision field (1.2.0.123, which MSI ignores when comparing) and bump the build number with each release, or fold the counter into the minor and build fields." />
   </Target>
 
   <Target Name="InstallKitPublishPayloads">
@@ -116,14 +309,17 @@
   <Target Name="InstallKitBuild"
           AfterTargets="Build"
           Condition="'$(InstallKitBuildOnBuild)' == 'true' and '$(DesignTimeBuild)' != 'true'"
-          DependsOnTargets="InstallKitRestoreTools;InstallKitPublishPayloads">
+          DependsOnTargets="_InstallKitCheckVersion;InstallKitRestoreTools;InstallKitPublishPayloads">
 
     <Error Code="IK003" Condition="'$(OS)' != 'Windows_NT'"
-           Text="Building MSIs needs Windows (WiX and the WixSharp engine run on .NET Framework). Build on a Windows machine or agent, or set InstallKitBuildOnBuild=false." />
+           Text="Building MSIs needs Windows (WiX and the WixSharp engine run on .NET Framework). Build on a Windows machine or agent, or do not enable InstallKitBuildOnBuild on this machine." />
 
     <Error Code="IK004"
            Condition="'$(_InstallKitWixMajor)' != '' and $(_InstallKitWixMajor) &gt;= 7 and '$(InstallKitAcceptWixEula)' == ''"
            Text="WiX $(InstallKitWixVersion) requires accepting its Open Source Maintenance Fee EULA (https://wixtoolset.org/osmf/). If it applies to you and you accept it, set &lt;InstallKitAcceptWixEula&gt;wix$(_InstallKitWixMajor)&lt;/InstallKitAcceptWixEula&gt;. Otherwise pin wix 6.0.2 or 5.0.2 in .config/dotnet-tools.json." />
+
+    <Message Importance="high" Condition="'$(_InstallKitWixMajor)' == '6' and '$(InstallKitSuppressWixNotice)' != 'true'"
+             Text="InstallKit: WiX $(InstallKitWixVersion) binaries are released under the Open Source Maintenance Fee EULA (https://wixtoolset.org/osmf/): a fee is owed by users who generate revenue with WiX. To use MS-RL licensed binaries pin wix 5.0.2 (best-effort tested). Hide this message with InstallKitSuppressWixNotice=true." />
 
     <Delete Files="$(InstallKitOutputsFile)" />
 

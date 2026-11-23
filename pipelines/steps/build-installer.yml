@@ -28,6 +28,7 @@ steps:
       arguments: >-
         -c ${{ parameters.configuration }}
         -p:Version=${{ parameters.version }}
+        -p:InstallKitBuildOnBuild=true
         "-p:InstallKitOutputDir=${{ parameters.outputDirectory }}/"
         ${{ parameters.extraArguments }}
     env:

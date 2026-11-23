@@ -75,6 +75,13 @@ namespace InstallKit
             return this;
         }
 
+        /// <summary>What the target machine must have: Windows version, 64-bit Windows, or any MSI condition.</summary>
+        public MsiBuilder Requirements(Action<RequirementsBuilder> configure)
+        {
+            configure(new RequirementsBuilder(this));
+            return this;
+        }
+
         /// <summary>MSI properties: fixed values, and values the modern dialogs ask the user for.</summary>
         public MsiBuilder Settings(Action<SettingsBuilder> configure)
         {
@@ -166,6 +173,30 @@ namespace InstallKit
         internal MsiBuilder AddCloseApplication(string processName, bool terminate = false, int timeoutSeconds = 5)
         {
             ListOf(CloseApplications, WithCloseApplications).Add(new CloseApplicationRule(processName, terminate, timeoutSeconds));
+            return this;
+        }
+
+        /// <inheritdoc cref="MsiDefinition.AddLaunchCondition"/>
+        internal MsiBuilder AddLaunchCondition(string condition, string message)
+        {
+            ListOf(LaunchConditions, WithLaunchConditions).Add(new LaunchConditionEntry(condition, message));
+            return this;
+        }
+
+        internal MsiBuilder AddPropertySearch(RegistryPropertySearch search)
+        {
+            var searches = ListOf(PropertySearches, WithPropertySearches);
+            if (!System.Linq.Enumerable.Any(searches, s => s.Property == search.Property))
+                searches.Add(search);
+            return this;
+        }
+
+        /// <inheritdoc cref="MsiDefinition.AddDataFolder"/>
+        internal MsiBuilder AddDataFolder(Environment.SpecialFolder root, string path, Action<DataFolderBuilder>? configure = null)
+        {
+            var folder = new DataFolder(root, path);
+            configure?.Invoke(new DataFolderBuilder(folder));
+            ListOf(DataFolders, WithDataFolders).Add(folder);
             return this;
         }
 
@@ -264,9 +295,16 @@ namespace InstallKit
         internal MsiBuilder AddOnBeforeInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
             AddHandler(InstallStage.BeforeInstall, handler, usesProperties);
 
-        /// <inheritdoc cref="MsiDefinition.OnAfterInstall"/>
+        /// <inheritdoc cref="MsiDefinition.OnAfterInstall(Action{InstallEvent}, string[])"/>
         internal MsiBuilder AddOnAfterInstall(Action<InstallEvent> handler, params string[] usesProperties) =>
             AddHandler(InstallStage.AfterInstall, handler, usesProperties);
+
+        /// <inheritdoc cref="MsiDefinition.OnAfterInstall(Action{InstallEvent}, InstallFailureMode, string[])"/>
+        internal MsiBuilder AddOnAfterInstall(Action<InstallEvent> handler, InstallFailureMode failureMode, params string[] usesProperties)
+        {
+            ListOf(EventHandlers, WithEventHandlers).Add(new InstallEventHandler(InstallStage.AfterInstall, handler, usesProperties, failureMode));
+            return this;
+        }
 
         /// <inheritdoc cref="MsiDefinition.RunAfterInstall"/>
         internal MsiBuilder AddRunAfterInstall(string path, string? arguments = null, Action<RunCommand>? configure = null) =>

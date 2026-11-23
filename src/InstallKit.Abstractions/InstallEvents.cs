@@ -35,6 +35,42 @@ namespace InstallKit
 
         public abstract bool IsRepairing { get; }
 
+        /// <summary>A first install of the product: not an upgrade, a repair, a change or an uninstall.</summary>
+        public virtual bool IsFreshInstall => IsInstalling && !IsUpgrading;
+
+        /// <summary>
+        /// The installed product is being changed (for example optional features added or removed with Change, or
+        /// <c>ADDLOCAL</c>/<c>REMOVE</c> on the command line): not a repair, an upgrade or an uninstall.
+        /// </summary>
+        public virtual bool IsChange => false;
+
+        /// <summary>The version of the MSI that is being installed (for example <c>1.2.3.0</c>), when known.</summary>
+        public virtual string? ProductVersion => null;
+
+        /// <summary>
+        /// Whether the optional feature (the name given to <c>Feature(...)</c>) is installed once this install is done:
+        /// ticked in a fresh install, kept or added in a change, and false after it is removed or the product is uninstalled.
+        /// </summary>
+        public virtual bool IsFeatureSelected(string feature) => false;
+
+        /// <summary>Whether the optional feature was installed before this install started. Compare with <see cref="IsFeatureSelected"/> to see what a change adds or removes.</summary>
+        public virtual bool WasFeatureSelected(string feature) => false;
+
+        /// <summary>
+        /// The Windows user name of the account that runs the setup (MSI's <c>LogonUser</c>), or <c>null</c> when unknown.
+        /// When a standard user is elevated with another administrator's credentials this is the administrator, not the person at the keyboard.
+        /// </summary>
+        public virtual string? InstallingUserName => null;
+
+        /// <summary>The SID of the account that runs the setup (MSI's <c>UserSID</c>), or <c>null</c> when unknown.</summary>
+        public virtual string? InstallingUserSid => null;
+
+        /// <summary>
+        /// The setup runs as <c>LocalSystem</c> (a deployment tool such as SCCM or Intune), so there is no interactive user to configure:
+        /// <see cref="InstallingUserSid"/> is <c>S-1-5-18</c>.
+        /// </summary>
+        public virtual bool IsInstalledBySystem => InstallingUserSid == "S-1-5-18";
+
         /// <summary>The install runs without UI (for example <c>msiexec /qn</c>).</summary>
         public abstract bool IsUiSuppressed { get; }
 
@@ -50,29 +86,50 @@ namespace InstallKit
         /// <summary>Writes to the MSI log (<c>msiexec /l*v</c>).</summary>
         public abstract void Log(string message);
 
-        /// <summary>Fails the install and rolls it back.</summary>
+        /// <summary>Fails the install and rolls it back. The reason is written to the log and shown to the user.</summary>
         public void Cancel(string? reason = null)
         {
             IsCanceled = true;
             CancelReason = reason;
         }
 
+        /// <summary>
+        /// Fails the install and rolls it back, with a message the user sees (in the setup dialog, or as the error of a silent install in
+        /// the log) and that is written to the MSI log. Same as <see cref="Cancel"/>, and usable in every stage.
+        /// </summary>
+        public void Fail(string message) => Cancel(message);
+
         public bool IsCanceled { get; private set; }
 
         public string? CancelReason { get; private set; }
     }
 
-    /// <summary>A handler registered with <see cref="MsiDefinition.OnAfterInstall"/> and friends.</summary>
+    /// <summary>What happens when an install event handler throws or calls <see cref="InstallEvent.Fail"/>.</summary>
+    public enum InstallFailureMode
+    {
+        /// <summary>The install fails and is rolled back. The default.</summary>
+        Rollback,
+
+        /// <summary>The problem is written to the MSI log and the install carries on. For advisory work such as optional configuration.</summary>
+        Warn,
+    }
+
+    /// <summary>A handler registered with <see cref="MsiDefinition.OnAfterInstall(Action{InstallEvent}, string[])"/> and friends.</summary>
     public sealed class InstallEventHandler
     {
-        public InstallEventHandler(InstallStage stage, Action<InstallEvent> handler, IEnumerable<string>? usesProperties = null)
+        public InstallEventHandler(InstallStage stage, Action<InstallEvent> handler, IEnumerable<string>? usesProperties = null,
+            InstallFailureMode failureMode = InstallFailureMode.Rollback)
         {
+            FailureMode = failureMode;
             Stage = stage;
             Handler = handler ?? throw new ArgumentNullException(nameof(handler));
             UsesProperties = (usesProperties ?? Enumerable.Empty<string>()).Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim()).ToArray();
         }
 
         public InstallStage Stage { get; }
+
+        /// <summary>Whether a failure of this handler rolls the install back or is only logged.</summary>
+        public InstallFailureMode FailureMode { get; }
 
         /// <summary>
         /// Runs on the target machine, not during the build. It must be a static method passed as a

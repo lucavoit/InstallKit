@@ -30,4 +30,32 @@ public class ProductVersionTests
         Assert.False(ProductVersion.TryParse(input, out _, out var error));
         Assert.False(string.IsNullOrEmpty(error));
     }
+
+    [Theory]
+    [InlineData("1.2.3", null)]
+    [InlineData("v1.2.3", null)]
+    [InlineData("1.2.3-rc1", "-rc1")]
+    [InlineData("1.2.3-beta.4+sha", "-beta.4+sha")]
+    [InlineData("1.2.3+build5", "+build5")]
+    [InlineData("1.2.3-", null)]
+    [InlineData("", null)]
+    public void Reports_the_suffix_that_is_dropped(string input, string? expected)
+        => Assert.Equal(expected, ProductVersion.GetDroppedSuffix(input));
+
+    [Fact]
+    public void Context_warns_and_keeps_the_suffix_when_it_is_dropped()
+    {
+        var output = new System.IO.StringWriter();
+        var original = Console.Out;
+        Console.SetOut(output);
+        try
+        {
+            var context = InstallerContext.FromEnvironment(new[] { "--version", "1.2.3-rc1" });
+            Assert.Equal("-rc1", context.VersionSuffix);
+            Assert.Equal(new Version(1, 2, 3, 0), context.Version);
+        }
+        finally { Console.SetOut(original); }
+
+        Assert.Contains("IK310", output.ToString());
+    }
 }

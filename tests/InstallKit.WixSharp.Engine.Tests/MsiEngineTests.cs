@@ -351,4 +351,79 @@ public class MsiEngineTests
         Assert.DoesNotContain(A(wxs.One("ServiceInstall").Parent!, "Id"), elsewhere);
         Assert.DoesNotContain(A(wxs.One("XmlFile").Parent!, "Id"), elsewhere);
     }
+
+    [Fact]
+    public void Launch_conditions_are_written_with_their_messages()
+    {
+        var workspace = new Wxs.Workspace();
+
+        var wxs = Wxs.Msi(workspace, workspace.App().Appearance(a => a.Classic(InstallerUi.Minimal))
+            .Requirements(r => r.Requires64Bit().RequiresWindows(19041).LaunchCondition("MYPROP = 1", "Set MYPROP.")));
+
+        var launches = wxs.All("Launch").ToList();
+        Assert.Contains(launches, l => A(l, "Condition") == "Installed OR (VersionNT64)");
+        Assert.Contains(launches, l => A(l, "Condition") == "Installed OR (WindowsBuild >= 19041)");
+        Assert.Contains(launches, l => A(l, "Condition") == "MYPROP = 1" && A(l, "Message") == "Set MYPROP.");
+        // The classic UI needs no .NET Framework, so nothing is added on its own.
+        Assert.DoesNotContain(launches, l => (A(l, "Condition") ?? "").Contains("INSTALLKIT_NETFX_RELEASE"));
+    }
+
+    [Fact]
+    public void The_dotnet_framework_48_condition_checks_the_release_value_and_explains_what_to_do()
+    {
+        var workspace = new Wxs.Workspace();
+        var plan = new InstallerPlan(workspace.Context);
+        var msi = plan.Msi(workspace.App().Appearance(a => a.Classic(InstallerUi.Minimal)));
+        var project = WixSharpEngine.CreateMsiProject(msi, workspace.Context);
+
+        // The engine adds this itself for the flat/WPF dialogs and managed install events (not compiled into this test build).
+        WixSharpEngine.AddNetFrameworkCondition(project, msi);
+        var wxs = System.Xml.Linq.XDocument.Load(project.BuildWxs(global::WixSharp.Compiler.OutputType.MSI, System.IO.Path.Combine(workspace.Root, "netfx.wxs")));
+
+        var launch = wxs.All("Launch").Single(l => (A(l, "Condition") ?? "").Contains("INSTALLKIT_NETFX_RELEASE"));
+        Assert.Equal("Installed OR (INSTALLKIT_NETFX_RELEASE >= \"#528040\")", A(launch, "Condition"));
+        Assert.Contains(".NET Framework 4.8", A(launch, "Message"));
+        var search = wxs.All("RegistrySearch").Single(r => A(r, "Key")!.EndsWith(@"NDP\v4\Full"));
+        Assert.Equal("Release", A(search, "Name"));
+    }
+
+    [Fact]
+    public void A_data_folder_is_created_below_program_data_with_its_access()
+    {
+        var workspace = new Wxs.Workspace();
+
+        var wxs = Wxs.Msi(workspace, workspace.App().Appearance(a => a.Classic(InstallerUi.Minimal))
+            .Machine(m => m.DataFolder(System.Environment.SpecialFolder.CommonApplicationData, @"Contoso\My App", f => f
+                .Allow("SYSTEM", FolderRights.FullControl)
+                .Allow("Administrators", FolderRights.FullControl)
+                .Allow("Users", FolderRights.Read))));
+
+        var root = wxs.All("StandardDirectory").Single(d => A(d, "Id") == "CommonAppDataFolder");
+        var vendor = root.Elements().Single(d => A(d, "Name") == "Contoso");
+        var leaf = vendor.Elements().Single(d => A(d, "Name") == "My App");
+        var permissions = leaf.Descendants().Where(e => e.Name.LocalName == "PermissionEx").ToList();
+        Assert.Equal(new[] { "SYSTEM", "Administrators", "Users" }, permissions.Select(p => A(p, "User")));
+        Assert.Equal("yes", A(permissions[0], "GenericAll"));
+        Assert.Equal(("yes", "yes", null), (A(permissions[2], "GenericRead"), A(permissions[2], "GenericExecute"), A(permissions[2], "GenericAll")));
+    }
+
+    [Fact]
+    public void The_requirement_helpers_search_the_registry_once_and_add_their_conditions()
+    {
+        var workspace = new Wxs.Workspace();
+
+        var wxs = Wxs.Msi(workspace, workspace.App().Appearance(a => a.Classic(InstallerUi.Minimal))
+            .Requirements(r => r.RequiresNetFramework(NetFrameworkVersion.NetFx472).RequiresNetFramework(NetFrameworkVersion.NetFx48).RequiresWebView2()));
+
+        var searches = wxs.All("RegistrySearch").ToList();
+        Assert.Equal(1, searches.Count(s => A(s, "Name") == "Release"));
+        var machine = searches.Single(s => A(s, "Root") == "HKLM" && A(s, "Name") == "pv");
+        Assert.Contains("F3017226-FE2A-4295-8BDF-00C3A9A7E4C5", A(machine, "Key"));
+        Assert.Contains(searches, s => A(s, "Root") == "HKCU" && A(s, "Name") == "pv");
+
+        var conditions = wxs.All("Launch").Select(l => A(l, "Condition")!).ToList();
+        Assert.Contains(conditions, c => c.Contains("#461808"));
+        Assert.Contains(conditions, c => c.Contains("#528040"));
+        Assert.Contains(conditions, c => c.Contains("INSTALLKIT_WEBVIEW2 <>"));
+    }
 }
